@@ -1,0 +1,47 @@
+body{
+    font-size: 12pt;
+    color:#2c558a;
+    background:#fdfeff;
+    width: 75ex;
+    margin:0 auto;
+    font-family: "Helvetica Neue", "Arial", "Helvetica", sans-serif;
+}
+
+a:link, a:visited, a:active, a:hover{
+    text-decoration: none;
+}
+
+a:link, a:visited {
+    color: #3d3dff;
+}
+
+a:hover {
+    color: #622c8c;
+}
+
+a:active {
+    color: #8c2c85;
+}
+
+h1,h2,h3{
+    font-weight:normal;
+    color:#2c558a;
+    letter-spacing:-0.02em;
+}
+
+h1{
+    font-size:2em;
+}
+h2{
+    font-size:1.5em;
+}
+h3{
+    font-weight: bold;
+}
+p{
+    line-height:1.7em;
+    text-align: justify;
+}
+ul li{
+    padding: 0.5em 0em;
+}

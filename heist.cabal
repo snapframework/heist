@@ -1,0 +1,35 @@
+name:           heist
+version:        0.1.1
+synopsis:       An xhtml templating system
+license:        BSD3
+license-file:   LICENSE
+author:         Doug Beardsley, Gregory Collins
+maintainer:     snap@snapframework.com
+build-type:     Simple
+cabal-version:  >= 1.6
+homepage:       http://snapframework.com/
+category:       Web
+
+
+Library
+  hs-source-dirs: src
+
+  exposed-modules:
+    Text.Templating.Heist
+
+  build-depends:
+    base >= 4 && < 5,
+    bytestring,
+    containers,
+    directory-tree,
+    filepath,
+    hexpat >= 0.11,
+    monads-fd,
+    transformers
+
+  ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2
+
+
+source-repository head
+  type:     git
+  location: http://git.snapframework.com/heist
