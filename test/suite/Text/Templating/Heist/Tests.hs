@@ -1,31 +1,12 @@
 {-# LANGUAGE OverloadedStrings, TypeSynonymInstances, GeneralizedNewtypeDeriving #-}
 module Text.Templating.Heist.Tests
   ( tests
-
--- Temporary exports to eliminate warnings
-  , html
-  , hhead
-  , title
-  , body
-  , para
-  , para2
-  , para3
-  , foo
-  , tdoc
-  , _bindPos
-  , _bindRefPos
-  , _bindElemName
-  , _bindChildren
-  , _bindDoc
-  , bindElem
-  , addBind
-  , prn
-  , runTests
-
   ) where
 
-import           Test.Framework (Test, defaultMain)
+import           Test.Framework (Test)
+import           Test.Framework.Providers.HUnit
 import           Test.Framework.Providers.QuickCheck2
+import qualified Test.HUnit as H
 import           Test.QuickCheck
 import           Test.QuickCheck.Gen
 import           Test.QuickCheck.Monadic
@@ -37,6 +18,7 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
+import           Data.Monoid
 
 import           System.IO.Unsafe
 
@@ -47,28 +29,58 @@ import qualified Text.XML.Expat.Tree as X
 
 tests :: [Test]
 tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_simpleBindTest
---        , testProperty "simpleApplyTest" $ monadicIO $ forAllM arbitrary prop_simpleApplyTest
+        , testProperty "simpleApplyTest" $ monadicIO $ forAllM arbitrary prop_simpleApplyTest
+        , testCase "stateMonoidTest" monoidTest
+        , testCase "templateAddTest" addTest
+        , testCase "getDocTest" getDocTest
+        , testCase "loadTest" loadTest
+        , testCase "fsLoadTest" fsLoadTest
         ]
 
-plainElementNames :: [B.ByteString]
-plainElementNames = [ "a"
-                    , "p"
-                    , "b"
-                    , "div"
-                    , "span"
-                    ]
+monoidTest :: IO ()
+monoidTest = do
+  H.assertBool "left monoid identity" $ mempty `mappend` es == es
+  H.assertBool "right monoid identity" $ es `mappend` mempty == es
+  where es = emptyTemplateState :: TemplateState IO
+
+addTest :: IO ()
+addTest = do
+  H.assertBool "lookup test" $ Just [] == lookupTemplate "aoeu" ts
+  H.assertBool "splice touched" $ Map.size (_spliceMap ts) == 0
+  where ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
+
+isLeft :: Either a b -> Bool
+isLeft (Left _) = True
+isLeft (Right _) = False
+
+loadTest :: H.Assertion
+loadTest = do
+  tm <- loadTemplates "templates"
+  print $ Map.size tm
+  H.assertBool "loadTest size" $ Map.size tm == 3
+
+getDocTest :: H.Assertion
+getDocTest = do
+  d <- getDoc "bkteoar"
+  H.assertBool "non-existent doc" $ isLeft d
+  e <- getDoc "templates/noroot.tpl"
+  H.assertBool "doc with no root tag" $ isLeft e
+  f <- getDoc "templates/index.tpl"
+  H.assertBool "index doc" $ not $ isLeft f
+
+fsLoadTest :: H.Assertion
+fsLoadTest = do
+  tm <- loadTemplates "templates"
+  let ts = emptyTemplateState {_templateMap = tm} :: TemplateState IO
+      f p n = H.assertBool ("loading template "++n) $ p $ lookupTemplate (B.pack n) ts
+  f isNothing "abc/def/xyz"
+  f isJust "a"
+  f isJust "bar/a"
 
 identStartChar :: [Char]
 identStartChar = ['a'..'z']
 identChar :: [Char]
 identChar = '_' : identStartChar
-
-newtype HtmlTag = HtmlTag B.ByteString
-instance Show HtmlTag where
-  show (HtmlTag s) = B.unpack s
-
-instance Arbitrary HtmlTag where
-  arbitrary = oneof $ map (return . HtmlTag) plainElementNames
 
 newtype Name = Name { unName :: B.ByteString } deriving (Show)
 
@@ -82,9 +94,9 @@ instance Arbitrary Name where
 instance Arbitrary Node where
   arbitrary = limitedDepth 3
   shrink (X.Text _) = []
-  shrink (X.Element n [] []) = []
-  shrink (X.Element n [] (c:cs)) = [X.Element n [] cs]
-  shrink (X.Element n (a:as) []) = [X.Element n as []]
+  shrink (X.Element _ [] []) = []
+  shrink (X.Element n [] (_:cs)) = [X.Element n [] cs]
+  shrink (X.Element n (_:as) []) = [X.Element n as []]
   shrink (X.Element n as cs) = [X.Element n as (tail cs), X.Element n (tail as) cs]
 
 textGen :: Gen [Char]
@@ -185,9 +197,9 @@ instance Arbitrary Bind where
     loc <- choose (0, s-1)
     loc2 <- choose (0, s-loc-1)
     return $ Bind name kids doc loc loc2
-  shrink (Bind e [c] [d] p r) = []
-  shrink (Bind e [c] (d:ds) p r) = [Bind e [c] ds p r]
-  shrink (Bind e (c:cs) d p r) = [Bind e cs d p r]
+  shrink (Bind e [c] (_:ds) p r) = [Bind e [c] ds p r]
+  shrink (Bind e (_:cs) d p r) = [Bind e cs d p r]
+  shrink _ = []
 
 empty :: tag -> X.Node tag text
 empty n = X.Element n [] []
@@ -236,13 +248,16 @@ buildApplyCaller :: Apply -> [Node]
 buildApplyCaller (Apply name caller _ kids pos) =
   insertAt [X.Element "apply" [("template", unName name)] kids] pos caller
 
+calcCorrect :: Apply -> [Node]
 calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
+
+calcResult :: (Monad m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
   runTemplate ts $ buildApplyCaller apply
   where ts = emptyTemplateState { _templateMap = Map.singleton [unName name] callee }
 
 prop_simpleApplyTest :: Apply -> PropertyM IO ()
-prop_simpleApplyTest apply@(Apply name caller callee _ _) = do
+prop_simpleApplyTest apply = do
   let correct = calcCorrect apply
   result <- run $ calcResult apply
   assert $ correct == result
@@ -252,36 +267,36 @@ prop_simpleApplyTest apply@(Apply name caller callee _ _) = do
  - Convenience code for manual ghci experimentation
  -}
 
-html :: [Node] -> Node
-html c = X.Element "html" [] [hhead, body c]
-hhead :: Node
-hhead = X.Element "head" [] [title, X.Element "script" [] []]
-title :: Node
-title = X.Element "title" [] [X.Text "Test Page"]
-body :: [Node] -> Node
-body = X.Element "body" []
-
-para :: Int -> Node
-para n = X.Element "p" [] [X.Text $ B.pack $ "This is paragraph " ++ show n]
-para2 :: B.ByteString -> Node
-para2 c = X.Element "p" [] [X.Text c]
-para3 :: Node
-para3 = X.Element "p" [] [X.Text "AHA!"]
-
-foo :: Int -> [Node]
-foo n = insertAt [X.Element "NEW" [] []] n [html [para 1, para 2]]
-
-tdoc :: [Node]
-tdoc = [para 1, para 2, para 3, para 4]
-
-bindElem :: [Node] -> Int -> Int -> Bind
-bindElem = Bind (Name "mytag") [para2 "bound paragraph"]
-
-addBind :: Bind -> [Node] -> [Node]
-addBind b = insertAt [buildBind b] 0 . insertAt [empty $ unName $ _bindElemName b] 2
-
-prn :: Node -> IO ()
-prn = L.putStrLn . formatNode
-runTests :: IO ()
-runTests = defaultMain tests
+--html :: [Node] -> Node
+--html c = X.Element "html" [] [hhead, body c]
+--hhead :: Node
+--hhead = X.Element "head" [] [title, X.Element "script" [] []]
+--title :: Node
+--title = X.Element "title" [] [X.Text "Test Page"]
+--body :: [Node] -> Node
+--body = X.Element "body" []
+--
+--para :: Int -> Node
+--para n = X.Element "p" [] [X.Text $ B.pack $ "This is paragraph " ++ show n]
+--para2 :: B.ByteString -> Node
+--para2 c = X.Element "p" [] [X.Text c]
+--para3 :: Node
+--para3 = X.Element "p" [] [X.Text "AHA!"]
+--
+--foo :: Int -> [Node]
+--foo n = insertAt [X.Element "NEW" [] []] n [html [para 1, para 2]]
+--
+--tdoc :: [Node]
+--tdoc = [para 1, para 2, para 3, para 4]
+--
+--bindElem :: [Node] -> Int -> Int -> Bind
+--bindElem = Bind (Name "mytag") [para2 "bound paragraph"]
+--
+--addBind :: Bind -> [Node] -> [Node]
+--addBind b = insertAt [buildBind b] 0 . insertAt [empty $ unName $ _bindElemName b] 2
+--
+--prn :: Node -> IO ()
+--prn = L.putStrLn . formatNode
+--runTests :: IO ()
+--runTests = defaultMain tests
 

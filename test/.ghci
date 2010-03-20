@@ -1,0 +1,4 @@
+:set -XOverloadedStrings
+:set -Wall
+:set -i../src
+:set -isuite
