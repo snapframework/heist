@@ -8,14 +8,12 @@ import           Test.Framework.Providers.HUnit
 import           Test.Framework.Providers.QuickCheck2
 import qualified Test.HUnit as H
 import           Test.QuickCheck
-import           Test.QuickCheck.Gen
 import           Test.QuickCheck.Monadic
 
 import           Control.Monad.State
 
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
-import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -45,7 +43,7 @@ monoidTest = do
 
 addTest :: IO ()
 addTest = do
-  H.assertBool "lookup test" $ Just [] == lookupTemplate "aoeu" ts
+  H.assertBool "lookup test" $ Just [] == (fmap fst $ lookupTemplate "aoeu" ts)
   H.assertBool "splice touched" $ Map.size (_spliceMap ts) == 0
   where ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
 
@@ -55,7 +53,7 @@ isLeft (Right _) = False
 
 loadTest :: H.Assertion
 loadTest = do
-  tm <- loadTemplates "templates"
+  tm <- liftM _templateMap $ (loadTemplates "templates" :: IO (TemplateState IO))
   print $ Map.size tm
   H.assertBool "loadTest size" $ Map.size tm == 3
 
@@ -70,7 +68,7 @@ getDocTest = do
 
 fsLoadTest :: H.Assertion
 fsLoadTest = do
-  tm <- loadTemplates "templates"
+  tm <- liftM _templateMap $ (loadTemplates "templates" :: IO (TemplateState IO))
   let ts = emptyTemplateState {_templateMap = tm} :: TemplateState IO
       f p n = H.assertBool ("loading template "++n) $ p $ lookupTemplate (B.pack n) ts
   f isNothing "abc/def/xyz"

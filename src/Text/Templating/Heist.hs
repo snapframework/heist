@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving, TupleSections #-}
 
 {-|
 
@@ -161,12 +161,13 @@ data TemplateState m = TemplateState {
   , _templateMap :: TemplateMap
   -- | A flag to control splice recursion
   , _recurse     :: Bool
---  , _curContext  :: TPath
+  , _curContext  :: TPath
 }
 
 instance Eq (TemplateState m) where
   a == b = (_recurse a == _recurse b) &&
-           (_templateMap a == _templateMap b)
+           (_templateMap a == _templateMap b) &&
+           (_curContext a == _curContext b)
 
 -- | 'TemplateMonad' is a monad transformer that gives you access to the 'Node'
 --   being processed (using the 'MonadReader' instance) as well as holding the
@@ -182,10 +183,10 @@ type Splice m = TemplateMonad m [Node]
 type SpliceMap m = Map ByteString (Splice m)
 
 instance Monoid (TemplateState m) where
-    mempty = TemplateState Map.empty Map.empty True -- [] []
+    mempty = TemplateState Map.empty Map.empty True []
 
-    (TemplateState s1 t1 r1) `mappend` (TemplateState s2 t2 r2) =
-        TemplateState s t r 
+    (TemplateState s1 t1 r1 c1) `mappend` (TemplateState s2 t2 r2 c2) =
+        TemplateState s t r c2
       where
         s = s1 `mappend` s2
         t = t1 `mappend` t2
@@ -198,7 +199,7 @@ instance Monoid (TemplateState m) where
 -- | An empty template state, with Heist's default splices (@\<bind\>@ and
 -- @\<apply\>@) mapped.
 emptyTemplateState :: Monad m => TemplateState m
-emptyTemplateState = TemplateState defaultSpliceMap Map.empty True
+emptyTemplateState = TemplateState defaultSpliceMap Map.empty True []
 
 -- | Bind a new splice declaration to a tag name within a 'TemplateState'.
 bindSplice :: Monad m =>
@@ -221,15 +222,17 @@ splitPaths = reverse . B.split '/'
   Searches for a template by looking in the full path then backing up into each
   of the parent directories until the template is found.
 -}
-traversePath :: TemplateMap -> TPath -> ByteString -> Maybe Template
-traversePath tm [] name = Map.lookup [name] tm
+traversePath :: TemplateMap -> TPath -> ByteString -> Maybe (Template, TPath)
+traversePath tm [] name = fmap (,[]) (Map.lookup [name] tm)
 traversePath tm path name =
   --trace ("traversePath "++(B.unpack name)++" "++(show path)++" returned "++(show $ Map.lookup (name:path) tm))
-  (Map.lookup (name:path) tm) `mplus` traversePath tm (tail path) name
+  (fmap (,path) $ Map.lookup (name:path) tm) `mplus` traversePath tm (tail path) name
 
 -- |Convenience function for looking up a template.
-lookupTemplate :: Monad m => ByteString -> TemplateState m -> Maybe Template
-lookupTemplate nameStr ts = traversePath (_templateMap ts) path name
+lookupTemplate :: Monad m => ByteString -> TemplateState m -> Maybe (Template, TPath)
+lookupTemplate nameStr ts = 
+  trace ("lookup "++(B.unpack nameStr)++" with "++(show $ _curContext ts)) $
+  traversePath (_templateMap ts) (path++(_curContext ts)) name
   where (name:path) = splitPaths nameStr
 
 -- |Adds a template to the template state.
@@ -248,6 +251,14 @@ getParamNode = ask
 stopRecursion :: Monad m => TemplateMonad m ()
 stopRecursion = modify (\st -> st { _recurse = False })
 
+-- | Sets the current context
+setContext :: Monad m => TPath -> TemplateMonad m ()
+setContext c = modify (\st -> st { _curContext = c })
+
+-- | Sets the current context
+getContext :: Monad m => TemplateMonad m TPath
+getContext = gets _curContext
+  
 -- |Performs splice processing on a list of nodes.
 runNodeList :: Monad m => [Node] -> Splice m
 runNodeList nodes = liftM concat $ sequence (map runNode nodes)
@@ -292,6 +303,14 @@ runSplice ts node (TemplateMonad splice) = do
 -}
 runTemplate :: Monad m => TemplateState m -> Template -> m [Node]
 runTemplate ts template = runSplice ts (X.Text "") (runNodeList template)
+
+nameContext = tail . splitPaths
+
+runTemplateByName :: Monad m => TemplateState m -> ByteString -> m [Node]
+runTemplateByName ts name = do
+  let mt = lookupTemplate name ts
+  maybe (return []) (\(t,ctx) -> runTemplate (ts {_curContext = ctx}) t) mt
+--  runTemplate (ts {_curContext = ctx}) $ maybe [] id t
 
 -- |Runs a template with an empty TemplateState.
 runBareTemplate :: Monad m => Template -> m [Node]
@@ -342,15 +361,19 @@ applyImpl = do
     Nothing   -> return [] -- TODO: error handling
     Just attr -> do 
       st <- get
-      let template = lookupTemplate attr st
-      modify $ \s -> s { _spliceMap = defaultSpliceMap }
+      let template = lookupTemplate attr (st {_curContext = nextCtx attr st})
+      put $ st { _spliceMap = defaultSpliceMap }
       processedChildren <- runNodeList $ X.getChildren node
       modify (bindSplice "content" $ return processedChildren)
       maybe (return []) -- TODO: error handling
-            (\t -> do result <- runNodeList t
-                      put st
-                      return result)
+            (\(t,ctx) -> do setContext ctx
+                            result <- runNodeList t
+                            put st
+                            return result)
             template
+  where nextCtx name st
+          | B.isPrefixOf "/" name = []
+          | otherwise             = _curContext st
       
 -- | The default set of built-in splices.
 defaultSpliceMap :: Monad m => SpliceMap m
@@ -392,13 +415,12 @@ loadTemplates :: Monad m => FilePath -> IO (TemplateState m)
 loadTemplates dir = do
   d <- readDirectoryWith (loadTemplate dir) dir
   let tm = F.fold (free d)
-  return $ TemplateState defaultSpliceMap tm True
+  return $ TemplateState defaultSpliceMap tm True []
 
 renderTemplate :: FilePath -> ByteString -> IO [Node]
 renderTemplate baseDir name = do
   ts <- loadTemplates baseDir
-  let t = lookupTemplate name ts
-  runTemplate ts $ maybe [] id t
+  runTemplateByName ts name
 
 tShow :: (X.GenericXMLString tag, X.GenericXMLString text)
       => [X.Node tag text] -> IO ()
