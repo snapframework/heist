@@ -86,6 +86,8 @@ module Text.Templating.Heist
     -- * Temporary (FIXME)
   , getDoc
   , loadTemplates
+  , renderTemplate
+  , tShow
 --  , test
 --  , evalFile
 
@@ -96,6 +98,7 @@ import           Control.Monad.RWS.Strict
 
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy as L
 import qualified Data.Foldable as F
 import           Data.List
 import qualified Data.Map as Map
@@ -106,6 +109,9 @@ import           System.Directory.Tree hiding (name)
 import           System.FilePath
 
 import qualified Text.XML.Expat.Tree as X
+
+import Text.XML.Expat.Format
+import Debug.Trace
 
 import           Text.Templating.Heist.Constants
 ------------------------------------------------------------------------------
@@ -155,6 +161,7 @@ data TemplateState m = TemplateState {
   , _templateMap :: TemplateMap
   -- | A flag to control splice recursion
   , _recurse     :: Bool
+--  , _curContext  :: TPath
 }
 
 instance Eq (TemplateState m) where
@@ -175,7 +182,7 @@ type Splice m = TemplateMonad m [Node]
 type SpliceMap m = Map ByteString (Splice m)
 
 instance Monoid (TemplateState m) where
-    mempty = TemplateState Map.empty Map.empty True
+    mempty = TemplateState Map.empty Map.empty True -- [] []
 
     (TemplateState s1 t1 r1) `mappend` (TemplateState s2 t2 r2) =
         TemplateState s t r 
@@ -217,8 +224,8 @@ splitPaths = reverse . B.split '/'
 traversePath :: TemplateMap -> TPath -> ByteString -> Maybe Template
 traversePath tm [] name = Map.lookup [name] tm
 traversePath tm path name =
-  Map.lookup (name:path) tm >>
-  traversePath tm (tail path) name
+  --trace ("traversePath "++(B.unpack name)++" "++(show path)++" returned "++(show $ Map.lookup (name:path) tm))
+  (Map.lookup (name:path) tm) `mplus` traversePath tm (tail path) name
 
 -- |Convenience function for looking up a template.
 lookupTemplate :: Monad m => ByteString -> TemplateState m -> Maybe Template
@@ -347,7 +354,7 @@ applyImpl = do
       
 -- | The default set of built-in splices.
 defaultSpliceMap :: Monad m => SpliceMap m
-defaultSpliceMap = Map.fromList
+defaultSpliceMap = Map.fromList $ map (\(a,b) -> (B.append "snap:" a, b))
   [(applyTag, applyImpl)
   ,(bindTag, bindImpl)
   ]
@@ -381,28 +388,19 @@ loadTemplate path fname
     return Map.empty
   where tName = drop ((length path)+1) $ take ((length fname) - 4) fname
 
-loadTemplates :: FilePath -> IO TemplateMap
+loadTemplates :: Monad m => FilePath -> IO (TemplateState m)
 loadTemplates dir = do
   d <- readDirectoryWith (loadTemplate dir) dir
-  return $ F.fold (free d)
+  let tm = F.fold (free d)
+  return $ TemplateState defaultSpliceMap tm True
 
-{-
- - Convenience functions for development and testing
- -}
+renderTemplate :: FilePath -> ByteString -> IO [Node]
+renderTemplate baseDir name = do
+  ts <- loadTemplates baseDir
+  let t = lookupTemplate name ts
+  runTemplate ts $ maybe [] id t
 
---test :: String -> String -> IO ()
---test path n = do
---  templates <- loadTemplates path
---
---  let getTmpl = liftM (lookupTemplate (B.pack n)) get
---
---  ns <- runSplice (TemplateState defaultSpliceMap templates True)
---                  (X.Text "")
---                  (runNodeList =<< (return . maybe [] id) =<< getTmpl)
---  L.putStrLn $ L.concat $ map formatNode ns
---
---evalFile :: String -> IO [Node]
---evalFile fname = do
---  doc <- getDoc fname
---  maybe (return []) runBareTemplate doc
+tShow :: (X.GenericXMLString tag, X.GenericXMLString text)
+      => [X.Node tag text] -> IO ()
+tShow = L.putStrLn . L.concat . map formatNode
 
