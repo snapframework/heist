@@ -17,6 +17,9 @@ Library
   exposed-modules:
     Text.Templating.Heist
 
+  other-modules:
+    Text.Templating.Heist.Constants
+
   build-depends:
     base >= 4 && < 5,
     bytestring,

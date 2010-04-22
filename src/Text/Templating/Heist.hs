@@ -86,6 +86,7 @@ module Text.Templating.Heist
     -- * Temporary (FIXME)
   , getDoc
   , loadTemplates
+  , oldRenderTemplate
   , renderTemplate
   , tShow
 --  , test
@@ -231,7 +232,7 @@ traversePath tm path name =
 -- |Convenience function for looking up a template.
 lookupTemplate :: Monad m => ByteString -> TemplateState m -> Maybe (Template, TPath)
 lookupTemplate nameStr ts = 
-  trace ("lookup "++(B.unpack nameStr)++" with "++(show $ _curContext ts)) $
+  --trace ("lookup "++(B.unpack nameStr)++" with "++(show $ _curContext ts)) $
   traversePath (_templateMap ts) (path++(_curContext ts)) name
   where (name:path) = splitPaths nameStr
 
@@ -417,10 +418,15 @@ loadTemplates dir = do
   let tm = F.fold (free d)
   return $ TemplateState defaultSpliceMap tm True []
 
-renderTemplate :: FilePath -> ByteString -> IO [Node]
-renderTemplate baseDir name = do
+oldRenderTemplate :: FilePath -> ByteString -> IO [Node]
+oldRenderTemplate baseDir name = do
   ts <- loadTemplates baseDir
   runTemplateByName ts name
+
+renderTemplate :: Monad m => TemplateState m -> ByteString -> m ByteString
+renderTemplate ts name = do
+  ns <- runTemplateByName ts name
+  return $ formatList' ns
 
 tShow :: (X.GenericXMLString tag, X.GenericXMLString text)
       => [X.Node tag text] -> IO ()
