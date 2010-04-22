@@ -378,7 +378,7 @@ applyImpl = do
       
 -- | The default set of built-in splices.
 defaultSpliceMap :: Monad m => SpliceMap m
-defaultSpliceMap = Map.fromList $ map (\(a,b) -> (B.append "snap:" a, b))
+defaultSpliceMap = Map.fromList
   [(applyTag, applyImpl)
   ,(bindTag, bindImpl)
   ]
@@ -406,11 +406,12 @@ mapLeft g = either (Left . g) Right
 loadTemplate :: String -> String -> IO TemplateMap
 loadTemplate path fname
   | ".tpl" `isSuffixOf` fname = do
---    putStrLn $ "Reading "++fname++" as "++tName
+    putStrLn $ "Reading "++fname++" as "++tName
     c <- getDoc fname
+    print c
     return $ either (const Map.empty) (Map.singleton (splitPaths $ B.pack tName) . (:[])) c
   | otherwise = do
---    putStrLn $ "Skipping "++fname
+    putStrLn $ "Skipping "++fname
     return Map.empty
   where tName = drop ((length path)+1) $ take ((length fname) - 4) fname
 

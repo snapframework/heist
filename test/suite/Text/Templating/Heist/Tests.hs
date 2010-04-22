@@ -55,7 +55,8 @@ loadTest :: H.Assertion
 loadTest = do
   tm <- liftM _templateMap $ (loadTemplates "templates" :: IO (TemplateState IO))
   print $ Map.size tm
-  H.assertBool "loadTest size" $ Map.size tm == 3
+  print $ tm
+  H.assertBool "loadTest size" $ Map.size tm == 12
 
 getDocTest :: H.Assertion
 getDocTest = do

@@ -1,1 +1,1 @@
-/bar/index
+<root>/bar/index</root>
