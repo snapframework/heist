@@ -86,8 +86,8 @@ module Text.Templating.Heist
     -- * Temporary (FIXME)
   , getDoc
   , loadTemplates
-  , oldRenderTemplate
   , renderTemplate
+  , renderTemplate'
   , tShow
 --  , test
 --  , evalFile
@@ -307,11 +307,11 @@ runTemplate ts template = runSplice ts (X.Text "") (runNodeList template)
 
 nameContext = tail . splitPaths
 
-runTemplateByName :: Monad m => TemplateState m -> ByteString -> m [Node]
+runTemplateByName :: Monad m => TemplateState m -> ByteString -> m (Maybe [Node])
 runTemplateByName ts name = do
   let mt = lookupTemplate name ts
-  maybe (return []) (\(t,ctx) -> runTemplate (ts {_curContext = ctx}) t) mt
---  runTemplate (ts {_curContext = ctx}) $ maybe [] id t
+  maybe (return Nothing) (\(t,ctx) -> return . Just =<< runTemplate (ts {_curContext = ctx}) t) mt
+--  maybe (return []) (\(t,ctx) -> runTemplate (ts {_curContext = ctx}) t) mt
 
 -- |Runs a template with an empty TemplateState.
 runBareTemplate :: Monad m => Template -> m [Node]
@@ -401,6 +401,8 @@ getDoc f = do
 mapLeft :: (a -> b) -> Either a c -> Either b c
 mapLeft g = either (Left . g) Right
 
+-- | Loads a template with the specified path and filename.  The
+-- template is only loaded if it has a ".tpl" extension.
 loadTemplate :: String -> String -> IO TemplateMap
 loadTemplate path fname
   | ".tpl" `isSuffixOf` fname = do
@@ -412,23 +414,39 @@ loadTemplate path fname
     return Map.empty
   where tName = drop ((length path)+1) $ take ((length fname) - 4) fname
 
+-- | Traverses the specified directory structure and builds a
+-- TemplateState by loading all the files with a ".tpl" extension.
 loadTemplates :: Monad m => FilePath -> IO (TemplateState m)
 loadTemplates dir = do
   d <- readDirectoryWith (loadTemplate dir) dir
   let tm = F.fold (free d)
   return $ TemplateState defaultSpliceMap tm True []
 
-oldRenderTemplate :: FilePath -> ByteString -> IO [Node]
-oldRenderTemplate baseDir name = do
-  ts <- loadTemplates baseDir
-  runTemplateByName ts name
-
-renderTemplate :: Monad m => TemplateState m -> ByteString -> m ByteString
+-- | Renders a template from the specified TemplateState.
+renderTemplate :: Monad m => TemplateState m -> ByteString -> m (Maybe ByteString)
 renderTemplate ts name = do
   ns <- runTemplateByName ts name
-  return $ formatList' ns
+  return $ (Just . formatList') =<< ns
+
+-- | Reloads the templates from disk and renders the specified
+-- template.
+renderTemplate' :: FilePath -> ByteString -> IO (Maybe ByteString)
+renderTemplate' baseDir name = do
+  ts <- loadTemplates baseDir
+  ns <- runTemplateByName ts name
+  return $ (Just . formatList') =<< ns
 
 tShow :: (X.GenericXMLString tag, X.GenericXMLString text)
       => [X.Node tag text] -> IO ()
 tShow = L.putStrLn . L.concat . map formatNode
+
+formatList :: (X.GenericXMLString tag, X.GenericXMLString text) =>
+              [X.Node tag text]
+           -> L.ByteString
+formatList nodes = foldl L.append xmlHeader $ map formatNode nodes
+
+formatList' :: (X.GenericXMLString tag, X.GenericXMLString text) =>
+               [X.Node tag text]
+            -> B.ByteString
+formatList' = B.concat . L.toChunks . formatList
 
