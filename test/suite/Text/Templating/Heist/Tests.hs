@@ -54,9 +54,7 @@ isLeft (Right _) = False
 loadTest :: H.Assertion
 loadTest = do
   tm <- liftM _templateMap $ (loadTemplates "templates" :: IO (TemplateState IO))
-  print $ Map.size tm
-  print $ tm
-  H.assertBool "loadTest size" $ Map.size tm == 12
+  H.assertBool "loadTest size" $ Map.size tm == 8
 
 getDocTest :: H.Assertion
 getDocTest = do

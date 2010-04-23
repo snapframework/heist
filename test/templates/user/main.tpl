@@ -1,4 +1,4 @@
 <html>
 User Page
-<snap:apply template="menu"/>
+<apply template="menu"/>
 </html>
