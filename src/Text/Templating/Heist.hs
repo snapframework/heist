@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving, TupleSections #-}
+{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
 
 {-|
 
@@ -212,11 +212,12 @@ lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 splitPaths :: ByteString -> TPath
 splitPaths = reverse . B.split '/'
 
+-- | Does a single template lookup without cascading up.
 singleLookup :: TemplateMap
              -> TPath
              -> ByteString
              -> Maybe (Template, TPath)
-singleLookup tm path name = fmap (,path) $ Map.lookup (name:path) tm
+singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 
 -- | Searches for a template by looking in the full path then backing up into each
 -- of the parent directories until the template is found.
@@ -224,7 +225,7 @@ traversePath :: TemplateMap
              -> TPath
              -> ByteString
              -> Maybe (Template, TPath)
-traversePath tm [] name = fmap (,[]) (Map.lookup [name] tm)
+traversePath tm [] name = fmap (\a -> (a,[])) (Map.lookup [name] tm)
 traversePath tm path name =
     singleLookup tm path name `mplus`
     traversePath tm (tail path) name
