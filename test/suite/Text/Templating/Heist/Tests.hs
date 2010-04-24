@@ -33,6 +33,7 @@ tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_sim
         , testCase "getDocTest" getDocTest
         , testCase "loadTest" loadTest
         , testCase "fsLoadTest" fsLoadTest
+        , testCase "renderNoNameTest" renderNoNameTest
         ]
 
 monoidTest :: IO ()
@@ -55,6 +56,12 @@ loadTest :: H.Assertion
 loadTest = do
   tm <- liftM _templateMap $ (loadTemplates "templates" :: IO (TemplateState IO))
   H.assertBool "loadTest size" $ Map.size tm == 8
+
+renderNoNameTest :: H.Assertion
+renderNoNameTest = do
+  ts <- loadTemplates "templates" :: IO (TemplateState IO)
+  t <- renderTemplate ts ""
+  H.assertBool "renderNoName" $ t == Nothing
 
 getDocTest :: H.Assertion
 getDocTest = do

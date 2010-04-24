@@ -237,7 +237,9 @@ lookupTemplate :: Monad m =>
                -> Maybe (Template, TPath)
 lookupTemplate nameStr ts = 
     f (_templateMap ts) path name
-  where (name:p) = splitPaths nameStr
+  where (name:p) = case splitPaths nameStr of
+                       [] -> [""]
+                       ps -> ps
         path = p ++ (_curContext ts)
         f = if '/' `B.elem` nameStr
                 then singleLookup
