@@ -88,6 +88,7 @@ module Text.Templating.Heist
   , renderTemplate
   , renderTemplate'
 
+  , heistExpatOptions
   , module Text.Templating.Heist.Constants
   ) where
 
@@ -414,8 +415,8 @@ defaultSpliceMap = Map.fromList
     ,(childrenTag, childrenImpl)
     ]
 
-expatOptions :: X.ParserOptions ByteString ByteString
-expatOptions =
+heistExpatOptions :: X.ParserOptions ByteString ByteString
+heistExpatOptions =
     X.defaultParserOptions {
            X.parserEncoding = Just X.UTF8
          , X.entityDecoder  = Just (\k -> Map.lookup k htmlEntityLookupTable)
@@ -429,7 +430,7 @@ expatOptions =
 getDoc :: String -> IO (Either String Node)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f) (\e -> return $ Left $ show e)
-    return $ (mapLeft show . X.parse' expatOptions) =<< bs
+    return $ (mapLeft show . X.parse' heistExpatOptions) =<< bs
 
 mapLeft :: (a -> b) -> Either a c -> Either b c
 mapLeft g = either (Left . g) Right
