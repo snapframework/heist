@@ -366,10 +366,9 @@ applyTag = "apply"
 applyAttr :: ByteString
 applyAttr = "template"
 
--- | Implementation of the bind splice.
+-- | Implementation of the apply splice.
 applyImpl :: Monad m => Splice m
 applyImpl = do
-    stopRecursion
     node <- getParamNode
     case X.getAttribute node applyAttr of
         Nothing   -> return [] -- TODO: error handling
