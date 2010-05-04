@@ -26,7 +26,7 @@ Library
     containers,
     directory-tree,
     filepath,
-    hexpat >= 0.11,
+    hexpat >= 0.14 && <0.15,
     monads-fd,
     transformers
 
