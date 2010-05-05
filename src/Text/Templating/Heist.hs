@@ -97,6 +97,7 @@ import           Control.Monad.RWS.Strict
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
+import           Data.Either
 import qualified Data.Foldable as F
 import           Data.List
 import qualified Data.Map as Map
@@ -508,8 +509,13 @@ heistExpatOptions =
 getDoc :: String -> IO (Either String Node)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f) (\e -> return $ Left $ show e)
-    return $ (mapLeft show . X.parse' heistExpatOptions) =<< bs
-
+    return $ (mapLeft genErrorMsg . X.parse' heistExpatOptions) =<< bs
+  where
+    genErrorMsg (X.XMLParseError str loc) = f ++ " " ++ locMsg loc ++ ": " ++ translate str
+    locMsg (X.XMLParseLocation line col _ _) =
+        "(line " ++ show line ++ ", col " ++ show col ++ ")"
+    translate "junk after document element" = "document must have a single root element"
+    translate s = s
 
 ------------------------------------------------------------------------------
 mapLeft :: (a -> b) -> Either a c -> Either b c
@@ -519,14 +525,12 @@ mapLeft g = either (Left . g) Right
 ------------------------------------------------------------------------------
 -- | Loads a template with the specified path and filename.  The
 -- template is only loaded if it has a ".tpl" extension.
-loadTemplate :: String -> String -> IO TemplateMap
+loadTemplate :: String -> String -> IO [Either String (TPath, Template)] --TemplateMap
 loadTemplate path fname
     | ".tpl" `isSuffixOf` fname = do
         c <- getDoc fname
-        return $ either
-            (const Map.empty)
-            (Map.singleton (splitPaths $ B.pack tName) . (:[])) c
-    | otherwise = return Map.empty
+        return [fmap (\t -> (splitPaths $ B.pack tName, [t])) c]
+    | otherwise = return []
   where tName = drop ((length path)+1) $
                 take ((length fname) - 4) fname
 
@@ -534,11 +538,14 @@ loadTemplate path fname
 ------------------------------------------------------------------------------
 -- | Traverses the specified directory structure and builds a
 -- TemplateState by loading all the files with a ".tpl" extension.
-loadTemplates :: Monad m => FilePath -> IO (TemplateState m)
+loadTemplates :: Monad m => FilePath -> IO (Either String (TemplateState m))
 loadTemplates dir = do
     d <- readDirectoryWith (loadTemplate dir) dir
-    let tm = F.fold (free d)
-    return $ TemplateState defaultSpliceMap tm True []
+    let tlist = F.fold (free d)
+        errs = lefts tlist
+    return $ case errs of
+        [] -> Right $ emptyTemplateState { _templateMap = Map.fromList $ rights tlist }
+        _  -> Left $ unlines errs
 
 
 ------------------------------------------------------------------------------
@@ -554,7 +561,8 @@ renderTemplate ts name = do
 -- template.
 renderTemplate' :: FilePath -> ByteString -> IO (Maybe ByteString)
 renderTemplate' baseDir name = do
-    ts <- loadTemplates baseDir
+    etm <- loadTemplates baseDir
+    let ts = either (const emptyTemplateState) id etm
     ns <- runTemplateByName ts name
     return $ (Just . formatList') =<< ns
 
