@@ -506,11 +506,13 @@ heistExpatOptions =
 ------------------------------------------------------------------------------
 
 -- | Reads an XML document from disk.
-getDoc :: String -> IO (Either String Node)
+getDoc :: String -> IO (Either String Template)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f) (\e -> return $ Left $ show e)
     let wrap b = "<snap:root>\n" `B.append` b `B.append` "\n</snap:root>"
-    return $ (mapLeft genErrorMsg . X.parse' heistExpatOptions . wrap) =<< bs
+    return $ (mapRight X.getChildren .
+              mapLeft genErrorMsg .
+              X.parse' heistExpatOptions . wrap) =<< bs
   where
     genErrorMsg (X.XMLParseError str loc) = f ++ " " ++ locMsg loc ++ ": " ++ translate str
     locMsg (X.XMLParseLocation line col _ _) =
@@ -521,6 +523,8 @@ getDoc f = do
 ------------------------------------------------------------------------------
 mapLeft :: (a -> b) -> Either a c -> Either b c
 mapLeft g = either (Left . g) Right
+mapRight :: (b -> c) -> Either a b -> Either a c
+mapRight g = either Left (Right . g)
 
 
 ------------------------------------------------------------------------------
@@ -530,7 +534,7 @@ loadTemplate :: String -> String -> IO [Either String (TPath, Template)] --Templ
 loadTemplate path fname
     | ".tpl" `isSuffixOf` fname = do
         c <- getDoc fname
-        return [fmap (\t -> (splitPaths $ B.pack tName, [t])) c]
+        return [fmap (\t -> (splitPaths $ B.pack tName, t)) c]
     | otherwise = return []
   where tName = drop ((length path)+1) $
                 take ((length fname) - 4) fname
