@@ -470,26 +470,12 @@ ignoreImpl = return []
 
 
 ------------------------------------------------------------------------------
--- | Default name for the ignore splice.
-childrenTag :: ByteString
-childrenTag = "children"
-
-
-------------------------------------------------------------------------------
--- | The ignore tag and everything it surrounds disappears in the
--- rendered output.
-childrenImpl :: Monad m => Splice m
-childrenImpl = return . X.getChildren =<< getParamNode
-
-
-------------------------------------------------------------------------------
 -- | The default set of built-in splices.
 defaultSpliceMap :: Monad m => SpliceMap m
 defaultSpliceMap = Map.fromList
     [(applyTag, applyImpl)
     ,(bindTag, bindImpl)
     ,(ignoreTag, ignoreImpl)
-    ,(childrenTag, childrenImpl)
     ]
 
 
