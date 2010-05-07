@@ -54,27 +54,31 @@ isLeft (Right _) = False
 
 loadTest :: H.Assertion
 loadTest = do
-  tm <- liftM _templateMap $ (loadTemplates "templates" :: IO (TemplateState IO))
-  H.assertBool "loadTest size" $ Map.size tm == 8
+  ets <- loadTemplates "templates" :: IO (Either String (TemplateState IO))
+  either (error "Error loading templates")
+         (\ts -> do let tm = _templateMap ts
+                    H.assertBool "loadTest size" $ Map.size tm == 12
+         ) ets
 
 renderNoNameTest :: H.Assertion
 renderNoNameTest = do
-  ts <- loadTemplates "templates" :: IO (TemplateState IO)
-  t <- renderTemplate ts ""
-  H.assertBool "renderNoName" $ t == Nothing
+  ets <- loadTemplates "templates" :: IO (Either String (TemplateState IO))
+  either (error "Error loading templates")
+         (\ts -> do t <- renderTemplate ts ""
+                    H.assertBool "renderNoName" $ t == Nothing
+         ) ets
 
 getDocTest :: H.Assertion
 getDocTest = do
   d <- getDoc "bkteoar"
   H.assertBool "non-existent doc" $ isLeft d
-  e <- getDoc "templates/noroot.tpl"
-  H.assertBool "doc with no root tag" $ isLeft e
   f <- getDoc "templates/index.tpl"
   H.assertBool "index doc" $ not $ isLeft f
 
 fsLoadTest :: H.Assertion
 fsLoadTest = do
-  tm <- liftM _templateMap $ (loadTemplates "templates" :: IO (TemplateState IO))
+  ets <- loadTemplates "templates" :: IO (Either String (TemplateState IO))
+  let tm = either (error "Error loading templates") _templateMap ets
   let ts = emptyTemplateState {_templateMap = tm} :: TemplateState IO
       f p n = H.assertBool ("loading template "++n) $ p $ lookupTemplate (B.pack n) ts
   f isNothing "abc/def/xyz"

@@ -509,11 +509,12 @@ heistExpatOptions =
 getDoc :: String -> IO (Either String Node)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f) (\e -> return $ Left $ show e)
-    return $ (mapLeft genErrorMsg . X.parse' heistExpatOptions) =<< bs
+    let wrap b = "<snap:root>\n" `B.append` b `B.append` "\n</snap:root>"
+    return $ (mapLeft genErrorMsg . X.parse' heistExpatOptions . wrap) =<< bs
   where
     genErrorMsg (X.XMLParseError str loc) = f ++ " " ++ locMsg loc ++ ": " ++ translate str
     locMsg (X.XMLParseLocation line col _ _) =
-        "(line " ++ show line ++ ", col " ++ show col ++ ")"
+        "(line " ++ show (line-1) ++ ", col " ++ show col ++ ")"
     translate "junk after document element" = "document must have a single root element"
     translate s = s
 
