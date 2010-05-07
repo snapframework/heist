@@ -1,0 +1,12 @@
+Add onLoad, preRun, postRun
+
+  onLoad :: Node -> IO a
+    parameter to bindSplice
+
+  preRun :: Monad m => Template -> m a
+  postRun :: Monad m => Template -> m a
+
+  The difference between pre-and post-Run and the splice is that the
+splice only gets spliced node as input.  preRun and postRun get the
+whole document.
+
