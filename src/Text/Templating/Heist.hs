@@ -564,8 +564,7 @@ renderTemplate' baseDir name = do
 formatList :: (X.GenericXMLString tag, X.GenericXMLString text) =>
               [X.Node tag text]
            -> L.ByteString
-formatList nodes = foldl L.append (L.fromChunks [xmlHeader]) $
-                       map formatNode nodes
+formatList nodes = foldl L.append L.empty $ map formatNode nodes
 
 formatList' :: (X.GenericXMLString tag, X.GenericXMLString text) =>
                [X.Node tag text]
