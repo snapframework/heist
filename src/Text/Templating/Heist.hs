@@ -308,7 +308,7 @@ setContext c = modify (\st -> st { _curContext = c })
 
 
 ------------------------------------------------------------------------------
--- | Sets the current context
+-- | Gets the current context
 getContext :: Monad m => TemplateMonad m TPath
 getContext = gets _curContext
   
