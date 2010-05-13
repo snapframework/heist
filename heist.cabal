@@ -18,6 +18,7 @@ Library
     Text.Templating.Heist
 
   other-modules:
+    Text.Templating.Heist.Internal
     Text.Templating.Heist.Constants
 
   build-depends:

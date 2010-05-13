@@ -20,7 +20,7 @@ import           Data.Monoid
 
 import           System.IO.Unsafe
 
-import           Text.Templating.Heist
+import           Text.Templating.Heist.Internal
 import           Text.XML.Expat.Cursor
 import           Text.XML.Expat.Format
 import qualified Text.XML.Expat.Tree as X
@@ -52,9 +52,13 @@ isLeft :: Either a b -> Bool
 isLeft (Left _) = True
 isLeft (Right _) = False
 
+
+loadT :: String -> IO (Either String (TemplateState IO))
+loadT s = loadTemplates s emptyTemplateState
+
 loadTest :: H.Assertion
 loadTest = do
-  ets <- loadTemplates "templates" :: IO (Either String (TemplateState IO))
+  ets <- loadT "templates"
   either (error "Error loading templates")
          (\ts -> do let tm = _templateMap ts
                     H.assertBool "loadTest size" $ Map.size tm == 12
@@ -62,7 +66,7 @@ loadTest = do
 
 renderNoNameTest :: H.Assertion
 renderNoNameTest = do
-  ets <- loadTemplates "templates" :: IO (Either String (TemplateState IO))
+  ets <- loadT "templates"
   either (error "Error loading templates")
          (\ts -> do t <- renderTemplate ts ""
                     H.assertBool "renderNoName" $ t == Nothing
@@ -77,7 +81,7 @@ getDocTest = do
 
 fsLoadTest :: H.Assertion
 fsLoadTest = do
-  ets <- loadTemplates "templates" :: IO (Either String (TemplateState IO))
+  ets <- loadT "templates"
   let tm = either (error "Error loading templates") _templateMap ets
   let ts = setTemplates tm emptyTemplateState :: TemplateState IO
       f p n = H.assertBool ("loading template "++n) $ p $ lookupTemplate (B.pack n) ts
