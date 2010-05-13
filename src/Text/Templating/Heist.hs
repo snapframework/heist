@@ -62,9 +62,7 @@ module Text.Templating.Heist
   , Splice
   , Template
   , TemplateMonad
-
-  -- ** FIXME: don't export state fields
-  , TemplateState(..)
+  , TemplateState
 
     -- * Functions and declarations on TemplateState values
   , addTemplate
@@ -72,6 +70,10 @@ module Text.Templating.Heist
   , bindSplice
   , lookupSplice
   , lookupTemplate
+  , setOnLoadHook
+  , setPreRunHook
+  , setPostRunHook
+  , setTemplates
 
     -- * TemplateMonad functions
   , stopRecursion
@@ -158,12 +160,16 @@ type TemplateMap = Map TPath Template
 -- output verbatim.
 data TemplateState m = TemplateState {
     -- | A mapping of splice names to splice actions
-      _spliceMap   :: SpliceMap m
+      _spliceMap      :: SpliceMap m
     -- | A mapping of template names to templates
-    , _templateMap :: TemplateMap
+    , _templateMap    :: TemplateMap
     -- | A flag to control splice recursion
-    , _recurse     :: Bool
-    , _curContext  :: TPath
+    , _recurse        :: Bool
+    , _curContext     :: TPath
+    , _recursionDepth :: Int
+    , _onLoadHook     :: Template -> IO Template
+    , _preRunHook     :: Template -> m Template
+    , _postRunHook    :: Template -> m Template
 }
 
 
@@ -185,7 +191,7 @@ newtype TemplateMonad m a = TemplateMonad (RWST Node () (TemplateState m) m a)
 
 ------------------------------------------------------------------------------
 -- | A Splice is a TemplateMonad computation that returns [Node].
-type Splice m = TemplateMonad m [Node]
+type Splice m = TemplateMonad m Template
 
 
 ------------------------------------------------------------------------------
@@ -194,15 +200,18 @@ type SpliceMap m = Map ByteString (Splice m)
 
 
 ------------------------------------------------------------------------------
-instance Monoid (TemplateState m) where
-    mempty = TemplateState Map.empty Map.empty True []
+instance (Monad m) => Monoid (TemplateState m) where
+    mempty = TemplateState Map.empty Map.empty True [] 0
+                           return return return
 
-    (TemplateState s1 t1 r1 _) `mappend` (TemplateState s2 t2 r2 c2) =
-        TemplateState s t r c2
+    (TemplateState s1 t1 r1 _ d1 o1 b1 a1) `mappend`
+        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2) =
+        TemplateState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
       where
         s = s1 `mappend` s2
         t = t1 `mappend` t2
         r = r1 && r2
+        d = max d1 d2
 
 ------------------------------------------------------------------------------
 -- TemplateState functions
@@ -211,7 +220,32 @@ instance Monoid (TemplateState m) where
 -- | An empty template state, with Heist's default splices (@\<bind\>@ and
 -- @\<apply\>@) mapped.
 emptyTemplateState :: Monad m => TemplateState m
-emptyTemplateState = TemplateState defaultSpliceMap Map.empty True []
+emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
+                                   return return return
+
+
+------------------------------------------------------------------------------
+-- | Sets the onLoad hook in a `TemplateState`.
+setOnLoadHook :: (Template -> IO Template)
+              -> TemplateState m
+              -> TemplateState m
+setOnLoadHook hook ts = ts { _onLoadHook = hook }
+
+
+------------------------------------------------------------------------------
+-- | Sets the preRun hook in a `TemplateState`.
+setPreRunHook :: (Template -> m Template)
+              -> TemplateState m
+              -> TemplateState m
+setPreRunHook hook ts = ts { _preRunHook = hook }
+
+
+------------------------------------------------------------------------------
+-- | Sets the postRun hook in a `TemplateState`.
+setPostRunHook :: (Template -> m Template)
+               -> TemplateState m
+               -> TemplateState m
+setPostRunHook hook ts = ts { _postRunHook = hook }
 
 
 ------------------------------------------------------------------------------
@@ -279,14 +313,30 @@ lookupTemplate nameStr ts =
 
 
 ------------------------------------------------------------------------------
+-- | Sets the templateMap in a TemplateState.
+setTemplates :: Monad m => TemplateMap -> TemplateState m -> TemplateState m
+setTemplates m ts = ts { _templateMap = m }
+
+
+------------------------------------------------------------------------------
+-- | Adds a template to the template state.
+insertTemplate :: Monad m =>
+               TPath
+            -> Template
+            -> TemplateState m
+            -> TemplateState m
+insertTemplate p t st =
+    setTemplates (Map.insert p t (_templateMap st)) st
+
+
+------------------------------------------------------------------------------
 -- | Adds a template to the template state.
 addTemplate :: Monad m =>
                ByteString
             -> Template
             -> TemplateState m
             -> TemplateState m
-addTemplate n t st =
-    st {_templateMap = Map.insert (splitPaths n) t (_templateMap st)}
+addTemplate n t st = insertTemplate (splitPaths n) t st
 
 
 ------------------------------------------------------------------------------
@@ -334,13 +384,22 @@ runNode n@(X.Element nm _ ch) = do
 
 
 ------------------------------------------------------------------------------
+-- | The maximum recursion depth.  (Used to prevent infinite loops.)
+mAX_RECURSION_DEPTH :: Int
+mAX_RECURSION_DEPTH = 20
+
+
+------------------------------------------------------------------------------
 -- | Checks the recursion flag and recurses accordingly.
 recurseSplice :: Monad m => Node -> Splice m -> Splice m
 recurseSplice node splice = do
     result <- local (const node) splice
     ts' <- get
-    if _recurse ts'
-        then runNodeList result
+    if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
+        then do modify (\st -> st { _recursionDepth = _recursionDepth st + 1 })
+                res <- runNodeList result
+                put ts'
+                return res
         else return result
 
 
@@ -361,7 +420,10 @@ runSplice ts node (TemplateMonad splice) = do
 -- | Runs a template in the underlying monad.  Similar to runSplice
 -- except that templates don't require a Node as a parameter.
 runTemplate :: Monad m => TemplateState m -> Template -> m [Node]
-runTemplate ts template = runSplice ts (X.Text "") (runNodeList template)
+runTemplate ts template =
+    _preRunHook ts template >>=
+    runSplice ts (X.Text "") . runNodeList >>=
+    _postRunHook ts
 
 
 ------------------------------------------------------------------------------
@@ -442,7 +504,6 @@ applyImpl = do
         Nothing   -> return [] -- TODO: error handling
         Just attr -> do 
             st <- get
-            put $ st { _spliceMap = defaultSpliceMap }
             processedChildren <- runNodeList $ X.getChildren node
             modify (bindSplice "content" $ return processedChildren)
             maybe (return []) -- TODO: error handling
@@ -529,14 +590,23 @@ loadTemplate path fname
 ------------------------------------------------------------------------------
 -- | Traverses the specified directory structure and builds a
 -- TemplateState by loading all the files with a ".tpl" extension.
-loadTemplates :: Monad m => FilePath -> IO (Either String (TemplateState m))
-loadTemplates dir = do
+loadTemplates :: Monad m => FilePath -> TemplateState m -> IO (Either String (TemplateState m))
+loadTemplates dir ts = do
     d <- readDirectoryWith (loadTemplate dir) dir
     let tlist = F.fold (free d)
         errs = lefts tlist
-    return $ case errs of
-        [] -> Right $ emptyTemplateState { _templateMap = Map.fromList $ rights tlist }
-        _  -> Left $ unlines errs
+    case errs of
+        [] -> liftM Right $ foldM loadHook ts $ rights tlist
+        _  -> return $ Left $ unlines errs
+
+
+------------------------------------------------------------------------------
+-- | Runs the onLoad hook on the template and returns the `TemplateState`
+-- with the result inserted.
+loadHook :: Monad m => TemplateState m -> (TPath, Template) -> IO (TemplateState m)
+loadHook ts (tp, t) = do
+    t' <- _onLoadHook ts t
+    return $ insertTemplate tp t' ts
 
 
 ------------------------------------------------------------------------------
@@ -552,7 +622,7 @@ renderTemplate ts name = do
 -- template.
 renderTemplate' :: FilePath -> ByteString -> IO (Maybe ByteString)
 renderTemplate' baseDir name = do
-    etm <- loadTemplates baseDir
+    etm <- loadTemplates baseDir emptyTemplateState
     let ts = either (const emptyTemplateState) id etm
     ns <- runTemplateByName ts name
     return $ (Just . formatList') =<< ns
@@ -570,4 +640,27 @@ formatList' :: (X.GenericXMLString tag, X.GenericXMLString text) =>
                [X.Node tag text]
             -> B.ByteString
 formatList' = B.concat . L.toChunks . formatList
+
+p :: ByteString -> Node
+p t = X.Element "p" [] [X.Text t]
+
+hookG :: Monad m => ByteString -> Template -> m Template
+hookG str t = return $ (p str) : t
+
+onLoad = hookG "Inserted on load"
+preRun = hookG "Inserted on preRun"
+postRun = hookG "Inserted on postRun"
+
+ts :: IO (Either String (TemplateState IO))
+ts = loadTemplates "test/templates" $
+    foldr ($) emptyTemplateState
+    [setOnLoadHook onLoad
+    ,setPreRunHook preRun
+    ,setPostRunHook postRun
+    ]
+
+r name etm = do
+    let ts = either (error "Danger Will Robinson!") id etm
+    ns <- runTemplateByName ts name
+    return $ (Just . formatList') =<< ns
 

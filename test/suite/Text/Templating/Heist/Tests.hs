@@ -79,7 +79,7 @@ fsLoadTest :: H.Assertion
 fsLoadTest = do
   ets <- loadTemplates "templates" :: IO (Either String (TemplateState IO))
   let tm = either (error "Error loading templates") _templateMap ets
-  let ts = emptyTemplateState {_templateMap = tm} :: TemplateState IO
+  let ts = setTemplates tm emptyTemplateState :: TemplateState IO
       f p n = H.assertBool ("loading template "++n) $ p $ lookupTemplate (B.pack n) ts
   f isNothing "abc/def/xyz"
   f isJust "a"
@@ -262,7 +262,7 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 calcResult :: (Monad m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
   runTemplate ts $ buildApplyCaller apply
-  where ts = emptyTemplateState { _templateMap = Map.singleton [unName name] callee }
+  where ts = setTemplates (Map.singleton [unName name] callee) emptyTemplateState
 
 prop_simpleApplyTest :: Apply -> PropertyM IO ()
 prop_simpleApplyTest apply = do
