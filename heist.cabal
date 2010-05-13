@@ -29,6 +29,7 @@ Library
     filepath,
     hexpat >= 0.15 && <0.16,
     monads-fd,
+    MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     transformers
 
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2

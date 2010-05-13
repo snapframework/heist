@@ -1,8 +1,12 @@
-{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Text.Templating.Heist.Internal where
 
 ------------------------------------------------------------------------------
+import           Control.Exception (SomeException)
+import           Control.Monad.CatchIO
 import           Control.Monad.RWS.Strict
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
@@ -12,6 +16,7 @@ import qualified Data.Foldable as F
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Map (Map)
+import           Prelude hiding (catch)
 import           System.Directory.Tree hiding (name)
 import           Text.XML.Expat.Format
 import qualified Text.XML.Expat.Tree as X
@@ -94,7 +99,11 @@ instance Eq (TemplateState m) where
 --   'TemplateState' that contains splice and template mappings (accessible
 --   using the 'MonadState' instance.
 newtype TemplateMonad m a = TemplateMonad (RWST Node () (TemplateState m) m a)
-  deriving (Monad, MonadIO, MonadReader Node, MonadState (TemplateState m))
+  deriving ( Monad
+           , MonadIO
+           , MonadCatchIO
+           , MonadReader Node
+           , MonadState (TemplateState m) )
 
 
 ------------------------------------------------------------------------------
@@ -466,7 +475,8 @@ heistExpatOptions =
 -- | Reads an XML document from disk.
 getDoc :: String -> IO (Either String Template)
 getDoc f = do
-    bs <- catch (liftM Right $ B.readFile f) (\e -> return $ Left $ show e)
+    bs <- catch (liftM Right $ B.readFile f)
+                (\(e::SomeException) -> return $ Left $ show e)
     let wrap b = "<snap:root>\n" `B.append` b `B.append` "\n</snap:root>"
     return $ (mapRight X.getChildren .
               mapLeft genErrorMsg .
