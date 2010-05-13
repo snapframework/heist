@@ -133,27 +133,30 @@ emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
 
 
 ------------------------------------------------------------------------------
--- | Sets the onLoad hook in a `TemplateState`.
-setOnLoadHook :: (Template -> IO Template)
+-- | Adds an onLoad hook to a `TemplateState`.
+addOnLoadHook :: (Monad m) =>
+                 (Template -> IO Template)
               -> TemplateState m
               -> TemplateState m
-setOnLoadHook hook ts = ts { _onLoadHook = hook }
+addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Sets the preRun hook in a `TemplateState`.
-setPreRunHook :: (Template -> m Template)
+-- | Adds a preRun hook to a `TemplateState`.
+addPreRunHook :: (Monad m) =>
+                 (Template -> m Template)
               -> TemplateState m
               -> TemplateState m
-setPreRunHook hook ts = ts { _preRunHook = hook }
+addPreRunHook hook ts = ts { _preRunHook = _preRunHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Sets the postRun hook in a `TemplateState`.
-setPostRunHook :: (Template -> m Template)
+-- | Adds a postRun hook to a `TemplateState`.
+addPostRunHook :: (Monad m) =>
+                  (Template -> m Template)
                -> TemplateState m
                -> TemplateState m
-setPostRunHook hook ts = ts { _postRunHook = hook }
+addPostRunHook hook ts = ts { _postRunHook = _postRunHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------

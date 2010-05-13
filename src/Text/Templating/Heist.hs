@@ -70,9 +70,9 @@ module Text.Templating.Heist
   , bindSplice
   , lookupSplice
   , lookupTemplate
-  , setOnLoadHook
-  , setPreRunHook
-  , setPostRunHook
+  , addOnLoadHook
+  , addPreRunHook
+  , addPostRunHook
   , setTemplates
 
     -- * TemplateMonad functions
