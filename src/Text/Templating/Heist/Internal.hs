@@ -539,6 +539,22 @@ renderTemplate ts name = do
 
 
 ------------------------------------------------------------------------------
+-- | Renders a template with the specified parameters.  This is the function
+-- to use when you want to "call" a template and pass in parameters from code.
+callTemplate :: Monad m
+             => TemplateState m            -- ^ `TemplateState` containing the
+                                           -- template being called.
+             -> ByteString                 -- ^ The name of the template
+             -> [(ByteString, ByteString)] -- ^ Association list of
+                                           -- (name,value) parameter pairs
+             -> m (Maybe ByteString)
+callTemplate ts name params = renderTemplate ts' name
+  where
+    ts' = foldr add ts params
+    add (n,v) = bindSplice n (return [X.Text v])
+
+
+------------------------------------------------------------------------------
 -- | Reloads the templates from disk and renders the specified
 -- template.
 renderTemplate' :: FilePath -> ByteString -> IO (Maybe ByteString)

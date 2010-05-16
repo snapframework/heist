@@ -88,6 +88,7 @@ module Text.Templating.Heist
   , getDoc
   , loadTemplates
   , renderTemplate
+  , callTemplate
   , renderTemplate'
 
   , heistExpatOptions
