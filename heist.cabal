@@ -27,7 +27,7 @@ Library
     containers,
     directory-tree,
     filepath,
-    hexpat >= 0.15 && <0.16,
+    hexpat >= 0.16 && <0.17,
     monads-fd,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     transformers
