@@ -189,7 +189,8 @@ instance Show Bind where
     ,"Result:"
     ,L.unpack $ L.concat $ map formatNode $ buildResult b
     ,"Splice result:"
-    ,L.unpack $ L.concat $ map formatNode $ unsafePerformIO $ runBareTemplate $ buildBindTemplate b
+    ,L.unpack $ L.concat $ map formatNode $ unsafePerformIO $
+        runRawTemplate emptyTemplateState $ buildBindTemplate b
     ,"Template:"
     ,L.unpack $ L.concat $ map formatNode $ buildBindTemplate b
     ]
@@ -231,7 +232,7 @@ prop_simpleBindTest :: Bind -> PropertyM IO ()
 prop_simpleBindTest bind = do
   let template = buildBindTemplate bind
       result = buildResult bind
-  spliceResult <- run $ runBareTemplate template
+  spliceResult <- run $ runRawTemplate emptyTemplateState template
   assert $ result == spliceResult
 
 {-
@@ -265,7 +266,7 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 
 calcResult :: (Monad m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
-  runTemplate ts $ buildApplyCaller apply
+  runRawTemplate ts $ buildApplyCaller apply
   where ts = setTemplates (Map.singleton [unName name] callee) emptyTemplateState
 
 prop_simpleApplyTest :: Apply -> PropertyM IO ()
