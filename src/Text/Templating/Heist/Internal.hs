@@ -107,16 +107,6 @@ newtype TemplateMonad m a = TemplateMonad (RWST Node () (TemplateState m) m a)
 
 
 ------------------------------------------------------------------------------
--- | A Splice is a TemplateMonad computation that returns [Node].
-type Splice m = TemplateMonad m Template
-
-
-------------------------------------------------------------------------------
--- | SpliceMap associates a name and a Splice.
-type SpliceMap m = Map ByteString (Splice m)
-
-
-------------------------------------------------------------------------------
 instance (Monad m) => Monoid (TemplateState m) where
     mempty = TemplateState Map.empty Map.empty True [] 0
                            return return return
@@ -129,6 +119,21 @@ instance (Monad m) => Monoid (TemplateState m) where
         t = t1 `mappend` t2
         r = r1 && r2
         d = max d1 d2
+
+
+------------------------------------------------------------------------------
+instance MonadTrans TemplateMonad where
+  lift = TemplateMonad . lift
+
+------------------------------------------------------------------------------
+-- | A Splice is a TemplateMonad computation that returns [Node].
+type Splice m = TemplateMonad m Template
+
+
+------------------------------------------------------------------------------
+-- | SpliceMap associates a name and a Splice.
+type SpliceMap m = Map ByteString (Splice m)
+
 
 ------------------------------------------------------------------------------
 -- TemplateState functions
@@ -339,8 +344,8 @@ runSplice ts node (TemplateMonad splice) = do
 ------------------------------------------------------------------------------
 -- | Runs a template in the underlying monad.  Similar to runSplice
 -- except that templates don't require a Node as a parameter.
-runTemplate :: Monad m => TemplateState m -> Template -> m [Node]
-runTemplate ts template =
+runRawTemplate :: Monad m => TemplateState m -> Template -> m [Node]
+runRawTemplate ts template =
     _preRunHook ts template >>=
     runSplice ts (X.Text "") . runNodeList >>=
     _postRunHook ts
@@ -349,23 +354,73 @@ runTemplate ts template =
 ------------------------------------------------------------------------------
 -- | Looks up a template name in the supplied 'TemplateState' and runs
 -- it in the underlying monad.
-runTemplateByName :: Monad m =>
-                     TemplateState m
-                  -> ByteString
-                  -> m (Maybe [Node])
-runTemplateByName ts name = do
-    let mt = lookupTemplate name ts
+runTemplate :: Monad m
+            => TemplateState m
+            -> ByteString
+            -> m (Maybe [Node])
+runTemplate ts name =
     maybe (return Nothing)
           (\(t,ctx) ->
               return . Just =<<
-              runTemplate (ts {_curContext = ctx}) t)
-          mt
+              runRawTemplate (ts {_curContext = ctx}) t)
+          (lookupTemplate name ts)
 
 
 ------------------------------------------------------------------------------
--- | Runs a template with an empty TemplateState.
-runBareTemplate :: Monad m => Template -> m [Node]
-runBareTemplate = runTemplate emptyTemplateState
+-- | Looks up a template name evaluates it.  Same as runTemplate except it
+-- runs in TemplateMonad instead of m.
+evalTemplate :: Monad m
+            => ByteString
+            -> TemplateMonad m (Maybe [Node])
+evalTemplate name = do
+    ts <- get
+    lift $ runTemplate ts name
+
+
+------------------------------------------------------------------------------
+-- | Binds a list of constant string splices
+bindStrings :: Monad m
+            => [(ByteString, ByteString)]
+            -> TemplateState m
+            -> TemplateState m
+bindStrings pairs ts = foldr add ts pairs
+  where
+    add (n,v) = bindSplice n (return [X.Text v])
+
+
+------------------------------------------------------------------------------
+-- | Renders a template with the specified parameters.  This is the function
+-- to use when you want to "call" a template and pass in parameters from code.
+callTemplate :: Monad m
+             => ByteString                 -- ^ The name of the template
+             -> [(ByteString, ByteString)] -- ^ Association list of
+                                           -- (name,value) parameter pairs
+             -> TemplateMonad m (Maybe Template)
+callTemplate name params = do
+    modify $ bindStrings params
+    evalTemplate name
+
+
+------------------------------------------------------------------------------
+-- | Renders a template from the specified TemplateState.
+renderTemplate :: Monad m
+               => TemplateState m
+               -> ByteString
+               -> m (Maybe ByteString)
+renderTemplate ts name = do
+    ns <- runTemplate ts name
+    return $ (Just . formatList') =<< ns
+
+
+--callTemplate2 :: Monad m
+--             => ByteString                 -- ^ The name of the template
+--             -> [(ByteString, ByteString)] -- ^ Association list of
+--                                           -- (name,value) parameter pairs
+--             -> TemplateMonad m (Maybe Template)
+--callTemplate2 name params = do
+--    ts <- get
+--    runTemplate (bindStrings params ts) name
+
 
 ------------------------------------------------------------------------------
 -- Heist built-in splices implementing core template functionality.
@@ -531,37 +586,13 @@ loadHook ts (tp, t) = do
 
 
 ------------------------------------------------------------------------------
--- | Renders a template from the specified TemplateState.
-renderTemplate :: Monad m => TemplateState m -> ByteString -> m (Maybe ByteString)
-renderTemplate ts name = do
-    ns <- runTemplateByName ts name
-    return $ (Just . formatList') =<< ns
-
-
-------------------------------------------------------------------------------
--- | Renders a template with the specified parameters.  This is the function
--- to use when you want to "call" a template and pass in parameters from code.
-callTemplate :: Monad m
-             => TemplateState m            -- ^ `TemplateState` containing the
-                                           -- template being called.
-             -> ByteString                 -- ^ The name of the template
-             -> [(ByteString, ByteString)] -- ^ Association list of
-                                           -- (name,value) parameter pairs
-             -> m (Maybe ByteString)
-callTemplate ts name params = renderTemplate ts' name
-  where
-    ts' = foldr add ts params
-    add (n,v) = bindSplice n (return [X.Text v])
-
-
-------------------------------------------------------------------------------
 -- | Reloads the templates from disk and renders the specified
 -- template.
 renderTemplate' :: FilePath -> ByteString -> IO (Maybe ByteString)
 renderTemplate' baseDir name = do
     etm <- loadTemplates baseDir emptyTemplateState
     let ts = either (const emptyTemplateState) id etm
-    ns <- runTemplateByName ts name
+    ns <- runTemplate ts name
     return $ (Just . formatList') =<< ns
 
 ------------------------------------------------------------------------------
@@ -600,7 +631,7 @@ ts = loadTemplates "test/templates" $
 
 r name etm = do
     let ts = either (error "Danger Will Robinson!") id etm
-    ns <- runTemplateByName ts name
+    ns <- runTemplate ts name
     return $ (Just . formatList') =<< ns
 
 

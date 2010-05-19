@@ -26,7 +26,7 @@
   > fooSplice = return $ Text "Testing 1-2-3"
   >
   > go :: Monad m => m [Node]
-  > go = runTemplate st template
+  > go = runRawTemplate st template
   >   where
   >     st = bindSplice "foo" fooSplice emptyTemplateState 
   >     template = Element "root" [] [Element "foo" [] []]
@@ -74,6 +74,7 @@ module Text.Templating.Heist
   , addPreRunHook
   , addPostRunHook
   , setTemplates
+  , loadTemplates
 
     -- * TemplateMonad functions
   , stopRecursion
@@ -82,14 +83,16 @@ module Text.Templating.Heist
   , getContext
 
     -- * Functions for running splices and templates
-  , runSplice
   , runTemplate
-  , runBareTemplate
-  , getDoc
-  , loadTemplates
-  , renderTemplate
+  , evalTemplate
   , callTemplate
-  , renderTemplate'
+  , renderTemplate
+  , bindStrings
+
+    -- * Misc functions
+  , runSplice
+  , runRawTemplate
+  , getDoc
 
   , heistExpatOptions
   , module Text.Templating.Heist.Constants
