@@ -20,6 +20,7 @@ import           Data.Monoid
 
 import           System.IO.Unsafe
 
+import           Text.Templating.Heist
 import           Text.Templating.Heist.Internal
 import           Text.XML.Expat.Cursor
 import           Text.XML.Expat.Format
