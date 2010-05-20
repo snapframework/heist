@@ -93,10 +93,44 @@ module Text.Templating.Heist
   , runSplice
   , runRawTemplate
   , getDoc
+  , bindStaticTag
 
   , heistExpatOptions
   , module Text.Templating.Heist.Constants
   ) where
 
-import Text.Templating.Heist.Internal
-import Text.Templating.Heist.Constants
+import qualified Data.Map as Map
+import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Constants
+import           Text.Templating.Heist.Splices
+
+
+------------------------------------------------------------------------------
+-- | The default set of built-in splices.
+defaultSpliceMap :: Monad m => SpliceMap m
+defaultSpliceMap = Map.fromList
+    [(applyTag, applyImpl)
+    ,(bindTag, bindImpl)
+    ,(ignoreTag, ignoreImpl)
+    ]
+
+
+------------------------------------------------------------------------------
+-- | An empty template state, with Heist's default splices (@\<bind\>@ and
+-- @\<apply\>@) mapped.
+emptyTemplateState :: Monad m => TemplateState m
+emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
+                                   return return return
+
+
+------------------------------------------------------------------------------
+-- | Reloads the templates from disk and renders the specified
+-- template.  (Old convenience code.)
+--renderTemplate' :: FilePath -> ByteString -> IO (Maybe ByteString)
+--renderTemplate' baseDir name = do
+--    etm <- loadTemplates baseDir emptyTemplateState
+--    let ts = either (const emptyTemplateState) id etm
+--    ns <- runTemplate ts name
+--    return $ (Just . formatList') =<< ns
+
+

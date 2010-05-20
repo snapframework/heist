@@ -76,8 +76,13 @@ Library
     Text.Templating.Heist
 
   other-modules:
-    Text.Templating.Heist.Internal
-    Text.Templating.Heist.Constants
+    Text.Templating.Heist.Internal,
+    Text.Templating.Heist.Constants,
+    Text.Templating.Heist.Splices,
+    Text.Templating.Heist.Splices.Apply,
+    Text.Templating.Heist.Splices.Bind,
+    Text.Templating.Heist.Splices.Ignore,
+    Text.Templating.Heist.Splices.Static
 
   build-depends:
     base >= 4 && < 5,
@@ -87,6 +92,7 @@ Library
     filepath,
     hexpat >= 0.16 && <0.17,
     monads-fd,
+    random,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     transformers
 

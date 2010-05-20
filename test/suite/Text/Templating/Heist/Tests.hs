@@ -277,6 +277,36 @@ prop_simpleApplyTest apply = do
 
 
 {-
+-- The beginning of some future tests for hook functions.
+
+p :: ByteString -> Node
+p t = X.Element "p" [] [X.Text t]
+
+hookG :: Monad m => ByteString -> Template -> m Template
+hookG str t = return $ (p str) : t
+
+onLoad = hookG "Inserted on load"
+preRun = hookG "Inserted on preRun"
+postRun = hookG "Inserted on postRun"
+
+ts :: IO (Either String (TemplateState IO))
+ts = loadTemplates "test/templates" $
+    foldr ($) emptyTemplateState
+    [setOnLoadHook onLoad
+    ,setPreRunHook preRun
+    ,setPostRunHook postRun
+    ]
+
+r name etm = do
+    let ts = either (error "Danger Will Robinson!") id etm
+    ns <- runTemplate ts name
+    return $ (Just . formatList') =<< ns
+
+
+-}
+
+
+{-
  - Convenience code for manual ghci experimentation
  -}
 
