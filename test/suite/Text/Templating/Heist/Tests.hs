@@ -265,7 +265,7 @@ buildApplyCaller (Apply name caller _ kids pos) =
 calcCorrect :: Apply -> [Node]
 calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 
-calcResult :: (Monad m) => Apply -> m [Node]
+calcResult :: (MonadIO m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
   runRawTemplate ts $ buildApplyCaller apply
   where ts = setTemplates (Map.singleton [unName name] callee) emptyTemplateState
