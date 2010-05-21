@@ -139,8 +139,9 @@ type SpliceMap m = Map ByteString (Splice m)
 -- TemplateState functions
 ------------------------------------------------------------------------------
 
+
 ------------------------------------------------------------------------------
--- | Adds an onLoad hook to a `TemplateState`.
+-- | Adds an on-load hook to a `TemplateState`.
 addOnLoadHook :: (Monad m) =>
                  (Template -> IO Template)
               -> TemplateState m
@@ -149,7 +150,7 @@ addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Adds a preRun hook to a `TemplateState`.
+-- | Adds a pre-run hook to a `TemplateState`.
 addPreRunHook :: (Monad m) =>
                  (Template -> m Template)
               -> TemplateState m
@@ -158,7 +159,7 @@ addPreRunHook hook ts = ts { _preRunHook = _preRunHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Adds a postRun hook to a `TemplateState`.
+-- | Adds a post-run hook to a `TemplateState`.
 addPostRunHook :: (Monad m) =>
                   (Template -> m Template)
                -> TemplateState m
@@ -308,7 +309,8 @@ mAX_RECURSION_DEPTH = 20
 
 
 ------------------------------------------------------------------------------
--- | Checks the recursion flag and recurses accordingly.
+-- | Checks the recursion flag and recurses accordingly.  Does not recurse
+-- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
 recurseSplice :: Monad m => Node -> Splice m -> Splice m
 recurseSplice node splice = do
     result <- local (const node) splice

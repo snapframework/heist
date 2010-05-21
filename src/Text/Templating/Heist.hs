@@ -4,55 +4,60 @@
 
   This module contains the core definitions for the Heist template system.
 
-  FIXME: this intro could be a lot better
+  The Heist template system is based on XML\/xhtml.  It allows you to build
+  custom XML-based markup languages.  With Heist you can define your own
+  domain-specific XML tags implemented with Haskell and use them in your
+  templates.  
 
-  The Heist template system is based on XML\/xhtml; templates are parsed in as
-  XML trees, and we define substitutions (or \"splices\") on certain tag names
-  that take 'Node' values in and substitute them with replacement text.
+  The most important concept in Heist is the 'Splice'.  Splices can be thought
+  of as functions that transform a node into a list of nodes.  Heist then
+  substitutes the resulting list of nodes into your template in place of the
+  input node.  'Splice' is implemented as a type synonym @type Splice m =
+  TemplateMonad m [Node]@, and 'TemplateMonad' has a function 'getParamNode'
+  that lets you get the input node.
 
-  In Heist nomenclature a \"splice\" is a program that, given a 'Node' from a
-  template's XML tree, transforms it and gives you a result to be \"spliced\"
-  back into the document. Each tag name in a template XML document is looked up
-  in a \"splice table\", held within a 'TemplateState', and if there's a match
-  the tag and its contents are passed to the 'Splice' for processing.
-
-  In the following example, we'll define a substitution for @\<foo/\>@ nodes that
-  causes the node to be replaced by the text \"Testing 1-2-3\":
+  Suppose you have a place on your page where you want to display a link with
+  the text \"Logout username\" if the user is currently logged in or a link to
+  the login page if no user is logged in.  Assume you have a function
+  @getUser :: MyAppMonad (Maybe ByteString)@ that gets the current user.
+  You can implement this functionality with a 'Splice' as follows:
 
   >
   > import Text.XML.Expat.Tree
   >
-  > fooSplice :: Monad m => Splice m
-  > fooSplice = return $ Text "Testing 1-2-3"
-  >
-  > go :: Monad m => m [Node]
-  > go = runRawTemplate st template
-  >   where
-  >     st = bindSplice "foo" fooSplice emptyTemplateState 
-  >     template = Element "root" [] [Element "foo" [] []]
-  >
-
-  Running \"go\" will result in the tree
-
-  > Element "root" [] [Text "Testing 1-2-3"]
-
-  'Splice' is a type synonym:
-
-  >
-  > type Splice m = TemplateMonad m [Node]
+  > link :: ByteString -> ByteString -> Node
+  > link target text = X.Element "a" [("href", target)] [X.Text text]
+  > 
+  > loginLink :: Node
+  > loginLink = link "/login" "Login"
+  > 
+  > logoutLink :: ByteString -> Node
+  > logoutLink user = link "/logout" (B.append "Logout " user)
+  > 
+  > loginLogoutSplice :: Splice MyAppMonad
+  > loginLogoutSplice = do
+  >     user <- lift getUser
+  >     return $ [maybe loginLink logoutLink user]
   >
 
-  where 'TemplateMonad' is a monad transformer that gives you access to the
-  'Node' being processed (it's a \"Reader\" monad) as well as holding the
-  'TemplateState' that contains splice and template mappings.
+  Next, you need to bind that splice to an XML tag.  Heist stores information
+  about splices and templates in the 'TemplateState' data structure.  The
+  following code demonstrates how this splice would be used.
 
-  TODO:
+  > mySplices = [ ("loginLogout", loginLogoutSplice) ]
+  > 
+  > main = do
+  >     ets <- loadTemplates "templates" $
+  >            foldr (uncurry bindSplice) emptyTemplateState mySplices
+  >     let ts = either error id ets
+  >     t <- runMyAppMonad $ renderTemplate ts "index"
+  >     print $ maybe "Page not found" id t
 
-  > * describe template loading and mapping
-  >
-  > * template contexts and subtrees
-  >
-  > * describe recursion / substitution process
+  Here we build up our 'TemplateState' by starting with emptyTemplateState and
+  applying bindSplice for all the splices we want to add.  Then we pass this
+  to loadTemplates our final 'TemplateState' wrapped in an Either to handle
+  errors.  Then we use this 'TemplateState' to render our templates.
+
 -}
 
 module Text.Templating.Heist
@@ -70,11 +75,14 @@ module Text.Templating.Heist
   , bindSplice
   , lookupSplice
   , lookupTemplate
+  , setTemplates
+  , loadTemplates
+
+    -- * Hook functions
+    -- $hookDoc
   , addOnLoadHook
   , addPreRunHook
   , addPostRunHook
-  , setTemplates
-  , loadTemplates
 
     -- * TemplateMonad functions
   , stopRecursion
@@ -99,6 +107,7 @@ module Text.Templating.Heist
   , module Text.Templating.Heist.Constants
   ) where
 
+import           Control.Monad.Trans
 import qualified Data.Map as Map
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Constants
@@ -107,18 +116,19 @@ import           Text.Templating.Heist.Splices
 
 ------------------------------------------------------------------------------
 -- | The default set of built-in splices.
-defaultSpliceMap :: Monad m => SpliceMap m
+defaultSpliceMap :: MonadIO m => SpliceMap m
 defaultSpliceMap = Map.fromList
     [(applyTag, applyImpl)
     ,(bindTag, bindImpl)
     ,(ignoreTag, ignoreImpl)
+    ,(markdownTag, markdownSplice)
     ]
 
 
 ------------------------------------------------------------------------------
 -- | An empty template state, with Heist's default splices (@\<bind\>@ and
 -- @\<apply\>@) mapped.
-emptyTemplateState :: Monad m => TemplateState m
+emptyTemplateState :: MonadIO m => TemplateState m
 emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
                                    return return return
 
@@ -133,4 +143,15 @@ emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
 --    ns <- runTemplate ts name
 --    return $ (Just . formatList') =<< ns
 
+
+-- $hookDoc
+-- Heist hooks allow you to modify templates when they are loaded and before
+-- and after they are run.  Every time you call one of the addAbcHook
+-- functions the hook is added to onto the processing pipeline.  The hooks
+-- processes the template in the order that they were added to the
+-- TemplateState.
+--
+-- The pre-run and post-run hooks are run before and after every template is
+-- run/rendered.  You should be careful what code you put in these hooks
+-- because it can significantly affect the performance of your site.
 

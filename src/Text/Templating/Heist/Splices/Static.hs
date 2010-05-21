@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Text.Templating.Heist.Splices.Static where
+module Text.Templating.Heist.Splices.Static 
+  ( StaticTagState
+  , bindStaticTag
+  , clearStaticTagCache
+  ) where
 
 ------------------------------------------------------------------------------
 import           Control.Concurrent
@@ -23,13 +27,25 @@ import           Text.Templating.Heist.Internal
 
 
 ------------------------------------------------------------------------------
+-- | State for storing static tag information
+newtype StaticTagState = STS (MVar (Map ByteString Template))
+
+
+------------------------------------------------------------------------------
+-- | Clears the static tag state.
+clearStaticTagCache :: StaticTagState -> IO ()
+clearStaticTagCache (STS staticMVar) =
+    modifyMVar_ staticMVar (const $ return Map.empty)
+
+
+------------------------------------------------------------------------------
 -- | The "static" splice ensures that its contents are evaluated once and then
 -- cached.  The cached contents are returned every time the splice is
 -- referenced.
 staticImpl :: (MonadIO m)
-           => MVar (Map ByteString Template)
+           => StaticTagState
            -> TemplateMonad m Template
-staticImpl mv = do
+staticImpl (STS mv) = do
     tree <- getParamNode
     let i = fromJust $ getAttribute tree "id"
 
@@ -54,10 +70,10 @@ staticImpl mv = do
 -- | Modifies a TemplateState to include a "static" tag.
 bindStaticTag :: MonadIO m
               => TemplateState m
-              -> IO (TemplateState m, MVar (Map ByteString [Node]))
+              -> IO (TemplateState m, StaticTagState)
 bindStaticTag ts = do
     sr <- newIORef $ Set.empty
-    mv <- newMVar Map.empty
+    mv <- liftM STS $ newMVar Map.empty
 
     return $ (addOnLoadHook (assignIds sr) $
                 bindSplice "static" (staticImpl mv) ts,
