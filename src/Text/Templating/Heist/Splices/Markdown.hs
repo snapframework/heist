@@ -2,9 +2,9 @@
 
 module Text.Templating.Heist.Splices.Markdown where
 
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy.Char8 as L
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import           Data.Maybe
 import           Control.Concurrent
 import           Control.Exception (evaluate, throwIO)
@@ -31,12 +31,12 @@ instance Show PandocMissingException where
 instance Exception PandocMissingException
 
 
-data MarkdownException = MarkdownException L.ByteString
+data MarkdownException = MarkdownException ByteString
    deriving (Typeable)
 
 instance Show MarkdownException where
     show (MarkdownException e) =
-        "Markdown error: pandoc replied:\n\n" ++ L.unpack e
+        "Markdown error: pandoc replied:\n\n" ++ BC.unpack e
 
 instance Exception MarkdownException
 
@@ -57,13 +57,13 @@ markdownSplice = do
     tree <- getParamNode
     markup <- liftIO $
         case getAttribute tree "file" of
-            Just f  -> pandoc (fromJust pdMD) $ B.unpack f
+            Just f  -> pandoc (fromJust pdMD) $ BC.unpack f
             Nothing -> pandocBS (fromJust pdMD) $ textContent tree
 
     let ee = parse' heistExpatOptions markup
     case ee of
       (Left e) -> throw $ MarkdownException
-                        $ L.pack ("Error parsing markdown output: " ++ show e)
+                        $ BC.pack ("Error parsing markdown output: " ++ show e)
       (Right n) -> return [n]
 
 
@@ -72,10 +72,9 @@ pandoc pandocPath inputFile = do
     (ex, sout, serr) <- readProcessWithExitCode' pandocPath args ""
 
     when (isFail ex) $ throw $ MarkdownException serr
-    return $ B.concat $ L.toChunks
-           $ L.concat [ "<div class=\"markdown\">\n"
-                      , sout
-                      , "\n</div>" ]
+    return $ BC.concat [ "<div class=\"markdown\">\n"
+                       , sout
+                       , "\n</div>" ]
 
   where
     isFail ExitSuccess = False
@@ -91,10 +90,9 @@ pandocBS pandocPath s = do
     (ex, sout, serr) <- readProcessWithExitCode' pandocPath args s
 
     when (isFail ex) $ throw $ MarkdownException serr
-    return $ B.concat $ L.toChunks
-           $ L.concat [ "<div class=\"markdown\">\n"
-                      , sout
-                      , "\n</div>" ]
+    return $ BC.concat [ "<div class=\"markdown\">\n"
+                       , sout
+                       , "\n</div>" ]
 
   where
     isFail ExitSuccess = False
@@ -107,7 +105,7 @@ readProcessWithExitCode'
     :: FilePath                 -- ^ command to run
     -> [String]                 -- ^ any arguments
     -> ByteString               -- ^ standard input
-    -> IO (ExitCode,L.ByteString,L.ByteString) -- ^ exitcode, stdout, stderr
+    -> IO (ExitCode,ByteString,ByteString) -- ^ exitcode, stdout, stderr
 readProcessWithExitCode' cmd args input = do
     (Just inh, Just outh, Just errh, pid) <-
         createProcess (proc cmd args){ std_in  = CreatePipe,
@@ -115,13 +113,20 @@ readProcessWithExitCode' cmd args input = do
                                        std_err = CreatePipe }
     outMVar <- newEmptyMVar
 
+    outM <- newEmptyMVar
+    errM <- newEmptyMVar
+
     -- fork off a thread to start consuming stdout
-    out <- L.hGetContents outh
-    forkIO $ evaluate (L.length out) >> putMVar outMVar ()
+    forkIO $ do
+        out <- B.hGetContents outh
+        putMVar outM out
+        putMVar outMVar ()
 
     -- fork off a thread to start consuming stderr
-    err  <- L.hGetContents errh
-    forkIO $ evaluate (L.length err) >> putMVar outMVar ()
+    forkIO $ do
+        err  <- B.hGetContents errh
+        putMVar errM err
+        putMVar outMVar ()
 
     -- now write and flush any input
     when (not (B.null input)) $ do B.hPutStr inh input; hFlush inh
@@ -134,6 +139,9 @@ readProcessWithExitCode' cmd args input = do
 
     -- wait on the process
     ex <- waitForProcess pid
+
+    out <- readMVar outM
+    err <- readMVar errM
 
     return (ex, out, err)
 
