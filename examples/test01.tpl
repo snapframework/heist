@@ -1,1 +1,1 @@
-<root><snap:bind tag="foo"><snap:bind tag="foo">bar</snap:bind></snap:bind><foo/><foo/></root>
+<root><bind tag="foo"><bind tag="foo">bar</bind></bind><foo/><foo/></root>

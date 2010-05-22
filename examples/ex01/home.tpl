@@ -4,7 +4,7 @@
   </head>
   <body>
     <h1>Home Page</h1>
-    <snap:apply template="ex01/nav"/>
+    <apply template="ex01/nav"/>
     <p>Welcome to our home page.</p>
   </body>
 </html>
