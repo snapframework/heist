@@ -108,4 +108,4 @@ Library
 
 source-repository head
   type:     git
-  location: http://git.snapframework.com/heist
+  location: http://git.snapframework.com/heist.git
