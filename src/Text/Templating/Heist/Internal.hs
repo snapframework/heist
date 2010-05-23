@@ -188,8 +188,14 @@ lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 
 ------------------------------------------------------------------------------
 -- | Converts a path into an array of the elements in reverse order.
+-- If the path is absolute, we need to remove the leading slash so the split
+-- doesn't leave "" as the last element of the TPath.
+--
+-- FIXME ".." currently doesn't work in paths, the solution is non-trivial
 splitPaths :: ByteString -> TPath
-splitPaths = reverse . B.split '/'
+splitPaths p = if B.null p then [] else (reverse $ B.split '/' path)
+  where
+    path = if B.head p == '/' then B.tail p else p
 
 
 ------------------------------------------------------------------------------
@@ -445,13 +451,17 @@ mapRight g = either Left (Right . g)
 ------------------------------------------------------------------------------
 -- | Loads a template with the specified path and filename.  The
 -- template is only loaded if it has a ".tpl" extension.
-loadTemplate :: String -> String -> IO [Either String (TPath, Template)] --TemplateMap
-loadTemplate path fname
+loadTemplate :: String -- ^ path of the template root
+             -> String -- ^ full file path (includes the template root)
+             -> IO [Either String (TPath, Template)] --TemplateMap
+loadTemplate templateRoot fname
     | ".tpl" `isSuffixOf` fname = do
         c <- getDoc fname
         return [fmap (\t -> (splitPaths $ B.pack tName, t)) c]
     | otherwise = return []
-  where tName = drop ((length path)+1) $
+  where -- tName is path relative to the template root directory
+        tName = drop ((length templateRoot)+1) $
+                -- We're only dropping the template root, not the whole path
                 take ((length fname) - 4) fname
 
 

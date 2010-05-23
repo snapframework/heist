@@ -132,17 +132,6 @@ emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
                                    return return return
 
 
-------------------------------------------------------------------------------
--- | Reloads the templates from disk and renders the specified
--- template.  (Old convenience code.)
---renderTemplate' :: FilePath -> ByteString -> IO (Maybe ByteString)
---renderTemplate' baseDir name = do
---    etm <- loadTemplates baseDir emptyTemplateState
---    let ts = either (const emptyTemplateState) id etm
---    ns <- runTemplate ts name
---    return $ (Just . formatList') =<< ns
-
-
 -- $hookDoc
 -- Heist hooks allow you to modify templates when they are loaded and before
 -- and after they are run.  Every time you call one of the addAbcHook

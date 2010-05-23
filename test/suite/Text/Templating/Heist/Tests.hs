@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TypeSynonymInstances, GeneralizedNewtypeDeriving #-}
 module Text.Templating.Heist.Tests
   ( tests
+  , quickRender
   ) where
 
 import           Test.Framework (Test)
@@ -12,6 +13,7 @@ import           Test.QuickCheck.Monadic
 
 import           Control.Monad.State
 
+import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Map as Map
@@ -89,6 +91,14 @@ fsLoadTest = do
   f isNothing "abc/def/xyz"
   f isJust "a"
   f isJust "bar/a"
+  f isJust "/bar/a"
+
+-- dotdotTest :: H.Assertion
+-- dotdotTest = do
+--   ets <- loadT "templates"
+--   let tm = either (error "Error loading templates") _templateMap ets
+--   let ts = setTemplates tm emptyTemplateState :: TemplateState IO
+--       f p n = H.assertBool ("loading template "++n) $ p $ lookupTemplate (B.pack n) ts
 
 identStartChar :: [Char]
 identStartChar = ['a'..'z']
@@ -275,6 +285,17 @@ prop_simpleApplyTest apply = do
   let correct = calcCorrect apply
   result <- run $ calcResult apply
   assert $ correct == result
+
+
+------------------------------------------------------------------------------
+-- | Reloads the templates from disk and renders the specified
+-- template.  (Old convenience code.)
+quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
+quickRender baseDir name = do
+    etm <- loadTemplates baseDir emptyTemplateState
+    let ts = either (const emptyTemplateState) id etm
+    ns <- runTemplate ts name
+    return $ (Just . formatList') =<< ns
 
 
 {-
