@@ -187,11 +187,11 @@ lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 
 
 ------------------------------------------------------------------------------
--- | Converts a path into an array of the elements in reverse order.
--- If the path is absolute, we need to remove the leading slash so the split
--- doesn't leave "" as the last element of the TPath.
+-- | Converts a path into an array of the elements in reverse order.  If the
+-- path is absolute, we need to remove the leading slash so the split doesn't
+-- leave @\"\"@ as the last element of the TPath.
 --
--- FIXME ".." currently doesn't work in paths, the solution is non-trivial
+-- FIXME @\"..\"@ currently doesn't work in paths, the solution is non-trivial
 splitPaths :: ByteString -> TPath
 splitPaths p = if B.null p then [] else (reverse $ B.split '/' path)
   where
