@@ -1,5 +1,5 @@
-Heist 0.1.1
------------
+Heist
+-----
 
 Heist, part of the Snap Framework (http://www.snapframework.com/), is a Haskell
 library for xhtml templating. FIXME: more description here
