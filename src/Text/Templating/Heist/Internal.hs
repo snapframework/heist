@@ -16,6 +16,7 @@ import qualified Data.Foldable as F
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Map (Map)
+import           Data.Typeable
 import           Prelude hiding (catch)
 import           System.Directory.Tree hiding (name)
 import           Text.XML.Expat.Format
@@ -124,6 +125,16 @@ instance (Monad m) => Monoid (TemplateState m) where
 ------------------------------------------------------------------------------
 instance MonadTrans TemplateMonad where
   lift = TemplateMonad . lift
+
+------------------------------------------------------------------------------
+instance (Typeable1 m, Typeable a) => Typeable (TemplateMonad m a) where
+    typeOf _ = mkTyConApp tCon [mRep, aRep]
+      where
+        tCon = mkTyCon "TemplateMonad"
+        maRep = typeOf (undefined :: m a)
+        (mCon, [aRep]) = splitTyConApp maRep
+        mRep = mkTyConApp mCon []
+
 
 ------------------------------------------------------------------------------
 -- | A Splice is a TemplateMonad computation that returns [Node].
