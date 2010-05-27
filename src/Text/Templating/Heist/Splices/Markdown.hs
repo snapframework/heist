@@ -7,7 +7,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Maybe
 import           Control.Concurrent
-import           Control.Exception (evaluate, throwIO)
+import           Control.Exception (throwIO)
 import           Control.Monad
 import           Control.Monad.CatchIO
 import           Control.Monad.Trans
