@@ -1,12 +1,7 @@
-Add onLoad, preRun, postRun
+For 0.2
+-------
 
-  onLoad :: Node -> IO a
-    parameter to bindSplice
-
-  preRun :: Monad m => Template -> m a
-  postRun :: Monad m => Template -> m a
-
-  The difference between pre-and post-Run and the splice is that the
-splice only gets spliced node as input.  preRun and postRun get the
-whole document.
+Allow DOCTYPEs in templates
+Ditch RWST as the underlying monad
+Add attribute string substitution
 
