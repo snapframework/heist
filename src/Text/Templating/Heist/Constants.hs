@@ -4,15 +4,16 @@ module Text.Templating.Heist.Constants where
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.Map as Map
 import           Data.Map (Map)
+import           Text.XML.Expat.Tree
 
 
 ------------------------------------------------------------------------------
 -- | Options passed to hexpat for XML parsing.
-heistExpatOptions :: X.ParserOptions ByteString ByteString
+heistExpatOptions :: ParserOptions ByteString ByteString
 heistExpatOptions =
-    X.defaultParserOptions {
-           X.parserEncoding = Just X.UTF8
-         , X.entityDecoder  = Just (\k -> Map.lookup k htmlEntityLookupTable)
+    defaultParserOptions {
+           parserEncoding = Just UTF8
+         , entityDecoder  = Just (\k -> Map.lookup k htmlEntityLookupTable)
          }
 
 ------------------------------------------------------------------------------
