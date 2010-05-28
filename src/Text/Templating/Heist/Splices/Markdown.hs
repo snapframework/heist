@@ -17,6 +17,7 @@ import           System.Directory
 import           System.Exit
 import           System.IO
 import           System.Process
+import           Text.Templating.Heist.Constants
 import           Text.Templating.Heist.Internal
 import           Text.XML.Expat.Tree hiding (Node)
 
