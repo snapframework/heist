@@ -36,42 +36,29 @@ type Node = X.Node ByteString ByteString
 
 
 ------------------------------------------------------------------------------
--- | A 'Template' is a forest of XML nodes.
+-- | A 'Template' is a forest of XML nodes.  Here we deviate from the "single
+-- root node" constraint of well-formed XML because we want to allow templates
+-- to contain fragments of a document that may not have a single root.
 type Template = [Node]
 
 
 ------------------------------------------------------------------------------
--- | Reversed list of directories
+-- | Reversed list of directories.  This holds the path to the template
+-- currently being processed.
 type TPath = [ByteString]
 
 
 ------------------------------------------------------------------------------
+-- | All templates are stored in a map.
 type TemplateMap = Map TPath Template
 
 
 ------------------------------------------------------------------------------
--- | Holds all the state information needed for template processing:
---
---     * a collection of named templates. If you use the @\<apply
---       template=\"foo\"\>@ tag to include another template by name, @\"foo\"@
---       is looked up in here.
---
---     * the mapping from tag names to 'Splice's.
---
---     * a flag to control whether we will recurse during splice processing.
---
--- We'll illustrate the recursion flag with a small example template:
---
---   > <foo>
---   >   <bar>
---   >     ...
---   >   </bar>
---   > </foo>
---
--- Assume that @\"foo\"@ is bound to a splice procedure. Running the @foo@
--- splice will result in a list of nodes @L@; if the recursion flag is on we
--- will recursively scan @L@ for splices, otherwise @L@ will be included in the
--- output verbatim.
+-- | Holds all the state information needed for template processing.  You will
+-- build a @TemplateState@ using any of Heist's @TemplateState m ->
+-- TemplateState m@ \"filter\" functions.  Then you use the resulting
+-- @TemplateState@ in calls to @renderTemplate@, @runTemplate@, or
+-- @runRawTemplate@.
 data TemplateState m = TemplateState {
     -- | A mapping of splice names to splice actions
       _spliceMap      :: SpliceMap m
@@ -79,10 +66,16 @@ data TemplateState m = TemplateState {
     , _templateMap    :: TemplateMap
     -- | A flag to control splice recursion
     , _recurse        :: Bool
+    -- | The path to the template currently being processed.
     , _curContext     :: TPath
+    -- | A counter keeping track of the current recursion depth to prevent
+    -- infinite loops.
     , _recursionDepth :: Int
+    -- | A hook run on all templates at load time.
     , _onLoadHook     :: Template -> IO Template
+    -- | A hook run on all templates just before they are rendered.
     , _preRunHook     :: Template -> m Template
+    -- | A hook run on all templates just after they are rendered.
     , _postRunHook    :: Template -> m Template
 }
 
@@ -137,7 +130,7 @@ instance (Typeable1 m, Typeable a) => Typeable (TemplateMonad m a) where
 
 
 ------------------------------------------------------------------------------
--- | A Splice is a TemplateMonad computation that returns [Node].
+-- | A Splice is a TemplateMonad computation that returns a 'Template'.
 type Splice m = TemplateMonad m Template
 
 
@@ -277,12 +270,34 @@ addTemplate n t st = insertTemplate (splitPaths n) t st
 
 ------------------------------------------------------------------------------
 -- | Gets the node currently being processed.
+--
+--   > <speech author="Shakespeare">
+--   >   To sleep, perchance to dream.
+--   > </speech>
+--
+-- When you call @getParamNode@ inside the code for the @speech@ splice, it
+-- returns the Node for the @speech@ tag and its children.  @getParamNode >>=
+-- getChildren@ returns a list containing one 'Text' node containing part of
+-- Hamlet's speech.  @getParamNode >>= getAttribute \"author\"@ would return
+-- @Just "Shakespeare"@.
 getParamNode :: Monad m => TemplateMonad m Node
 getParamNode = ask
 
 
 ------------------------------------------------------------------------------
--- | Stops the recursive processing of splices.
+-- | Stops the recursive processing of splices.  Consider the following
+-- example:
+--
+--   > <foo>
+--   >   <bar>
+--   >     ...
+--   >   </bar>
+--   > </foo>
+--
+-- Assume that @\"foo\"@ is bound to a splice procedure. Running the @foo@
+-- splice will result in a list of nodes @L@.  Normally @foo@ will recursively
+-- scan @L@ for splices and run them.  If @foo@ calls @stopRecursion@, @L@
+-- will be included in the output verbatim without running any splices.
 stopRecursion :: Monad m => TemplateMonad m ()
 stopRecursion = modify (\st -> st { _recurse = False })
 
@@ -423,14 +438,6 @@ renderTemplate ts name = do
     ns <- runTemplate ts name
     return $ (Just . formatList') =<< ns
 
-
-------------------------------------------------------------------------------
-heistExpatOptions :: X.ParserOptions ByteString ByteString
-heistExpatOptions =
-    X.defaultParserOptions {
-           X.parserEncoding = Just X.UTF8
-         , X.entityDecoder  = Just (\k -> Map.lookup k htmlEntityLookupTable)
-         }
 
 ------------------------------------------------------------------------------
 -- Template loading

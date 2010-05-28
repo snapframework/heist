@@ -64,8 +64,8 @@ module Text.Templating.Heist
   (
     -- * Types
     Node
-  , Splice
   , Template
+  , Splice
   , TemplateMonad
   , TemplateState
 
@@ -102,8 +102,6 @@ module Text.Templating.Heist
   , getDoc
   , bindStaticTag
 
-  , heistExpatOptions
-  , module Text.Templating.Heist.Constants
   ) where
 
 import           Control.Monad.Trans

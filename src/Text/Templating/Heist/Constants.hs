@@ -5,6 +5,18 @@ import           Data.ByteString.Char8 (ByteString)
 import qualified Data.Map as Map
 import           Data.Map (Map)
 
+
+------------------------------------------------------------------------------
+-- | Options passed to hexpat for XML parsing.
+heistExpatOptions :: X.ParserOptions ByteString ByteString
+heistExpatOptions =
+    X.defaultParserOptions {
+           X.parserEncoding = Just X.UTF8
+         , X.entityDecoder  = Just (\k -> Map.lookup k htmlEntityLookupTable)
+         }
+
+------------------------------------------------------------------------------
+-- | Character entity references for HTML.
 htmlEntityLookupTable :: Map ByteString ByteString
 htmlEntityLookupTable = Map.fromList [
                          ("acute"      , "\xc2\xb4")
