@@ -144,6 +144,21 @@ runTemplateMonad ts node (TemplateMonad tm) = do
 
 
 ------------------------------------------------------------------------------
+-- | Restores the components of TemplateState that can get modified in
+-- template calls.  You should use this function instead of @put@ to restore
+-- an old state.  Thas was needed because doctypes needs to be in a "global
+-- scope" as opposed to the template call "local scope" of state items such
+-- as recursionDepth, curContext, and spliceMap.
+restoreState :: Monad m => TemplateState m -> TemplateMonad m ()
+restoreState ts1 = 
+    modify (\ts2 -> ts2
+        { _recursionDepth = _recursionDepth ts1
+        , _curContext = _curContext ts1
+        , _spliceMap = _spliceMap ts1
+        })
+
+
+------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
 addDoctype :: Monad m => [ByteString] -> TemplateMonad m ()
 addDoctype dt = do
@@ -376,33 +391,6 @@ mAX_RECURSION_DEPTH :: Int
 mAX_RECURSION_DEPTH = 50
 
 
-modRecursionDepth :: Monad m => (Int -> Int) -> TemplateMonad m ()
-modRecursionDepth f =
-    modify (\st -> st { _recursionDepth = f (_recursionDepth st) })
-
-
-restoreState :: Monad m => TemplateState m -> TemplateMonad m ()
-restoreState ts1 = 
-    modify (\ts2 -> ts2
-        { _recursionDepth = _recursionDepth ts1
-        , _curContext = _curContext ts1
-        , _spliceMap = _spliceMap ts1
-        })
-
-
-call :: Monad m => TemplateMonad m a -> TemplateMonad m a
-call k = do
-    ts <- get
-    let rd = _recursionDepth ts
-        cc = _curContext ts
-        sm = _spliceMap ts
-    res <- k
-    put $ ts { _recursionDepth = rd 
-             , _curContext = cc
-             , _spliceMap = sm
-             }
-    return res
-    
 ------------------------------------------------------------------------------
 -- | Checks the recursion flag and recurses accordingly.  Does not recurse
 -- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
@@ -416,6 +404,10 @@ recurseSplice node splice = do
                 restoreState ts'
                 return res
         else return result
+  where
+    modRecursionDepth :: Monad m => (Int -> Int) -> TemplateMonad m ()
+    modRecursionDepth f =
+        modify (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
 
 ------------------------------------------------------------------------------

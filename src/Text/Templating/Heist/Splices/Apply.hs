@@ -36,12 +36,11 @@ applyImpl = do
             maybe (return []) -- TODO: error handling
                   (\(t,ctx) -> do
                       addDoctype $ maybeToList $ _itDoctype t
-                      st' <- get
                       processedChildren <- runNodeList $ X.getChildren node
                       modify (bindSplice "content" $ return processedChildren)
                       setContext ctx
                       result <- runNodeList $ _itNodes t
-                      restoreState st'
+                      restoreState st
                       return result)
                   (lookupTemplate attr (st {_curContext = nextCtx attr st}))
   where nextCtx name st
