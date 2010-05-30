@@ -90,15 +90,12 @@ module Text.Templating.Heist
   , getContext
 
     -- * Functions for running splices and templates
-  , runTemplate
   , evalTemplate
   , callTemplate
   , renderTemplate
   , bindStrings
 
     -- * Misc functions
-  , runSplice
-  , runRawTemplate
   , getDoc
   , bindStaticTag
 
@@ -107,7 +104,6 @@ module Text.Templating.Heist
 import           Control.Monad.Trans
 import qualified Data.Map as Map
 import           Text.Templating.Heist.Internal
-import           Text.Templating.Heist.Constants
 import           Text.Templating.Heist.Splices
 
 
@@ -127,7 +123,7 @@ defaultSpliceMap = Map.fromList
 -- @\<apply\>@) mapped.
 emptyTemplateState :: MonadIO m => TemplateState m
 emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
-                                   return return return
+                                   return return return []
 
 
 -- $hookDoc

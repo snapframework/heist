@@ -16,6 +16,7 @@ import qualified Data.Foldable as F
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Map (Map)
+import           Data.Maybe
 import           Data.Typeable
 import           Prelude hiding (catch)
 import           System.Directory.Tree hiding (name)
@@ -29,6 +30,7 @@ import           Text.Templating.Heist.Constants
 -- Types
 ------------------------------------------------------------------------------
 
+------------------------------------------------------------------------------
 -- | Heist templates are XML documents. The hexpat library is polymorphic over
 -- the type of strings, so here we define a 'Node' alias to fix the string
 -- types of the tag names and tag bodies to 'ByteString'.
@@ -43,6 +45,17 @@ type Template = [Node]
 
 
 ------------------------------------------------------------------------------
+-- | An 'InternalTemplate' carries a doctype with it that we get from the
+-- template at load time.  The tricks that we're playing so templates don't
+-- have to have a single root node screw up doctypes, so we have to handle
+-- them manually.
+data InternalTemplate = InternalTemplate {
+    _itDoctype :: Maybe ByteString,
+    _itNodes   :: [Node]
+} deriving (Eq, Show)
+
+
+------------------------------------------------------------------------------
 -- | Reversed list of directories.  This holds the path to the template
 -- currently being processed.
 type TPath = [ByteString]
@@ -50,15 +63,14 @@ type TPath = [ByteString]
 
 ------------------------------------------------------------------------------
 -- | All templates are stored in a map.
-type TemplateMap = Map TPath Template
+type TemplateMap = Map TPath InternalTemplate
 
 
 ------------------------------------------------------------------------------
 -- | Holds all the state information needed for template processing.  You will
 -- build a @TemplateState@ using any of Heist's @TemplateState m ->
 -- TemplateState m@ \"filter\" functions.  Then you use the resulting
--- @TemplateState@ in calls to @renderTemplate@, @runTemplate@, or
--- @runRawTemplate@.
+-- @TemplateState@ in calls to @renderTemplate@.
 data TemplateState m = TemplateState {
     -- | A mapping of splice names to splice actions
       _spliceMap      :: SpliceMap m
@@ -77,6 +89,8 @@ data TemplateState m = TemplateState {
     , _preRunHook     :: Template -> m Template
     -- | A hook run on all templates just after they are rendered.
     , _postRunHook    :: Template -> m Template
+    -- | The doctypes encountered during template processing.
+    , _doctypes       :: [ByteString]
 }
 
 
@@ -103,11 +117,12 @@ newtype TemplateMonad m a = TemplateMonad (RWST Node () (TemplateState m) m a)
 ------------------------------------------------------------------------------
 instance (Monad m) => Monoid (TemplateState m) where
     mempty = TemplateState Map.empty Map.empty True [] 0
-                           return return return
+                           return return return []
 
-    (TemplateState s1 t1 r1 _ d1 o1 b1 a1) `mappend`
-        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2) =
+    (TemplateState s1 t1 r1 _ d1 o1 b1 a1 dt1) `mappend`
+        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2 dt2) =
         TemplateState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
+            (dt1 `mappend` dt2)
       where
         s = s1 `mappend` s2
         t = t1 `mappend` t2
@@ -116,8 +131,29 @@ instance (Monad m) => Monoid (TemplateState m) where
 
 
 ------------------------------------------------------------------------------
+-- | Runs a splice in the underlying monad.  Splices require two
+-- parameters, the template state, and an input node.
+runTemplateMonad :: Monad m =>
+             TemplateState m   -- ^ The initial template state
+          -> Node              -- ^ The splice's input node
+          -> TemplateMonad m a
+          -> m a
+runTemplateMonad ts node (TemplateMonad tm) = do
+    (result,_,_) <- runRWST tm node ts
+    return result
+
+
+------------------------------------------------------------------------------
+-- | Mappends a doctype to the state.
+addDoctype :: Monad m => [ByteString] -> TemplateMonad m ()
+addDoctype dt = do
+    modify (\s -> s { _doctypes = _doctypes s `mappend` dt })
+
+
+------------------------------------------------------------------------------
 instance MonadTrans TemplateMonad where
   lift = TemplateMonad . lift
+
 
 ------------------------------------------------------------------------------
 instance (Typeable1 m, Typeable a) => Typeable (TemplateMonad m a) where
@@ -207,7 +243,7 @@ splitPaths p = if B.null p then [] else (reverse $ B.split '/' path)
 singleLookup :: TemplateMap
              -> TPath
              -> ByteString
-             -> Maybe (Template, TPath)
+             -> Maybe (InternalTemplate, TPath)
 singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 
 
@@ -217,7 +253,7 @@ singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 traversePath :: TemplateMap
              -> TPath
              -> ByteString
-             -> Maybe (Template, TPath)
+             -> Maybe (InternalTemplate, TPath)
 traversePath tm [] name = fmap (\a -> (a,[])) (Map.lookup [name] tm)
 traversePath tm path name =
     singleLookup tm path name `mplus`
@@ -229,7 +265,7 @@ traversePath tm path name =
 lookupTemplate :: Monad m =>
                   ByteString
                -> TemplateState m
-               -> Maybe (Template, TPath)
+               -> Maybe (InternalTemplate, TPath)
 lookupTemplate nameStr ts = 
     f (_templateMap ts) path name
   where (name:p) = case splitPaths nameStr of
@@ -251,7 +287,7 @@ setTemplates m ts = ts { _templateMap = m }
 -- | Adds a template to the template state.
 insertTemplate :: Monad m =>
                TPath
-            -> Template
+            -> InternalTemplate
             -> TemplateState m
             -> TemplateState m
 insertTemplate p t st =
@@ -262,7 +298,7 @@ insertTemplate p t st =
 -- | Adds a template to the template state.
 addTemplate :: Monad m =>
                ByteString
-            -> Template
+            -> InternalTemplate
             -> TemplateState m
             -> TemplateState m
 addTemplate n t st = insertTemplate (splitPaths n) t st
@@ -315,12 +351,6 @@ getContext = gets _curContext
   
 
 ------------------------------------------------------------------------------
--- | Performs splice processing on a list of nodes.
-runNodeList :: Monad m => [Node] -> Splice m
-runNodeList nodes = liftM concat $ sequence (map runNode nodes)
-
-
-------------------------------------------------------------------------------
 -- | Performs splice processing on a single node.
 runNode :: Monad m => Node -> Splice m
 runNode n@(X.Text _)          = return [n]
@@ -335,11 +365,44 @@ runNode n@(X.Element nm _ ch) = do
 
 
 ------------------------------------------------------------------------------
+-- | Performs splice processing on a list of nodes.
+runNodeList :: Monad m => [Node] -> Splice m
+runNodeList nodes = liftM concat $ sequence (map runNode nodes)
+
+
+------------------------------------------------------------------------------
 -- | The maximum recursion depth.  (Used to prevent infinite loops.)
 mAX_RECURSION_DEPTH :: Int
-mAX_RECURSION_DEPTH = 20
+mAX_RECURSION_DEPTH = 50
 
 
+modRecursionDepth :: Monad m => (Int -> Int) -> TemplateMonad m ()
+modRecursionDepth f =
+    modify (\st -> st { _recursionDepth = f (_recursionDepth st) })
+
+
+restoreState :: Monad m => TemplateState m -> TemplateMonad m ()
+restoreState ts1 = 
+    modify (\ts2 -> ts2
+        { _recursionDepth = _recursionDepth ts1
+        , _curContext = _curContext ts1
+        , _spliceMap = _spliceMap ts1
+        })
+
+
+call :: Monad m => TemplateMonad m a -> TemplateMonad m a
+call k = do
+    ts <- get
+    let rd = _recursionDepth ts
+        cc = _curContext ts
+        sm = _spliceMap ts
+    res <- k
+    put $ ts { _recursionDepth = rd 
+             , _curContext = cc
+             , _spliceMap = sm
+             }
+    return res
+    
 ------------------------------------------------------------------------------
 -- | Checks the recursion flag and recurses accordingly.  Does not recurse
 -- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
@@ -348,60 +411,54 @@ recurseSplice node splice = do
     result <- local (const node) splice
     ts' <- get
     if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
-        then do modify (\st -> st { _recursionDepth = _recursionDepth st + 1 })
+        then do modRecursionDepth (+1)
                 res <- runNodeList result
-                put ts'
+                restoreState ts'
                 return res
         else return result
 
 
 ------------------------------------------------------------------------------
--- | Runs a splice in the underlying monad.  Splices require two
--- parameters, the template state, and an input node.
-runSplice :: Monad m =>
-             TemplateState m -- ^ The initial template state
-          -> Node            -- ^ The splice's input node
-          -> Splice m        -- ^ The splice
-          -> m [Node]
-runSplice ts node (TemplateMonad splice) = do
-    (result,_,_) <- runRWST splice node ts
-    return result
-
-
-------------------------------------------------------------------------------
--- | Runs a template in the underlying monad.  Similar to runSplice
--- except that templates don't require a Node as a parameter.
-runRawTemplate :: Monad m => TemplateState m -> Template -> m [Node]
-runRawTemplate ts template =
-    _preRunHook ts template >>=
-    runSplice ts (X.Text "") . runNodeList >>=
-    _postRunHook ts
-
-
-------------------------------------------------------------------------------
--- | Looks up a template name in the supplied 'TemplateState' and runs
--- it in the underlying monad.
-runTemplate :: Monad m
-            => TemplateState m
-            -> ByteString
-            -> m (Maybe [Node])
-runTemplate ts name =
-    maybe (return Nothing)
-          (\(t,ctx) ->
-              return . Just =<<
-              runRawTemplate (ts {_curContext = ctx}) t)
+-- | Looks up a template name runs a TemplateMonad computation on it.
+lookupAndRun :: Monad m
+             => ByteString
+             -> ((InternalTemplate, TPath) -> TemplateMonad m (Maybe a))
+             -> TemplateMonad m (Maybe a)
+lookupAndRun name k = do
+    ts <- get
+    maybe (return Nothing) k
           (lookupTemplate name ts)
 
 
 ------------------------------------------------------------------------------
--- | Looks up a template name evaluates it.  Same as runTemplate except it
--- runs in TemplateMonad instead of m.
+-- | Looks up a template name evaluates it by calling runNodeList.
 evalTemplate :: Monad m
             => ByteString
-            -> TemplateMonad m (Maybe [Node])
-evalTemplate name = do
-    ts <- get
-    lift $ runTemplate ts name
+            -> TemplateMonad m (Maybe Template)
+evalTemplate name = lookupAndRun name
+    (\(t,ctx) -> do
+        ts <- get
+        put (ts {_curContext = ctx})
+        res <- runNodeList $ _itNodes t
+        restoreState ts
+        return $ Just res)
+
+
+------------------------------------------------------------------------------
+-- | Looks up a template name evaluates it by calling runNodeList.  This also
+-- executes pre- and post-run hooks and adds the doctype.
+evalWithHooks :: Monad m
+            => ByteString
+            -> TemplateMonad m (Maybe Template)
+evalWithHooks name = lookupAndRun name
+    (\(t,ctx) -> do
+        addDoctype $ maybeToList $ _itDoctype t
+        ts <- get
+        nodes <- lift $ _preRunHook ts $ _itNodes t
+        put (ts {_curContext = ctx})
+        res <- runNodeList nodes
+        restoreState ts
+        return . Just =<< lift (_postRunHook ts res))
 
 
 ------------------------------------------------------------------------------
@@ -429,35 +486,83 @@ callTemplate name params = do
 
 
 ------------------------------------------------------------------------------
+-- | Converts a Template to an InternalTemplate.  This can only be done inside
+-- TemplateMonad where the doctype is available.
+toInternalTemplate :: Monad m => Template -> TemplateMonad m InternalTemplate
+toInternalTemplate t = do
+    dts <- gets _doctypes
+    return $ InternalTemplate {
+        _itDoctype = listToMaybe dts,
+        _itNodes = t
+    }
+
+
+------------------------------------------------------------------------------
+-- | Renders an internal template by prepending the appropriate doctype.
+renderInternal :: Monad m => InternalTemplate -> TemplateMonad m ByteString
+renderInternal (InternalTemplate dt nodes) =
+    return $ maybe bs (flip B.append bs) dt
+  where
+    bs = formatList' nodes
+
+
+------------------------------------------------------------------------------
 -- | Renders a template from the specified TemplateState.
 renderTemplate :: Monad m
                => TemplateState m
                -> ByteString
                -> m (Maybe ByteString)
 renderTemplate ts name = do
-    ns <- runTemplate ts name
-    return $ (Just . formatList') =<< ns
-
+    runTemplateMonad ts (X.Text "") $ do
+        mt <- evalWithHooks name
+        maybe (return Nothing)
+              (\t -> liftM Just $ renderInternal =<< toInternalTemplate t)
+              mt
+        
 
 ------------------------------------------------------------------------------
 -- Template loading
 ------------------------------------------------------------------------------
 
 -- | Reads an XML document from disk.
-getDoc :: String -> IO (Either String Template)
+getDoc :: String -> IO (Either String InternalTemplate)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
-    let wrap b = "<snap:root>\n" `B.append` b `B.append` "\n</snap:root>"
-    return $ (mapRight X.getChildren .
-              mapLeft genErrorMsg .
-              X.parse' heistExpatOptions . wrap) =<< bs
+    return $ do
+        (doctype, rest) <- liftM extractDoctype bs
+        let wrap b = "<snap:root>\n" `B.append` b `B.append` "\n</snap:root>"
+            toTemplate t = InternalTemplate {
+                _itDoctype = doctype,
+                _itNodes = t
+            }
+        mapRight (toTemplate . X.getChildren) .
+            mapLeft genErrorMsg .
+            X.parse' heistExpatOptions . wrap $ rest
   where
     genErrorMsg (X.XMLParseError str loc) = f ++ " " ++ locMsg loc ++ ": " ++ translate str
     locMsg (X.XMLParseLocation line col _ _) =
         "(line " ++ show (line-1) ++ ", col " ++ show col ++ ")"
     translate "junk after document element" = "document must have a single root element"
     translate s = s
+
+
+------------------------------------------------------------------------------
+-- | Checks whether the bytestring has a doctype.
+hasDoctype :: ByteString -> Bool
+hasDoctype bs = "<!DOCTYPE" `B.isPrefixOf` bs
+
+
+------------------------------------------------------------------------------
+-- | Converts a ByteString into a tuple containing a possible doctype
+-- ByteString and the rest of the document.
+extractDoctype :: ByteString -> (Maybe ByteString, ByteString)
+extractDoctype bs = 
+    if hasDoctype bs
+        then (Just $ B.snoc (B.takeWhile p bs) '>', B.tail $ B.dropWhile p bs)
+        else (Nothing, bs)
+  where
+    p = (/='>')
 
 ------------------------------------------------------------------------------
 mapLeft :: (a -> b) -> Either a c -> Either b c
@@ -471,14 +576,15 @@ mapRight g = either Left (Right . g)
 -- template is only loaded if it has a ".tpl" extension.
 loadTemplate :: String -- ^ path of the template root
              -> String -- ^ full file path (includes the template root)
-             -> IO [Either String (TPath, Template)] --TemplateMap
+             -> IO [Either String (TPath, InternalTemplate)] --TemplateMap
 loadTemplate templateRoot fname
     | ".tpl" `isSuffixOf` fname = do
         c <- getDoc fname
         return [fmap (\t -> (splitPaths $ B.pack tName, t)) c]
     | otherwise = return []
   where -- tName is path relative to the template root directory
-        tName = drop ((length templateRoot)+1) $
+        correction = if last templateRoot == '/' then 0 else 1
+        tName = drop ((length templateRoot)+correction) $
                 -- We're only dropping the template root, not the whole path
                 take ((length fname) - 4) fname
 
@@ -497,11 +603,21 @@ loadTemplates dir ts = do
 
 
 ------------------------------------------------------------------------------
+-- | Reversed list of directories.  This holds the path to the template
+runHookInternal :: Monad m => (Template -> m Template)
+                -> InternalTemplate
+                -> m InternalTemplate
+runHookInternal f t = do
+    n <- f $ _itNodes t
+    return $ t { _itNodes = n }
+
+
+------------------------------------------------------------------------------
 -- | Runs the onLoad hook on the template and returns the `TemplateState`
 -- with the result inserted.
-loadHook :: Monad m => TemplateState m -> (TPath, Template) -> IO (TemplateState m)
+loadHook :: Monad m => TemplateState m -> (TPath, InternalTemplate) -> IO (TemplateState m)
 loadHook ts (tp, t) = do
-    t' <- _onLoadHook ts t
+    t' <- runHookInternal (_onLoadHook ts) t
     return $ insertTemplate tp t' ts
 
 

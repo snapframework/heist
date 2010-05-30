@@ -3,3 +3,4 @@
 :set -i../src
 :set -isuite
 :set -hide-package mtl
+:set -hide-package MonadCatchIO-mtl

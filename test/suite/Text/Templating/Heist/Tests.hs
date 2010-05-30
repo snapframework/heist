@@ -37,6 +37,7 @@ tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_sim
         , testCase "loadTest" loadTest
         , testCase "fsLoadTest" fsLoadTest
         , testCase "renderNoNameTest" renderNoNameTest
+        , testCase "doctypeTest" doctypeTest
         ]
 
 monoidTest :: IO ()
@@ -47,9 +48,9 @@ monoidTest = do
 
 addTest :: IO ()
 addTest = do
-  H.assertBool "lookup test" $ Just [] == (fmap fst $ lookupTemplate "aoeu" ts)
+  H.assertBool "lookup test" $ Just [] == (fmap (_itNodes . fst) $ lookupTemplate "aoeu" ts)
   H.assertBool "splice touched" $ Map.size (_spliceMap ts) == 0
-  where ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
+  where ts = addTemplate "aoeu" (InternalTemplate Nothing []) (mempty::TemplateState IO)
 
 isLeft :: Either a b -> Bool
 isLeft (Left _) = True
@@ -64,7 +65,7 @@ loadTest = do
   ets <- loadT "templates"
   either (error "Error loading templates")
          (\ts -> do let tm = _templateMap ts
-                    H.assertBool "loadTest size" $ Map.size tm == 12
+                    H.assertBool "loadTest size" $ Map.size tm == 14
          ) ets
 
 renderNoNameTest :: H.Assertion
@@ -92,6 +93,15 @@ fsLoadTest = do
   f isJust "a"
   f isJust "bar/a"
   f isJust "/bar/a"
+
+doctypeTest :: H.Assertion
+doctypeTest = do
+  ets <- loadT "templates"
+  let ts = either (error "Error loading templates") id ets
+  index <- renderTemplate ts "index"
+  H.assertBool "doctype test index" $ hasDoctype $ fromJust index
+  ioc <- renderTemplate ts "ioc"
+  H.assertBool "doctype test ioc" $ hasDoctype $ fromJust ioc
 
 -- dotdotTest :: H.Assertion
 -- dotdotTest = do
@@ -201,7 +211,8 @@ instance Show Bind where
     ,L.unpack $ L.concat $ map formatNode $ buildResult b
     ,"Splice result:"
     ,L.unpack $ L.concat $ map formatNode $ unsafePerformIO $
-        runRawTemplate emptyTemplateState $ buildBindTemplate b
+        runTemplateMonad emptyTemplateState (X.Text "")$
+        runNodeList $ buildBindTemplate b
     ,"Template:"
     ,L.unpack $ L.concat $ map formatNode $ buildBindTemplate b
     ]
@@ -243,7 +254,8 @@ prop_simpleBindTest :: Bind -> PropertyM IO ()
 prop_simpleBindTest bind = do
   let template = buildBindTemplate bind
       result = buildResult bind
-  spliceResult <- run $ runRawTemplate emptyTemplateState template
+  spliceResult <- run $ runTemplateMonad emptyTemplateState (X.Text "") $
+                  runNodeList template
   assert $ result == spliceResult
 
 {-
@@ -277,8 +289,11 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 
 calcResult :: (MonadIO m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
-  runRawTemplate ts $ buildApplyCaller apply
-  where ts = setTemplates (Map.singleton [unName name] callee) emptyTemplateState
+  runTemplateMonad ts (X.Text "") $
+  runNodeList $ buildApplyCaller apply
+  where ts = setTemplates (Map.singleton [unName name]
+                           (InternalTemplate Nothing callee))
+             emptyTemplateState
 
 prop_simpleApplyTest :: Apply -> PropertyM IO ()
 prop_simpleApplyTest apply = do
@@ -287,15 +302,18 @@ prop_simpleApplyTest apply = do
   assert $ correct == result
 
 
+getTS :: FilePath -> IO (TemplateState IO)
+getTS baseDir = do
+    etm <- loadTemplates baseDir emptyTemplateState
+    return $ either error id etm
+
 ------------------------------------------------------------------------------
 -- | Reloads the templates from disk and renders the specified
 -- template.  (Old convenience code.)
 quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
 quickRender baseDir name = do
-    etm <- loadTemplates baseDir emptyTemplateState
-    let ts = either (const emptyTemplateState) id etm
-    ns <- runTemplate ts name
-    return $ (Just . formatList') =<< ns
+    ts <- getTS baseDir
+    renderTemplate ts name
 
 
 {-
@@ -321,7 +339,7 @@ ts = loadTemplates "test/templates" $
 
 r name etm = do
     let ts = either (error "Danger Will Robinson!") id etm
-    ns <- runTemplate ts name
+    ns <- runNodeList ts name
     return $ (Just . formatList') =<< ns
 
 
