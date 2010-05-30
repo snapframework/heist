@@ -19,6 +19,7 @@ import           Data.Map (Map)
 import           Data.Typeable
 import           Prelude hiding (catch)
 import           System.Directory.Tree hiding (name)
+import           System.FilePath
 import           Text.XML.Expat.Format
 import qualified Text.XML.Expat.Tree as X
 
@@ -196,10 +197,22 @@ lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 -- leave @\"\"@ as the last element of the TPath.
 --
 -- FIXME @\"..\"@ currently doesn't work in paths, the solution is non-trivial
-splitPaths :: ByteString -> TPath
-splitPaths p = if B.null p then [] else (reverse $ B.split '/' path)
+splitPathWith :: Char -> ByteString -> TPath
+splitPathWith s p = if B.null p then [] else (reverse $ B.split s path)
   where
-    path = if B.head p == '/' then B.tail p else p
+    path = if B.head p == s then B.tail p else p
+
+-- | Converts a path into an array of the elements in reverse order using the
+-- path separator of the local operating system. See 'splitPathWith' for more
+-- details.
+splitLocalPath :: ByteString -> TPath
+splitLocalPath = splitPathWith pathSeparator
+
+-- | Converts a path into an array of the elements in reverse order using a
+-- forward slash (/) as the path separator. See 'splitPathWith' for more
+-- details.
+splitTemplatePath :: ByteString -> TPath
+splitTemplatePath = splitPathWith '/'
 
 
 ------------------------------------------------------------------------------
@@ -232,7 +245,7 @@ lookupTemplate :: Monad m =>
                -> Maybe (Template, TPath)
 lookupTemplate nameStr ts = 
     f (_templateMap ts) path name
-  where (name:p) = case splitPaths nameStr of
+  where (name:p) = case splitTemplatePath nameStr of
                        [] -> [""]
                        ps -> ps
         path = p ++ (_curContext ts)
@@ -265,7 +278,7 @@ addTemplate :: Monad m =>
             -> Template
             -> TemplateState m
             -> TemplateState m
-addTemplate n t st = insertTemplate (splitPaths n) t st
+addTemplate n t st = insertTemplate (splitTemplatePath n) t st
 
 
 ------------------------------------------------------------------------------
@@ -475,7 +488,7 @@ loadTemplate :: String -- ^ path of the template root
 loadTemplate templateRoot fname
     | ".tpl" `isSuffixOf` fname = do
         c <- getDoc fname
-        return [fmap (\t -> (splitPaths $ B.pack tName, t)) c]
+        return [fmap (\t -> (splitLocalPath $ B.pack tName, t)) c]
     | otherwise = return []
   where -- tName is path relative to the template root directory
         tName = drop ((length templateRoot)+1) $
