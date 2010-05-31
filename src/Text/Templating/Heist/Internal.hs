@@ -383,6 +383,9 @@ runNode n@(X.Element nm at ch) = do
         return (n,v')
 
 
+------------------------------------------------------------------------------
+-- | Parses an attribute with attribute variable substitution.
+parseAtt :: Monad m => ByteString -> TemplateMonad m ByteString
 parseAtt bs
     | B.null bs = return B.empty
     | otherwise = let (pre,rest) = B.span (/='{') bs in do
@@ -393,7 +396,12 @@ parseAtt bs
                     return $ B.append a c
         return $ B.append pre suffix
 
+
 ------------------------------------------------------------------------------
+-- | Parses an attribute variable token.  This token starts immediately after
+-- the opening '{' and extends to the corresponding closing '}'.  The return
+-- value is a tuple of the token's substituted value and the rest of the
+-- ByteString to be parsed (starting immediately after the closing '}').
 parseVar :: Monad m => ByteString -> ByteString
          -> TemplateMonad m (ByteString, ByteString)
 parseVar pre bs
@@ -407,6 +415,11 @@ parseVar pre bs
                      _   -> do s <- getAttributeSplice $ B.append pre name
                                return (s, B.tail rest)
 
+
+------------------------------------------------------------------------------
+-- | Get's the attribute value.  This is just a normal splice lookup with the
+-- added restriction that the splice's result list has to contain a single
+-- text element.  Otherwise the attribute evaluates to the empty string.
 getAttributeSplice :: Monad m => ByteString -> TemplateMonad m ByteString
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) get
