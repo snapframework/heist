@@ -369,15 +369,49 @@ getContext = gets _curContext
 -- | Performs splice processing on a single node.
 runNode :: Monad m => Node -> Splice m
 runNode n@(X.Text _)          = return [n]
-runNode n@(X.Element nm _ ch) = do
+runNode n@(X.Element nm at ch) = do
     s <- liftM (lookupSplice nm) get
     maybe runChildren (recurseSplice n) s
-
+    
   where
     runChildren = do
         newKids <- runNodeList ch
-        return [X.modifyChildren (const newKids) n]
+        newAtts <- mapM attSubst at
+        return [X.Element nm newAtts newKids]
+    attSubst (n,v) = do
+        v' <- parseAtt v
+        return (n,v')
 
+
+parseAtt bs
+    | B.null bs = return B.empty
+    | otherwise = let (pre,rest) = B.span (/='{') bs in do
+        suffix <- if B.null rest
+            then return B.empty
+            else parseVar "" (B.tail rest)
+        return $ B.append pre suffix
+    
+parseVar pre bs
+    | B.null bs = return B.empty
+    | otherwise = let (name,rest) = B.span (\c -> c/='{' && c/='}') bs in do
+        suffix <- if B.null rest
+            then return B.empty
+            else case B.head rest of
+                     '{' -> parseVar (B.append pre name) (B.tail rest)
+                     '}' -> do s <- getAttributeSplice $ B.append pre name
+                               end <- parseAtt $ B.tail rest
+                               return $ B.append s end
+                     _   -> return B.empty
+        return $ B.append pre suffix
+
+getAttributeSplice :: Monad m => ByteString -> TemplateMonad m ByteString
+getAttributeSplice name = do
+    s <- liftM (lookupSplice name) get
+    nodes <- maybe (return []) id s
+    return $ check nodes
+  where
+    check ((X.Text t):_) = t
+    check _ = ""
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
