@@ -388,21 +388,24 @@ parseAtt bs
     | otherwise = let (pre,rest) = B.span (/='{') bs in do
         suffix <- if B.null rest
             then return B.empty
-            else parseVar "" (B.tail rest)
+            else do (a,b) <- parseVar "" (B.tail rest)
+                    c <- parseAtt b
+                    return $ B.append a c
         return $ B.append pre suffix
-    
+
+------------------------------------------------------------------------------
+parseVar :: Monad m => ByteString -> ByteString
+         -> TemplateMonad m (ByteString, ByteString)
 parseVar pre bs
-    | B.null bs = return B.empty
+    | B.null bs = return (B.empty, B.empty)
     | otherwise = let (name,rest) = B.span (\c -> c/='{' && c/='}') bs in do
-        suffix <- if B.null rest
-            then return B.empty
+        if B.null rest
+            then return (B.empty, B.empty)
             else case B.head rest of
-                     '{' -> parseVar (B.append pre name) (B.tail rest)
-                     '}' -> do s <- getAttributeSplice $ B.append pre name
-                               end <- parseAtt $ B.tail rest
-                               return $ B.append s end
-                     _   -> return B.empty
-        return $ B.append pre suffix
+                     '{' -> do (a,b) <- parseVar "" (B.tail rest)
+                               parseVar (B.concat [pre, name, a]) b
+                     _   -> do s <- getAttributeSplice $ B.append pre name
+                               return (s, B.tail rest)
 
 getAttributeSplice :: Monad m => ByteString -> TemplateMonad m ByteString
 getAttributeSplice name = do

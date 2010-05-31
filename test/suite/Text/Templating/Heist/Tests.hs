@@ -24,6 +24,7 @@ import           System.IO.Unsafe
 
 import           Text.Templating.Heist
 import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Splices.Apply
 import           Text.XML.Expat.Cursor
 import           Text.XML.Expat.Format
 import qualified Text.XML.Expat.Tree as X
@@ -38,8 +39,17 @@ tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_sim
         , testCase "fsLoadTest" fsLoadTest
         , testCase "renderNoNameTest" renderNoNameTest
         , testCase "doctypeTest" doctypeTest
+        , testCase "attributeSubstitution" attrSubst
+        , testCase "applyTest" applyTest
         ]
 
+applyTest :: H.Assertion
+applyTest = do
+    let es = emptyTemplateState :: TemplateState IO
+    res <- runTemplateMonad es
+        (X.Element "apply" [("template", "nonexistant")] []) applyImpl
+    H.assertEqual "apply nothing" res []
+    
 monoidTest :: IO ()
 monoidTest = do
   H.assertBool "left monoid identity" $ mempty `mappend` es == es
@@ -65,7 +75,7 @@ loadTest = do
   ets <- loadT "templates"
   either (error "Error loading templates")
          (\ts -> do let tm = _templateMap ts
-                    H.assertBool "loadTest size" $ Map.size tm == 14
+                    H.assertBool "loadTest size" $ Map.size tm == 15
          ) ets
 
 renderNoNameTest :: H.Assertion
@@ -96,12 +106,40 @@ fsLoadTest = do
 
 doctypeTest :: H.Assertion
 doctypeTest = do
-  ets <- loadT "templates"
-  let ts = either (error "Error loading templates") id ets
-  index <- renderTemplate ts "index"
-  H.assertBool "doctype test index" $ hasDoctype $ fromJust index
-  ioc <- renderTemplate ts "ioc"
-  H.assertBool "doctype test ioc" $ hasDoctype $ fromJust ioc
+    ets <- loadT "templates"
+    let ts = either (error "Error loading templates") id ets
+    index <- renderTemplate ts "index"
+    H.assertBool "doctype test index" $ hasDoctype $ fromJust index
+    ioc <- renderTemplate ts "ioc"
+    H.assertBool "doctype test ioc" $ hasDoctype $ fromJust ioc
+
+attrSubst :: H.Assertion
+attrSubst = do
+    ets <- loadT "templates"
+    let ts = either (error "Error loading templates") id ets
+    check ts ("a", "42") "pre_meaning_of_everything_post"
+    check ts ("a", "64") "pre_power_of_two_post"
+    check ts ("b", "42") "pre_MEANING_OF_EVERYTHING_post"
+    check ts ("b", "64") "pre_POWER_OF_TWO_post"
+    emptyPV ts
+    single ts
+    partial ts
+  where
+    setTs (char, ind) = bindSplice "char" (return [X.Text char]) .
+                        bindSplice "ind" (return [X.Text ind])
+    check ts arg str = do
+        res <- renderTemplate (setTs arg ts) "attrs"
+        H.assertBool ("attr subst "++(show arg)) $
+            not $ B.null $ snd $ B.breakSubstring str $ fromJust res
+    emptyPV ts = do
+        res <- runTemplateMonad ts (X.Text "") $ parseVar "" ""
+        H.assertEqual "emptyParseVar" res ("", "")
+    single ts = do
+        res <- runTemplateMonad ts (X.Text "") $ parseVar "" "{abc}"
+        H.assertEqual "singleParseVar" res ("", "")
+    partial ts = do
+        res <- runTemplateMonad ts (X.Text "") $ parseVar "" "{abc"
+        H.assertEqual "partialParseVar" res ("", "")
 
 -- dotdotTest :: H.Assertion
 -- dotdotTest = do
