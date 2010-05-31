@@ -5,9 +5,11 @@
 module Text.Templating.Heist.Internal where
 
 ------------------------------------------------------------------------------
+import           Control.Applicative
 import           Control.Exception (SomeException)
 import           Control.Monad.CatchIO
 import           Control.Monad.RWS.Strict
+import qualified Data.Attoparsec.Char8 as AP
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
@@ -397,36 +399,36 @@ runNode n@(X.Element nm at ch) = do
 
 
 ------------------------------------------------------------------------------
--- | Parses an attribute with attribute variable substitution.
-parseAtt :: Monad m => ByteString -> TemplateMonad m ByteString
-parseAtt bs
-    | B.null bs = return B.empty
-    | otherwise = let (pre,rest) = B.span (/='{') bs in do
-        suffix <- if B.null rest
-            then return B.empty
-            else do (a,b) <- parseVar "" (B.tail rest)
-                    c <- parseAtt b
-                    return $ B.append a c
-        return $ B.append pre suffix
+-- | Parses an attribute for any identifier expressions and performs
+-- appropriate substitution.
+parseAtt bs = do
+    let ast = case AP.feed (AP.parse attParser bs) "" of
+            (AP.Fail _ _ _) -> []
+            (AP.Done _ res) -> res
+    chunks <- mapM cvt ast
+    return $ B.concat chunks
+  where
+    cvt (Literal bs) = return bs
+    cvt (Ident bs) = getAttributeSplice bs
 
 
 ------------------------------------------------------------------------------
--- | Parses an attribute variable token.  This token starts immediately after
--- the opening '{' and extends to the corresponding closing '}'.  The return
--- value is a tuple of the token's substituted value and the rest of the
--- ByteString to be parsed (starting immediately after the closing '}').
-parseVar :: Monad m => ByteString -> ByteString
-         -> TemplateMonad m (ByteString, ByteString)
-parseVar pre bs
-    | B.null bs = return (B.empty, B.empty)
-    | otherwise = let (name,rest) = B.span (\c -> c/='{' && c/='}') bs in do
-        if B.null rest
-            then return (B.empty, B.empty)
-            else case B.head rest of
-                     '{' -> do (a,b) <- parseVar "" (B.tail rest)
-                               parseVar (B.concat [pre, name, a]) b
-                     _   -> do s <- getAttributeSplice $ B.append pre name
-                               return (s, B.tail rest)
+-- | AST to hold attribute parsing structure.  This is necessary because
+-- attoparsec doesn't support parsers running in another monad.
+data AttAST = Literal ByteString |
+              Ident ByteString
+    deriving (Show)
+
+
+------------------------------------------------------------------------------
+-- | Parser for attribute variable substitution.
+attParser = AP.many1 (identParser <|> litParser)
+  where
+    escChar = (AP.char '\\' *> AP.anyChar) <|>
+              AP.satisfy (AP.notInClass "\\$")
+    litParser = Literal <$> (B.pack <$> AP.many1 escChar)
+    identParser = AP.string "$(" *>
+        (Ident <$> AP.takeWhile (/=')')) <* AP.string ")"
 
 
 ------------------------------------------------------------------------------
