@@ -1,7 +1,8 @@
-For 0.2
+* Fix handling of ".." in apply tags
+
+Ongoing
 -------
 
-Allow DOCTYPEs in templates
-Ditch RWST as the underlying monad
-Add attribute string substitution
+* Improve test coverage
+* Head merging (ala the Lift Web Framework)
 
