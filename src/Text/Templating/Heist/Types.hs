@@ -5,6 +5,19 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
+{-|
+
+This module contains the core Heist data types.  TemplateMonad intentionally
+does not expose any of it's functionality via MonadState or MonadReader
+functions.  We define passthrough instances for the most common types of
+monads.  These instances allow the user to use TemplateMonad in a monad stack
+without needing calls to `lift`.
+
+Edward Kmett wrote most of the TemplateMonad code and associated instances,
+liberating us from the unused writer portion of RWST.
+
+-}
+
 module Text.Templating.Heist.Types where
 
 ------------------------------------------------------------------------------
