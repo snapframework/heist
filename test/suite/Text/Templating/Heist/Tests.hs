@@ -4,6 +4,15 @@ module Text.Templating.Heist.Tests
   , quickRender
   ) where
 
+------------------------------------------------------------------------------
+import           Control.Monad.State
+import           Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as L
+import qualified Data.Map as Map
+import           Data.Maybe
+import           Data.Monoid
+import           System.IO.Unsafe
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
 import           Test.Framework.Providers.QuickCheck2
@@ -11,19 +20,11 @@ import qualified Test.HUnit as H
 import           Test.QuickCheck
 import           Test.QuickCheck.Monadic
 
-import           Control.Monad.State
 
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy.Char8 as L
-import qualified Data.Map as Map
-import           Data.Maybe
-import           Data.Monoid
-
-import           System.IO.Unsafe
-
+------------------------------------------------------------------------------
 import           Text.Templating.Heist
 import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Types
 import           Text.Templating.Heist.Splices.Apply
 import           Text.XML.Expat.Cursor
 import           Text.XML.Expat.Format
@@ -46,8 +47,8 @@ tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_sim
 applyTest :: H.Assertion
 applyTest = do
     let es = emptyTemplateState :: TemplateState IO
-    res <- runTemplateMonad es
-        (X.Element "apply" [("template", "nonexistant")] []) applyImpl
+    res <- evalTemplateMonad applyImpl
+        (X.Element "apply" [("template", "nonexistant")] []) es
     H.assertEqual "apply nothing" res []
     
 monoidTest :: IO ()
@@ -236,8 +237,8 @@ instance Show Bind where
     ,L.unpack $ L.concat $ map formatNode $ buildResult b
     ,"Splice result:"
     ,L.unpack $ L.concat $ map formatNode $ unsafePerformIO $
-        runTemplateMonad emptyTemplateState (X.Text "")$
-        runNodeList $ buildBindTemplate b
+        evalTemplateMonad (runNodeList $ buildBindTemplate b)
+                          (X.Text "") emptyTemplateState
     ,"Template:"
     ,L.unpack $ L.concat $ map formatNode $ buildBindTemplate b
     ]
@@ -279,8 +280,10 @@ prop_simpleBindTest :: Bind -> PropertyM IO ()
 prop_simpleBindTest bind = do
   let template = buildBindTemplate bind
       result = buildResult bind
-  spliceResult <- run $ runTemplateMonad emptyTemplateState (X.Text "") $
-                  runNodeList template
+  spliceResult <- run $ evalTemplateMonad (runNodeList template)
+                                          (X.Text "")
+                                          emptyTemplateState
+                  
   assert $ result == spliceResult
 
 {-
@@ -314,8 +317,9 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 
 calcResult :: (MonadIO m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
-  runTemplateMonad ts (X.Text "") $
-  runNodeList $ buildApplyCaller apply
+  evalTemplateMonad (runNodeList $ buildApplyCaller apply)
+      (X.Text "") ts
+  
   where ts = setTemplates (Map.singleton [unName name]
                            (InternalTemplate Nothing callee))
              emptyTemplateState
@@ -327,8 +331,8 @@ prop_simpleApplyTest apply = do
   assert $ correct == result
 
 
-getTS :: FilePath -> IO (TemplateState IO)
-getTS baseDir = do
+loadTS :: FilePath -> IO (TemplateState IO)
+loadTS baseDir = do
     etm <- loadTemplates baseDir emptyTemplateState
     return $ either error id etm
 
@@ -337,7 +341,7 @@ getTS baseDir = do
 -- template.  (Old convenience code.)
 quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
 quickRender baseDir name = do
-    ts <- getTS baseDir
+    ts <- loadTS baseDir
     renderTemplate ts name
 
 
