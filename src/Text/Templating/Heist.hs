@@ -105,6 +105,7 @@ import           Control.Monad.Trans
 import qualified Data.Map as Map
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Splices
+import           Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------

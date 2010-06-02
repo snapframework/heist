@@ -24,6 +24,7 @@ import           Text.XML.Expat.Tree hiding (Node)
 
 ------------------------------------------------------------------------------
 import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------

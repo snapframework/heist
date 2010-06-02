@@ -5,10 +5,12 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Text.Templating.Heist.TemplateMonad where
+module Text.Templating.Heist.Types where
 
 ------------------------------------------------------------------------------
 import           Control.Applicative
+import           Control.Monad.Cont
+import           Control.Monad.Error
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans
@@ -17,6 +19,7 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as Map
 import           Data.Map (Map)
 import           Data.Monoid
+import           Data.Typeable
 import           Prelude hiding (catch)
 import qualified Text.XML.Expat.Tree as X
 
@@ -118,53 +121,101 @@ instance Eq (TemplateState m) where
              (_curContext a == _curContext b)
 
 
+------------------------------------------------------------------------------
+-- | TemplateMonad is a combination of the reader and state monads.  The
+-- reader environment is the contents of the node being spliced.  The state is
+-- the TemplateState data structure.
 newtype TemplateMonad m a = TemplateMonad {
     runTemplateMonad :: Node
-                     -> (TemplateState m)
+                     -> TemplateState m
                      -> m (a, TemplateState m)
 }
 
+
+------------------------------------------------------------------------------
+-- | Helper function for the functor instance
+evalTemplateMonad :: Monad m
+                  => TemplateMonad m a
+                  -> Node
+                  -> TemplateState m
+                  -> m a
+evalTemplateMonad m r s = do
+    (a, _) <- runTemplateMonad m r s
+    return a
+  
+------------------------------------------------------------------------------
+-- | Helper function for the functor instance
 first :: (a -> b) -> (a, c) -> (b, c)
 first f (a,b) = (f a, b)
 
+
+------------------------------------------------------------------------------
+-- | Functor instance
 instance Functor m => Functor (TemplateMonad m) where
     fmap f (TemplateMonad m) = TemplateMonad $ \r s -> first f <$> m r s
 
+
+------------------------------------------------------------------------------
+-- | Applicative instance
 instance (Monad m, Functor m) => Applicative (TemplateMonad m) where
     pure = return
     (<*>) = ap
 
+
+------------------------------------------------------------------------------
+-- | Monad instance
 instance Monad m => Monad (TemplateMonad m) where
     return a = TemplateMonad (\_ s -> return (a, s))
     TemplateMonad m >>= k = TemplateMonad $ \r s -> do
         (a, s') <- m r s
         runTemplateMonad (k a) r s'
 
+
+------------------------------------------------------------------------------
+-- | MonadIO instance
 instance MonadIO m => MonadIO (TemplateMonad m) where
     liftIO = lift . liftIO
 
+
+------------------------------------------------------------------------------
+-- | MonadTrans instance
 instance MonadTrans TemplateMonad where
     lift m = TemplateMonad $ \_ s -> do
         a <- m
         return (a, s)
 
+
+------------------------------------------------------------------------------
+-- | MonadFix passthrough instance
 instance MonadFix m => MonadFix (TemplateMonad m) where
     mfix f = TemplateMonad $ \r s ->
         mfix $ \ (a, _) -> runTemplateMonad (f a) r s
 
+
+------------------------------------------------------------------------------
+-- | Alternative passthrough instance
 instance (Functor m, MonadPlus m) => Alternative (TemplateMonad m) where
     empty = mzero
     (<|>) = mplus
 
+
+------------------------------------------------------------------------------
+-- | MonadPlus passthrough instance
 instance MonadPlus m => MonadPlus (TemplateMonad m) where
     mzero = lift mzero
     m `mplus` n = TemplateMonad $ \r s ->
         runTemplateMonad m r s `mplus` runTemplateMonad n r s
 
+
+------------------------------------------------------------------------------
+-- | MonadState passthrough instance
 instance MonadState s m => MonadState s (TemplateMonad m) where
     get = lift get
     put = lift . put
 
+
+------------------------------------------------------------------------------
+-- | MonadReader passthrough instance
 instance MonadReader r m => MonadReader r (TemplateMonad m) where
     ask = TemplateMonad $ \_ s -> do
             r <- ask
@@ -172,9 +223,56 @@ instance MonadReader r m => MonadReader r (TemplateMonad m) where
     local f (TemplateMonad m) =
         TemplateMonad $ \r s -> local f (m r s)
 
---instance MonadError m => MonadError (TemplateMonad m) where
---    throwError = lift . throwError
---    catchError = liftCatch catchError
+
+------------------------------------------------------------------------------
+-- | Helper for MonadError instance.
+liftCatch :: (m (a,TemplateState m)
+              -> (e -> m (a,TemplateState m))
+              -> m (a,TemplateState m))
+          -> TemplateMonad m a
+          -> (e -> TemplateMonad m a)
+          -> TemplateMonad m a
+liftCatch ce m h =
+    TemplateMonad $ \r s ->
+        (runTemplateMonad m r s `ce`
+        (\e -> runTemplateMonad (h e) r s))
+
+
+------------------------------------------------------------------------------
+-- | MonadError passthrough instance
+instance (MonadError e m) => MonadError e (TemplateMonad m) where
+    throwError = lift . throwError
+    catchError = liftCatch catchError
+
+
+------------------------------------------------------------------------------
+-- | Helper for MonadCont instance.
+liftCallCC :: ((((a,TemplateState m) -> m (b, TemplateState m))
+                  -> m (a, TemplateState m))
+                -> m (a, TemplateState m))
+           -> ((a -> TemplateMonad m b) -> TemplateMonad m a)
+           -> TemplateMonad m a
+liftCallCC ccc f = TemplateMonad $ \r s ->
+    ccc $ \c ->
+    runTemplateMonad (f (\a -> TemplateMonad $ \_ _ -> c (a, s))) r s
+
+
+------------------------------------------------------------------------------
+-- | MonadCont passthrough instance
+instance (MonadCont m) => MonadCont (TemplateMonad m) where
+    callCC = liftCallCC callCC
+
+
+------------------------------------------------------------------------------
+-- | The Typeable instance is here so Heist can be dynamically executed with
+-- Hint.
+instance (Typeable1 m, Typeable a) => Typeable (TemplateMonad m a) where
+    typeOf _ = mkTyConApp tCon [mRep, aRep]
+      where
+        tCon = mkTyCon "TemplateMonad"
+        maRep = typeOf (undefined :: m a)
+        (mCon, [aRep]) = splitTyConApp maRep
+        mRep = mkTyConApp mCon []
 
 
 ------------------------------------------------------------------------------
@@ -183,7 +281,17 @@ instance MonadReader r m => MonadReader r (TemplateMonad m) where
 
 
 ------------------------------------------------------------------------------
--- | 
+-- | Gets the node currently being processed.
+--
+--   > <speech author="Shakespeare">
+--   >   To sleep, perchance to dream.
+--   > </speech>
+--
+-- When you call @getParamNode@ inside the code for the @speech@ splice, it
+-- returns the Node for the @speech@ tag and its children.  @getParamNode >>=
+-- getChildren@ returns a list containing one 'Text' node containing part of
+-- Hamlet's speech.  @getParamNode >>= getAttribute \"author\"@ would return
+-- @Just "Shakespeare"@.
 getParamNode :: Monad m => TemplateMonad m Node
 getParamNode = TemplateMonad $ \r s -> return (r,s)
 
@@ -199,27 +307,27 @@ localParamNode f m = TemplateMonad $ \r s -> runTemplateMonad m (f r) s
 
 ------------------------------------------------------------------------------
 -- | 
-getsTemplateState :: Monad m => (TemplateState m -> r) -> TemplateMonad m r
-getsTemplateState f = TemplateMonad $ \_ s -> return (f s, s)
+getsTS :: Monad m => (TemplateState m -> r) -> TemplateMonad m r
+getsTS f = TemplateMonad $ \_ s -> return (f s, s)
 
 
 ------------------------------------------------------------------------------
 -- | 
-getTemplateState :: Monad m => TemplateMonad m (TemplateState m)
-getTemplateState = TemplateMonad $ \_ s -> return (s, s)
+getTS :: Monad m => TemplateMonad m (TemplateState m)
+getTS = TemplateMonad $ \_ s -> return (s, s)
 
 
 ------------------------------------------------------------------------------
 -- | 
-putTemplateState :: Monad m => TemplateState m -> TemplateMonad m ()
-putTemplateState s = TemplateMonad $ \_ _ -> return ((), s)
+putTS :: Monad m => TemplateState m -> TemplateMonad m ()
+putTS s = TemplateMonad $ \_ _ -> return ((), s)
 
 
 ------------------------------------------------------------------------------
 -- | 
-modifyTemplateState :: Monad m
+modifyTS :: Monad m
                     => (TemplateState m -> TemplateState m)
                     -> TemplateMonad m ()
-modifyTemplateState f = TemplateMonad $ \_ s -> return ((), f s)
+modifyTS f = TemplateMonad $ \_ s -> return ((), f s)
 
 

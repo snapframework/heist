@@ -9,6 +9,7 @@ import qualified Text.XML.Expat.Tree as X
 
 ------------------------------------------------------------------------------
 import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Types
 
 -- | Default name for the bind splice.
 bindTag :: ByteString
@@ -32,6 +33,6 @@ bindImpl = do
     return []
 
   where
-    add node nm = modify $ bindSplice nm (return $ X.getChildren node)
+    add node nm = modifyTS $ bindSplice nm (return $ X.getChildren node)
 
 

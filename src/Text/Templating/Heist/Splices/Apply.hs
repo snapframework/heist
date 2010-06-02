@@ -11,6 +11,7 @@ import qualified Text.XML.Expat.Tree as X
 
 ------------------------------------------------------------------------------
 import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | Default name for the apply splice.
@@ -32,12 +33,12 @@ applyImpl = do
     case X.getAttribute node applyAttr of
         Nothing   -> return [] -- TODO: error handling
         Just attr -> do 
-            st <- get
+            st <- getTS
             maybe (return []) -- TODO: error handling
                   (\(t,ctx) -> do
                       addDoctype $ maybeToList $ _itDoctype t
                       processedChildren <- runNodeList $ X.getChildren node
-                      modify (bindSplice "content" $ return processedChildren)
+                      modifyTS (bindSplice "content" $ return processedChildren)
                       setContext ctx
                       result <- runNodeList $ _itNodes t
                       restoreState st

@@ -2,6 +2,7 @@
 
 module Text.Templating.Heist.Splices.Markdown where
 
+------------------------------------------------------------------------------
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -17,10 +18,11 @@ import           System.Directory
 import           System.Exit
 import           System.IO
 import           System.Process
-import           Text.Templating.Heist.Constants
-import           Text.Templating.Heist.Internal
 import           Text.XML.Expat.Tree hiding (Node)
 
+------------------------------------------------------------------------------
+import           Text.Templating.Heist.Constants
+import           Text.Templating.Heist.Types
 
 data PandocMissingException = PandocMissingException
    deriving (Typeable)

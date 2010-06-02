@@ -6,7 +6,7 @@ module Text.Templating.Heist.Splices.Ignore where
 import           Data.ByteString.Char8 (ByteString)
 
 ------------------------------------------------------------------------------
-import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------

@@ -17,9 +17,7 @@ import           Data.Either
 import qualified Data.Foldable as F
 import           Data.List
 import qualified Data.Map as Map
-import           Data.Map (Map)
 import           Data.Maybe
-import           Data.Typeable
 import           Prelude hiding (catch)
 import           System.Directory.Tree hiding (name)
 import           System.FilePath
@@ -28,133 +26,18 @@ import qualified Text.XML.Expat.Tree as X
 
 ------------------------------------------------------------------------------
 import           Text.Templating.Heist.Constants
-
-------------------------------------------------------------------------------
--- Types
-------------------------------------------------------------------------------
-
-------------------------------------------------------------------------------
--- | Heist templates are XML documents. The hexpat library is polymorphic over
--- the type of strings, so here we define a 'Node' alias to fix the string
--- types of the tag names and tag bodies to 'ByteString'.
-type Node = X.Node ByteString ByteString
-
-
-------------------------------------------------------------------------------
--- | A 'Template' is a forest of XML nodes.  Here we deviate from the "single
--- root node" constraint of well-formed XML because we want to allow templates
--- to contain fragments of a document that may not have a single root.
-type Template = [Node]
-
-
-------------------------------------------------------------------------------
--- | An 'InternalTemplate' carries a doctype with it that we get from the
--- template at load time.  The tricks that we're playing so templates don't
--- have to have a single root node screw up doctypes, so we have to handle
--- them manually.
-data InternalTemplate = InternalTemplate {
-    _itDoctype :: Maybe ByteString,
-    _itNodes   :: [Node]
-} deriving (Eq, Show)
-
-
-------------------------------------------------------------------------------
--- | Reversed list of directories.  This holds the path to the template
--- currently being processed.
-type TPath = [ByteString]
-
-
-------------------------------------------------------------------------------
--- | All templates are stored in a map.
-type TemplateMap = Map TPath InternalTemplate
-
-
-------------------------------------------------------------------------------
--- | Holds all the state information needed for template processing.  You will
--- build a @TemplateState@ using any of Heist's @TemplateState m ->
--- TemplateState m@ \"filter\" functions.  Then you use the resulting
--- @TemplateState@ in calls to @renderTemplate@.
-data TemplateState m = TemplateState {
-    -- | A mapping of splice names to splice actions
-      _spliceMap      :: SpliceMap m
-    -- | A mapping of template names to templates
-    , _templateMap    :: TemplateMap
-    -- | A flag to control splice recursion
-    , _recurse        :: Bool
-    -- | The path to the template currently being processed.
-    , _curContext     :: TPath
-    -- | A counter keeping track of the current recursion depth to prevent
-    -- infinite loops.
-    , _recursionDepth :: Int
-    -- | A hook run on all templates at load time.
-    , _onLoadHook     :: Template -> IO Template
-    -- | A hook run on all templates just before they are rendered.
-    , _preRunHook     :: Template -> m Template
-    -- | A hook run on all templates just after they are rendered.
-    , _postRunHook    :: Template -> m Template
-    -- | The doctypes encountered during template processing.
-    , _doctypes       :: [ByteString]
-}
-
-
-------------------------------------------------------------------------------
-instance Eq (TemplateState m) where
-    a == b = (_recurse a == _recurse b) &&
-             (_templateMap a == _templateMap b) &&
-             (_curContext a == _curContext b)
-
-
-------------------------------------------------------------------------------
--- | 'TemplateMonad' is a monad transformer that gives you access to the 'Node'
---   being processed (using the 'MonadReader' instance) as well as holding the
---   'TemplateState' that contains splice and template mappings (accessible
---   using the 'MonadState' instance.
-newtype TemplateMonad m a = TemplateMonad (RWST Node () (TemplateState m) m a)
-  deriving ( Monad
-           , MonadIO
-           , MonadCatchIO
-           , MonadReader Node
-           , MonadState (TemplateState m) )
-
-
-------------------------------------------------------------------------------
-instance (Monad m) => Monoid (TemplateState m) where
-    mempty = TemplateState Map.empty Map.empty True [] 0
-                           return return return []
-
-    (TemplateState s1 t1 r1 _ d1 o1 b1 a1 dt1) `mappend`
-        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2 dt2) =
-        TemplateState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
-            (dt1 `mappend` dt2)
-      where
-        s = s1 `mappend` s2
-        t = t1 `mappend` t2
-        r = r1 && r2
-        d = max d1 d2
-
-
-------------------------------------------------------------------------------
--- | Runs a splice in the underlying monad.  Splices require two
--- parameters, the template state, and an input node.
-runTemplateMonad :: Monad m =>
-             TemplateState m   -- ^ The initial template state
-          -> Node              -- ^ The splice's input node
-          -> TemplateMonad m a
-          -> m a
-runTemplateMonad ts node (TemplateMonad tm) = do
-    (result,_,_) <- runRWST tm node ts
-    return result
+import           Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
 -- | Restores the components of TemplateState that can get modified in
--- template calls.  You should use this function instead of @put@ to restore
+-- template calls.  You should use this function instead of @putTS@ to restore
 -- an old state.  Thas was needed because doctypes needs to be in a "global
 -- scope" as opposed to the template call "local scope" of state items such
 -- as recursionDepth, curContext, and spliceMap.
 restoreState :: Monad m => TemplateState m -> TemplateMonad m ()
 restoreState ts1 = 
-    modify (\ts2 -> ts2
+    modifyTS (\ts2 -> ts2
         { _recursionDepth = _recursionDepth ts1
         , _curContext = _curContext ts1
         , _spliceMap = _spliceMap ts1
@@ -165,32 +48,7 @@ restoreState ts1 =
 -- | Mappends a doctype to the state.
 addDoctype :: Monad m => [ByteString] -> TemplateMonad m ()
 addDoctype dt = do
-    modify (\s -> s { _doctypes = _doctypes s `mappend` dt })
-
-
-------------------------------------------------------------------------------
-instance MonadTrans TemplateMonad where
-  lift = TemplateMonad . lift
-
-
-------------------------------------------------------------------------------
-instance (Typeable1 m, Typeable a) => Typeable (TemplateMonad m a) where
-    typeOf _ = mkTyConApp tCon [mRep, aRep]
-      where
-        tCon = mkTyCon "TemplateMonad"
-        maRep = typeOf (undefined :: m a)
-        (mCon, [aRep]) = splitTyConApp maRep
-        mRep = mkTyConApp mCon []
-
-
-------------------------------------------------------------------------------
--- | A Splice is a TemplateMonad computation that returns a 'Template'.
-type Splice m = TemplateMonad m Template
-
-
-------------------------------------------------------------------------------
--- | SpliceMap associates a name and a Splice.
-type SpliceMap m = Map ByteString (Splice m)
+    modifyTS (\s -> s { _doctypes = _doctypes s `mappend` dt })
 
 
 ------------------------------------------------------------------------------
@@ -335,22 +193,6 @@ addTemplate n t st = insertTemplate (splitTemplatePath n) t st
 
 
 ------------------------------------------------------------------------------
--- | Gets the node currently being processed.
---
---   > <speech author="Shakespeare">
---   >   To sleep, perchance to dream.
---   > </speech>
---
--- When you call @getParamNode@ inside the code for the @speech@ splice, it
--- returns the Node for the @speech@ tag and its children.  @getParamNode >>=
--- getChildren@ returns a list containing one 'Text' node containing part of
--- Hamlet's speech.  @getParamNode >>= getAttribute \"author\"@ would return
--- @Just "Shakespeare"@.
-getParamNode :: Monad m => TemplateMonad m Node
-getParamNode = ask
-
-
-------------------------------------------------------------------------------
 -- | Stops the recursive processing of splices.  Consider the following
 -- example:
 --
@@ -365,19 +207,19 @@ getParamNode = ask
 -- scan @L@ for splices and run them.  If @foo@ calls @stopRecursion@, @L@
 -- will be included in the output verbatim without running any splices.
 stopRecursion :: Monad m => TemplateMonad m ()
-stopRecursion = modify (\st -> st { _recurse = False })
+stopRecursion = modifyTS (\st -> st { _recurse = False })
 
 
 ------------------------------------------------------------------------------
 -- | Sets the current context
 setContext :: Monad m => TPath -> TemplateMonad m ()
-setContext c = modify (\st -> st { _curContext = c })
+setContext c = modifyTS (\st -> st { _curContext = c })
 
 
 ------------------------------------------------------------------------------
 -- | Gets the current context
 getContext :: Monad m => TemplateMonad m TPath
-getContext = gets _curContext
+getContext = getsTS _curContext
   
 
 ------------------------------------------------------------------------------
@@ -385,7 +227,7 @@ getContext = gets _curContext
 runNode :: Monad m => Node -> Splice m
 runNode n@(X.Text _)          = return [n]
 runNode n@(X.Element nm at ch) = do
-    s <- liftM (lookupSplice nm) get
+    s <- liftM (lookupSplice nm) getTS
     maybe runChildren (recurseSplice n) s
     
   where
@@ -393,23 +235,31 @@ runNode n@(X.Element nm at ch) = do
         newKids <- runNodeList ch
         newAtts <- mapM attSubst at
         return [X.Element nm newAtts newKids]
-    attSubst (n,v) = do
-        v' <- parseAtt v
-        return (n,v')
+
+
+------------------------------------------------------------------------------
+-- | Helper function for substituting a parsed attribute into an attribute
+-- tuple.
+attSubst :: (Monad m) => (t, ByteString) -> TemplateMonad m (t, ByteString)
+attSubst (n,v) = do
+    v' <- parseAtt v
+    return (n,v')
 
 
 ------------------------------------------------------------------------------
 -- | Parses an attribute for any identifier expressions and performs
 -- appropriate substitution.
+parseAtt :: (Monad m) => ByteString -> TemplateMonad m ByteString
 parseAtt bs = do
     let ast = case AP.feed (AP.parse attParser bs) "" of
             (AP.Fail _ _ _) -> []
             (AP.Done _ res) -> res
+            (AP.Partial _)  -> []
     chunks <- mapM cvt ast
     return $ B.concat chunks
   where
-    cvt (Literal bs) = return bs
-    cvt (Ident bs) = getAttributeSplice bs
+    cvt (Literal x) = return x
+    cvt (Ident x) = getAttributeSplice x
 
 
 ------------------------------------------------------------------------------
@@ -422,6 +272,7 @@ data AttAST = Literal ByteString |
 
 ------------------------------------------------------------------------------
 -- | Parser for attribute variable substitution.
+attParser :: AP.Parser [AttAST]
 attParser = AP.many1 (identParser <|> litParser)
   where
     escChar = (AP.char '\\' *> AP.anyChar) <|>
@@ -437,7 +288,7 @@ attParser = AP.many1 (identParser <|> litParser)
 -- text element.  Otherwise the attribute evaluates to the empty string.
 getAttributeSplice :: Monad m => ByteString -> TemplateMonad m ByteString
 getAttributeSplice name = do
-    s <- liftM (lookupSplice name) get
+    s <- liftM (lookupSplice name) getTS
     nodes <- maybe (return []) id s
     return $ check nodes
   where
@@ -461,8 +312,8 @@ mAX_RECURSION_DEPTH = 50
 -- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
 recurseSplice :: Monad m => Node -> Splice m -> Splice m
 recurseSplice node splice = do
-    result <- local (const node) splice
-    ts' <- get
+    result <- localParamNode (const node) splice
+    ts' <- getTS
     if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
         then do modRecursionDepth (+1)
                 res <- runNodeList result
@@ -472,7 +323,7 @@ recurseSplice node splice = do
   where
     modRecursionDepth :: Monad m => (Int -> Int) -> TemplateMonad m ()
     modRecursionDepth f =
-        modify (\st -> st { _recursionDepth = f (_recursionDepth st) })
+        modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
 
 ------------------------------------------------------------------------------
@@ -482,7 +333,7 @@ lookupAndRun :: Monad m
              -> ((InternalTemplate, TPath) -> TemplateMonad m (Maybe a))
              -> TemplateMonad m (Maybe a)
 lookupAndRun name k = do
-    ts <- get
+    ts <- getTS
     maybe (return Nothing) k
           (lookupTemplate name ts)
 
@@ -494,8 +345,8 @@ evalTemplate :: Monad m
             -> TemplateMonad m (Maybe Template)
 evalTemplate name = lookupAndRun name
     (\(t,ctx) -> do
-        ts <- get
-        put (ts {_curContext = ctx})
+        ts <- getTS
+        putTS (ts {_curContext = ctx})
         res <- runNodeList $ _itNodes t
         restoreState ts
         return $ Just res)
@@ -510,9 +361,9 @@ evalWithHooks :: Monad m
 evalWithHooks name = lookupAndRun name
     (\(t,ctx) -> do
         addDoctype $ maybeToList $ _itDoctype t
-        ts <- get
+        ts <- getTS
         nodes <- lift $ _preRunHook ts $ _itNodes t
-        put (ts {_curContext = ctx})
+        putTS (ts {_curContext = ctx})
         res <- runNodeList nodes
         restoreState ts
         return . Just =<< lift (_postRunHook ts res))
@@ -538,7 +389,7 @@ callTemplate :: Monad m
                                            -- (name,value) parameter pairs
              -> TemplateMonad m (Maybe Template)
 callTemplate name params = do
-    modify $ bindStrings params
+    modifyTS $ bindStrings params
     evalTemplate name
 
 
@@ -547,7 +398,7 @@ callTemplate name params = do
 -- TemplateMonad where the doctype is available.
 toInternalTemplate :: Monad m => Template -> TemplateMonad m InternalTemplate
 toInternalTemplate t = do
-    dts <- gets _doctypes
+    dts <- getsTS _doctypes
     return $ InternalTemplate {
         _itDoctype = listToMaybe dts,
         _itNodes = t
@@ -570,12 +421,12 @@ renderTemplate :: Monad m
                -> ByteString
                -> m (Maybe ByteString)
 renderTemplate ts name = do
-    runTemplateMonad ts (X.Text "") $ do
-        mt <- evalWithHooks name
-        maybe (return Nothing)
-              (\t -> liftM Just $ renderInternal =<< toInternalTemplate t)
-              mt
-        
+    evalTemplateMonad
+        (do mt <- evalWithHooks name
+            maybe (return Nothing)
+                (\t -> liftM Just $ renderInternal =<< toInternalTemplate t)
+                mt
+        ) (X.Text "") ts
 
 ------------------------------------------------------------------------------
 -- Template loading
