@@ -120,8 +120,9 @@ defaultSpliceMap = Map.fromList
 
 
 ------------------------------------------------------------------------------
--- | An empty template state, with Heist's default splices (@\<bind\>@ and
--- @\<apply\>@) mapped.
+-- | An empty template state, with Heist's default splices (@\<apply\>@,
+-- @\<bind\>@, @\<ignore\>@, and @\<markdown\>@) mapped.  The static tag is
+-- not mapped here because it must be mapped manually in your application.
 emptyTemplateState :: MonadIO m => TemplateState m
 emptyTemplateState = TemplateState defaultSpliceMap Map.empty True [] 0
                                    return return return []

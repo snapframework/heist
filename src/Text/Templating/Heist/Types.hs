@@ -135,9 +135,9 @@ instance Eq (TemplateState m) where
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad is a combination of the reader and state monads.  The
--- reader environment is the contents of the node being spliced.  The state is
--- the TemplateState data structure.
+-- | TemplateMonad is the monad used for 'Splice' processing.  TemplateMonad
+-- provides \"passthrough\" instances for many of the monads you might use in
+-- the inner monad.  
 newtype TemplateMonad m a = TemplateMonad {
     runTemplateMonad :: Node
                      -> TemplateState m
@@ -146,7 +146,7 @@ newtype TemplateMonad m a = TemplateMonad {
 
 
 ------------------------------------------------------------------------------
--- | Helper function for the functor instance
+-- | Evaluates a template monad as a computation in the underlying monad.
 evalTemplateMonad :: Monad m
                   => TemplateMonad m a
                   -> Node
@@ -310,7 +310,7 @@ getParamNode = TemplateMonad $ \r s -> return (r,s)
 
 
 ------------------------------------------------------------------------------
--- | 
+-- | TemplateMonad's local
 localParamNode :: Monad m
                => (Node -> Node)
                -> TemplateMonad m a
@@ -319,25 +319,25 @@ localParamNode f m = TemplateMonad $ \r s -> runTemplateMonad m (f r) s
 
 
 ------------------------------------------------------------------------------
--- | 
+-- | TemplateMonad's gets
 getsTS :: Monad m => (TemplateState m -> r) -> TemplateMonad m r
 getsTS f = TemplateMonad $ \_ s -> return (f s, s)
 
 
 ------------------------------------------------------------------------------
--- | 
+-- | TemplateMonad's get
 getTS :: Monad m => TemplateMonad m (TemplateState m)
 getTS = TemplateMonad $ \_ s -> return (s, s)
 
 
 ------------------------------------------------------------------------------
--- | 
+-- | TemplateMonad's put
 putTS :: Monad m => TemplateState m -> TemplateMonad m ()
 putTS s = TemplateMonad $ \_ _ -> return ((), s)
 
 
 ------------------------------------------------------------------------------
--- | 
+-- | TemplateMonad's modify
 modifyTS :: Monad m
                     => (TemplateState m -> TemplateState m)
                     -> TemplateMonad m ()
