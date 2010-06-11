@@ -40,7 +40,7 @@ clearStaticTagCache (STS staticMVar) =
 
 
 ------------------------------------------------------------------------------
--- | The "static" splice ensures that its contents are evaluated once and then
+-- | The \"static\" splice ensures that its contents are evaluated once and then
 -- cached.  The cached contents are returned every time the splice is
 -- referenced.
 staticImpl :: (MonadIO m)
@@ -68,7 +68,10 @@ staticImpl (STS mv) = do
 
 
 ------------------------------------------------------------------------------
--- | Modifies a TemplateState to include a "static" tag.
+-- | Modifies a TemplateState to include a \"static\" tag.  The static tag is
+-- not bound automatically with the other default Heist tags.  This is because
+-- this function also returns StaticTagState, so the user will be able to
+-- clear it with the 'clearStaticTagCache' function.
 bindStaticTag :: MonadIO m
               => TemplateState m
               -> IO (TemplateState m, StaticTagState)
