@@ -137,7 +137,7 @@ instance Eq (TemplateState m) where
 ------------------------------------------------------------------------------
 -- | TemplateMonad is the monad used for 'Splice' processing.  TemplateMonad
 -- provides \"passthrough\" instances for many of the monads you might use in
--- the inner monad.  
+-- the inner monad.
 newtype TemplateMonad m a = TemplateMonad {
     runTemplateMonad :: Node
                      -> TemplateState m
@@ -155,7 +155,7 @@ evalTemplateMonad :: Monad m
 evalTemplateMonad m r s = do
     (a, _) <- runTemplateMonad m r s
     return a
-  
+
 ------------------------------------------------------------------------------
 -- | Helper function for the functor instance
 first :: (a -> b) -> (a, c) -> (b, c)
