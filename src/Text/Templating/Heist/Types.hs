@@ -135,6 +135,17 @@ instance Eq (TemplateState m) where
 
 
 ------------------------------------------------------------------------------
+-- | The Typeable instance is here so Heist can be dynamically executed with
+-- Hint.
+templateStateTyCon :: TyCon
+templateStateTyCon = mkTyCon "Text.Templating.Heist.Types.TemplateState"
+{-# NOINLINE templateStateTyCon #-}
+
+instance (Typeable1 m) => Typeable (TemplateState m) where
+    typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
+
+
+------------------------------------------------------------------------------
 -- | TemplateMonad is the monad used for 'Splice' processing.  TemplateMonad
 -- provides \"passthrough\" instances for many of the monads you might use in
 -- the inner monad.
