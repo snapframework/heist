@@ -290,13 +290,12 @@ instance (MonadCont m) => MonadCont (TemplateMonad m) where
 ------------------------------------------------------------------------------
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
-instance (Typeable1 m, Typeable a) => Typeable (TemplateMonad m a) where
-    typeOf _ = mkTyConApp tCon [mRep, aRep]
-      where
-        tCon = mkTyCon "TemplateMonad"
-        maRep = typeOf (undefined :: m a)
-        (mCon, [aRep]) = splitTyConApp maRep
-        mRep = mkTyConApp mCon []
+templateMonadTyCon :: TyCon
+templateMonadTyCon = mkTyCon "Text.Templating.Heist.Types.TemplateMonad"
+{-# NOINLINE templateMonadTyCon #-}
+
+instance (Typeable1 m) => Typeable1 (TemplateMonad m) where
+    typeOf1 _ = mkTyConApp templateMonadTyCon [typeOf1 (undefined :: m ())]
 
 
 ------------------------------------------------------------------------------
