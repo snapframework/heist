@@ -283,22 +283,32 @@ attParser = AP.many1 (identParser <|> litParser)
 
 
 ------------------------------------------------------------------------------
--- | Get's the attribute value.  This is just a normal splice lookup with the
--- added restriction that the splice's result list has to start with a list
--- of text elements.  Otherwise the attribute evaluates to the empty string.
+-- | Get's the attribute value.  If the splice's result list contains non-text
+-- nodes, this will translate them into text nodes with textContent and
+-- concatenate them together.
 --
--- This originally only took the first text node. However, because HTML 
--- entities will split a text node, and it might be desirable to have text
--- containing HTML entities in an attribute, it was decided instead to to
--- take the first few consecutive text nodes and concatenate them instead.
+-- Originally, this only took the first node from the splices's result list,
+-- and only if it was a text node. This caused problems when the splice's
+-- result contained HTML entities, as they would split a text node. This was
+-- then fixed to take the first consecutive bunch of text nodes, and return
+-- their concatenation. This was seen as more useful than throwing an error,
+-- and more intuitive than trying to render all the nodes as text.
+-- 
+-- However, it was decided in the end to render all the nodes as text, and
+-- then concatenate them. If a splice returned
+-- \"some \<b\>text\<\/b\> foobar\", the user would almost certainly want
+-- \"some text foobar\" to be rendered, and Heist would probably seem
+-- annoyingly limited for not being able to do this. If the user really did
+-- want it to render \"some \", it would probably be easier for them to
+-- accept that they were silly to pass more than that to be substituted than
+-- it would be for the former user to accept that
+-- \"some \<b\>text\<\/b\> foobar\" is being rendered as \"some \" because
+-- it's \"more intuitive\".
 getAttributeSplice :: Monad m => ByteString -> TemplateMonad m ByteString
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) getTS
     nodes <- maybe (return []) id s
-    return $ check nodes
-  where
-    check ((X.Text t):xs) = B.append t $ check xs
-    check _ = ""
+    return $ B.concat $ map X.textContent nodes
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
