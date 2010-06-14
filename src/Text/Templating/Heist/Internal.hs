@@ -284,15 +284,20 @@ attParser = AP.many1 (identParser <|> litParser)
 
 ------------------------------------------------------------------------------
 -- | Get's the attribute value.  This is just a normal splice lookup with the
--- added restriction that the splice's result list has to contain a single
--- text element.  Otherwise the attribute evaluates to the empty string.
+-- added restriction that the splice's result list has to start with a list
+-- of text elements.  Otherwise the attribute evaluates to the empty string.
+--
+-- This originally only took the first text node. However, because HTML 
+-- entities will split a text node, and it might be desirable to have text
+-- containing HTML entities in an attribute, it was decided instead to to
+-- take the first few consecutive text nodes and concatenate them instead.
 getAttributeSplice :: Monad m => ByteString -> TemplateMonad m ByteString
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) getTS
     nodes <- maybe (return []) id s
     return $ check nodes
   where
-    check ((X.Text t):_) = t
+    check ((X.Text t):xs) = B.append t $ check xs
     check _ = ""
 
 ------------------------------------------------------------------------------
