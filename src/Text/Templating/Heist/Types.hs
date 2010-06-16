@@ -138,7 +138,7 @@ instance Eq (TemplateState m) where
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateStateTyCon :: TyCon
-templateStateTyCon = mkTyCon "Text.Templating.Heist.Types.TemplateState"
+templateStateTyCon = mkTyCon "Text.Templating.Heist.TemplateState"
 {-# NOINLINE templateStateTyCon #-}
 
 instance (Typeable1 m) => Typeable (TemplateState m) where
@@ -291,7 +291,7 @@ instance (MonadCont m) => MonadCont (TemplateMonad m) where
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateMonadTyCon :: TyCon
-templateMonadTyCon = mkTyCon "Text.Templating.Heist.Types.TemplateMonad"
+templateMonadTyCon = mkTyCon "Text.Templating.Heist.TemplateMonad"
 {-# NOINLINE templateMonadTyCon #-}
 
 instance (Typeable1 m) => Typeable1 (TemplateMonad m) where
