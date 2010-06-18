@@ -82,8 +82,8 @@ bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'TemplateState'.
 bindSplices :: Monad m =>
-               [(ByteString, Splice m)] -- ^ splices to bind action
-            -> TemplateState m   -- ^ source state
+               [(ByteString, Splice m)] -- ^ splices to bind
+            -> TemplateState m   -- ^ start state
             -> TemplateState m
 bindSplices ss ts = foldl' (flip id) ts acts 
   where
