@@ -73,6 +73,7 @@ module Text.Templating.Heist
   , addTemplate
   , emptyTemplateState
   , bindSplice
+  , bindSplices
   , lookupSplice
   , setTemplates
   , loadTemplates

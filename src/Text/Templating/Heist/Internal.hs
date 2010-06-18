@@ -85,7 +85,7 @@ addPostRunHook hook ts = ts { _postRunHook = _postRunHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Bind a new splice declaration to a tag name within a 'TemplateState'.
+-- | Binds a new splice declaration to a tag name within a 'TemplateState'.
 bindSplice :: Monad m =>
               ByteString        -- ^ tag name
            -> Splice m          -- ^ splice action
@@ -93,6 +93,16 @@ bindSplice :: Monad m =>
            -> TemplateState m
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 
+
+------------------------------------------------------------------------------
+-- | Binds a set of new splice declarations within a 'TemplateState'.
+bindSplices :: Monad m =>
+               [(ByteString, Splice m)] -- ^ splices to bind action
+            -> TemplateState m   -- ^ source state
+            -> TemplateState m
+bindSplices ss ts = foldl' (flip id) ts acts 
+  where
+    acts = map (uncurry bindSplice) ss
 
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a splice.
