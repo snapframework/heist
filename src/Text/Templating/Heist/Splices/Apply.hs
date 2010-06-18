@@ -41,7 +41,7 @@ applyImpl = do
                       modifyTS (bindSplice "content" $ return processedChildren)
                       setContext ctx
                       result <- runNodeList $ _itNodes t
-                      restoreState st
+                      restoreTS st
                       return result)
                   (lookupTemplate attr (st {_curContext = nextCtx attr st}))
   where nextCtx name st

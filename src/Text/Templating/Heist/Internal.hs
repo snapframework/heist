@@ -31,21 +31,6 @@ import             Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
--- | Restores the components of TemplateState that can get modified in
--- template calls.  You should use this function instead of @putTS@ to restore
--- an old state.  Thas was needed because doctypes needs to be in a "global
--- scope" as opposed to the template call "local scope" of state items such
--- as recursionDepth, curContext, and spliceMap.
-restoreState :: Monad m => TemplateState m -> TemplateMonad m ()
-restoreState ts1 = 
-    modifyTS (\ts2 -> ts2
-        { _recursionDepth = _recursionDepth ts1
-        , _curContext = _curContext ts1
-        , _spliceMap = _spliceMap ts1
-        })
-
-
-------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
 addDoctype :: Monad m => [ByteString] -> TemplateMonad m ()
 addDoctype dt = do
@@ -343,7 +328,7 @@ recurseSplice node splice = do
     if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
         then do modRecursionDepth (+1)
                 res <- runNodeList result
-                restoreState ts'
+                restoreTS ts'
                 return res
         else return result
   where
@@ -374,7 +359,7 @@ evalTemplate name = lookupAndRun name
         ts <- getTS
         putTS (ts {_curContext = ctx})
         res <- runNodeList $ _itNodes t
-        restoreState ts
+        restoreTS ts
         return $ Just res)
 
 
@@ -391,7 +376,7 @@ evalWithHooks name = lookupAndRun name
         nodes <- lift $ _preRunHook ts $ _itNodes t
         putTS (ts {_curContext = ctx})
         res <- runNodeList nodes
-        restoreState ts
+        restoreTS ts
         return . Just =<< lift (_postRunHook ts res))
 
 

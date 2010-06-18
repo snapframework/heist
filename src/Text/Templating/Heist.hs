@@ -95,6 +95,7 @@ module Text.Templating.Heist
   , getTS
   , putTS
   , modifyTS
+  , restoreTS
 
     -- * Functions for running splices and templates
   , evalTemplate
