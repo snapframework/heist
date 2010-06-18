@@ -1,9 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-|
 
@@ -21,20 +22,19 @@ liberating us from the unused writer portion of RWST.
 module Text.Templating.Heist.Types where
 
 ------------------------------------------------------------------------------
-import           Control.Applicative
-import           Control.Monad.Cont
-import           Control.Monad.Error
-import           Control.Monad.Reader
-import           Control.Monad.State
-import           Control.Monad.Trans
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
-import qualified Data.Map as Map
-import           Data.Map (Map)
-import           Data.Monoid
-import           Data.Typeable
-import           Prelude hiding (catch)
-import qualified Text.XML.Expat.Tree as X
+import             Control.Applicative
+import "monads-fd" Control.Monad.Cont
+import "monads-fd" Control.Monad.Error
+import "monads-fd" Control.Monad.Reader
+import "monads-fd" Control.Monad.State
+import "monads-fd" Control.Monad.Trans
+import             Data.ByteString.Char8 (ByteString)
+import qualified   Data.Map as Map
+import             Data.Map (Map)
+import             Data.Monoid
+import             Data.Typeable
+import             Prelude hiding (catch)
+import qualified   Text.XML.Expat.Tree as X
 
 
 ------------------------------------------------------------------------------

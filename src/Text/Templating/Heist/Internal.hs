@@ -1,32 +1,33 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Text.Templating.Heist.Internal where
 
 ------------------------------------------------------------------------------
-import           Control.Applicative
-import           Control.Exception (SomeException)
-import           Control.Monad.CatchIO
-import           Control.Monad.RWS.Strict
-import qualified Data.Attoparsec.Char8 as AP
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy as L
-import           Data.Either
-import qualified Data.Foldable as F
-import           Data.List
-import qualified Data.Map as Map
-import           Data.Maybe
-import           Prelude hiding (catch)
-import           System.Directory.Tree hiding (name)
-import           System.FilePath
-import           Text.XML.Expat.Format
-import qualified Text.XML.Expat.Tree as X
+import             Control.Applicative
+import             Control.Exception (SomeException)
+import             Control.Monad.CatchIO
+import "monads-fd" Control.Monad.RWS.Strict
+import qualified   Data.Attoparsec.Char8 as AP
+import             Data.ByteString.Char8 (ByteString)
+import qualified   Data.ByteString.Char8 as B
+import qualified   Data.ByteString.Lazy as L
+import             Data.Either
+import qualified   Data.Foldable as F
+import             Data.List
+import qualified   Data.Map as Map
+import             Data.Maybe
+import             Prelude hiding (catch)
+import             System.Directory.Tree hiding (name)
+import             System.FilePath
+import             Text.XML.Expat.Format
+import qualified   Text.XML.Expat.Tree as X
 
 ------------------------------------------------------------------------------
-import           Text.Templating.Heist.Constants
-import           Text.Templating.Heist.Types
+import             Text.Templating.Heist.Constants
+import             Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
@@ -447,27 +448,45 @@ renderTemplate ts name = do
 -- Template loading
 ------------------------------------------------------------------------------
 
+-- | Turns an in-memory XML/XHTML bytestring into a (doctype,'[Node]') pair.
+parseDoc :: ByteString -> IO (Either String (Maybe ByteString,[Node]))
+parseDoc bs = do
+    let (doctype,rest) = extractDoctype bs
+    let wrap b = B.concat ["<snap:root>\n", b, "\n</snap:root>"]
+
+    return $
+      mapRight (\n -> (doctype,X.getChildren n)) $
+      mapLeft genErrorMsg $
+      X.parse' heistExpatOptions (wrap rest)
+
+  where
+    genErrorMsg (X.XMLParseError str loc) = locMsg loc ++ ": " ++ translate str
+
+    locMsg (X.XMLParseLocation line col _ _) =
+        "(line " ++ show (line-1) ++ ", col " ++ show col ++ ")"
+
+    translate "junk after document element" = "document must have a single root element"
+    translate s = s
+
+
 -- | Reads an XML document from disk.
 getDoc :: String -> IO (Either String InternalTemplate)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
-    return $ do
-        (doctype, rest) <- liftM extractDoctype bs
-        let wrap b = "<snap:root>\n" `B.append` b `B.append` "\n</snap:root>"
-            toTemplate t = InternalTemplate {
-                _itDoctype = doctype,
-                _itNodes = t
-            }
-        mapRight (toTemplate . X.getChildren) .
-            mapLeft genErrorMsg .
-            X.parse' heistExpatOptions . wrap $ rest
-  where
-    genErrorMsg (X.XMLParseError str loc) = f ++ " " ++ locMsg loc ++ ": " ++ translate str
-    locMsg (X.XMLParseLocation line col _ _) =
-        "(line " ++ show (line-1) ++ ", col " ++ show col ++ ")"
-    translate "junk after document element" = "document must have a single root element"
-    translate s = s
+
+    d' <- either (return . Left)
+                 parseDoc
+                 bs
+
+    let d = mapLeft (\s -> f ++ " " ++ s) d'
+
+    return $ either Left
+               (\(doctype, nodes) -> Right $ InternalTemplate {
+                    _itDoctype = doctype,
+                    _itNodes = nodes
+                })
+               d
 
 
 ------------------------------------------------------------------------------
@@ -482,7 +501,7 @@ hasDoctype bs = "<!DOCTYPE" `B.isPrefixOf` bs
 extractDoctype :: ByteString -> (Maybe ByteString, ByteString)
 extractDoctype bs = 
     if hasDoctype bs
-        then (Just $ B.snoc (B.takeWhile p bs) '>', B.tail $ B.dropWhile p bs)
+        then (Just $ B.snoc (B.takeWhile p bs) '>',B.tail $ B.dropWhile p bs)
         else (Nothing, bs)
   where
     p = (/='>')

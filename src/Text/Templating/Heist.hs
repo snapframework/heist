@@ -97,6 +97,7 @@ module Text.Templating.Heist
 
     -- * Misc functions
   , getDoc
+  , parseDoc
   , bindStaticTag
 
   ) where
