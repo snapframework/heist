@@ -77,6 +77,7 @@ module Text.Templating.Heist
   , lookupSplice
   , setTemplates
   , loadTemplates
+  , hasTemplate
 
     -- * Hook functions
     -- $hookDoc

@@ -145,6 +145,15 @@ traversePath tm path name =
 
 
 ------------------------------------------------------------------------------
+-- | Returns 'True' if the given template can be found in the template state.
+hasTemplate :: Monad m =>
+               ByteString
+            -> TemplateState m
+            -> Bool
+hasTemplate nameStr ts = isJust $ lookupTemplate nameStr ts
+
+
+------------------------------------------------------------------------------
 -- | Convenience function for looking up a template.
 lookupTemplate :: Monad m =>
                   ByteString
