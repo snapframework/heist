@@ -320,7 +320,7 @@ getParamNode = TemplateMonad $ \r s -> return (r,s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's local
+-- | TemplateMonad's 'local'.
 localParamNode :: Monad m
                => (Node -> Node)
                -> TemplateMonad m a
@@ -329,25 +329,25 @@ localParamNode f m = TemplateMonad $ \r s -> runTemplateMonad m (f r) s
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's gets
+-- | TemplateMonad's 'gets'.
 getsTS :: Monad m => (TemplateState m -> r) -> TemplateMonad m r
 getsTS f = TemplateMonad $ \_ s -> return (f s, s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's get
+-- | TemplateMonad's 'get'.
 getTS :: Monad m => TemplateMonad m (TemplateState m)
 getTS = TemplateMonad $ \_ s -> return (s, s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's put
+-- | TemplateMonad's 'put'.
 putTS :: Monad m => TemplateState m -> TemplateMonad m ()
 putTS s = TemplateMonad $ \_ _ -> return ((), s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's modify
+-- | TemplateMonad's 'modify'.
 modifyTS :: Monad m
                     => (TemplateState m -> TemplateState m)
                     -> TemplateMonad m ()

@@ -90,6 +90,12 @@ module Text.Templating.Heist
   , runNodeList
   , getContext
 
+  , localParamNode
+  , getsTS
+  , getTS
+  , putTS
+  , modifyTS
+
     -- * Functions for running splices and templates
   , evalTemplate
   , callTemplate
