@@ -79,7 +79,8 @@ Library
     Text.Templating.Heist.Splices.Bind,
     Text.Templating.Heist.Splices.Ignore,
     Text.Templating.Heist.Splices.Markdown,
-    Text.Templating.Heist.Splices.Static
+    Text.Templating.Heist.Splices.Static,
+    Text.Templating.Heist.TemplateDirectory
 
   other-modules:
     Text.Templating.Heist.Internal,

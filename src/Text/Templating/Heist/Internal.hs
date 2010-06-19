@@ -89,6 +89,7 @@ bindSplices ss ts = foldl' (flip id) ts acts
   where
     acts = map (uncurry bindSplice) ss
 
+
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a splice.
 lookupSplice :: Monad m =>
