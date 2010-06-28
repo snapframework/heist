@@ -192,10 +192,11 @@ insertTemplate p t st =
 -- | Adds a template to the template state.
 addTemplate :: Monad m =>
                ByteString
-            -> InternalTemplate
+            -> Template
             -> TemplateState m
             -> TemplateState m
-addTemplate n t st = insertTemplate (splitTemplatePath n) t st
+addTemplate n t st = insertTemplate (splitTemplatePath n)
+                                    (InternalTemplate Nothing t) st
 
 
 ------------------------------------------------------------------------------
