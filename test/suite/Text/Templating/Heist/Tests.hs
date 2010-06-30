@@ -61,7 +61,7 @@ addTest :: IO ()
 addTest = do
   H.assertBool "lookup test" $ Just [] == (fmap (_itNodes . fst) $ lookupTemplate "aoeu" ts)
   H.assertBool "splice touched" $ Map.size (_spliceMap ts) == 0
-  where ts = addTemplate "aoeu" (InternalTemplate Nothing []) (mempty::TemplateState IO)
+  where ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
 
 isLeft :: Either a b -> Bool
 isLeft (Left _) = True
