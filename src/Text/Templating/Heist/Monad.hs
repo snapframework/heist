@@ -19,7 +19,6 @@ module Text.Templating.Heist.Monad
     , runHeistT
     ) where
 
-import           Control.Applicative
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Cont
@@ -32,7 +31,6 @@ import           Control.Monad.State.Strict
 import qualified Control.Monad.State.Lazy as LState
 import           Control.Monad.Writer.Strict hiding (pass)
 import qualified Control.Monad.Writer.Lazy as LWriter
-import           Control.Monad.Trans
 import           Data.ByteString(ByteString)
 import           Text.Templating.Heist
 import           Text.Templating.Heist.Splices.Static
@@ -67,10 +65,10 @@ class (Monad m, Monad n) => MonadHeist m n | n -> m where
 
 ------------------------------------------------------------------------------
 -- | HeistState is the internal state of any 'MonadHeist'. 'HeistT' is just a
--- 'ReaderT' with a 'HeistT' as its environment. It stores the 'TemplateState'
--- and the 'StaticTagState' and enough additional information to support the
--- 'heistReload' operation which flushes the 'StaticTagState' and reloads all
--- the templates in the 'TemplateState' from disk.
+-- 'ReaderT' with a 'HeistState' as its environment. It stores the
+-- 'TemplateState' and the 'StaticTagState' and enough additional information
+-- to support the 'heistReload' operation which flushes the 'StaticTagState'
+-- and reloads all the templates in the 'TemplateState' from disk.
 data HeistState m = HeistState
     { _path     :: FilePath
     , _origTs   :: TemplateState m
