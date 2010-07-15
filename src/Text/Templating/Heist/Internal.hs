@@ -392,14 +392,22 @@ evalWithHooks name = lookupAndRun name
 
 
 ------------------------------------------------------------------------------
--- | Binds a list of constant string splices
+-- | Binds a list of constant string splices.
 bindStrings :: Monad m
             => [(ByteString, ByteString)]
             -> TemplateState m
             -> TemplateState m
-bindStrings pairs ts = foldr add ts pairs
-  where
-    add (n,v) = bindSplice n (return [X.Text v])
+bindStrings pairs ts = foldr (uncurry bindString) ts pairs
+
+
+------------------------------------------------------------------------------
+-- | Binds a single constant string splice.
+bindString :: Monad m
+            => ByteString
+            -> ByteString
+            -> TemplateState m
+            -> TemplateState m
+bindString n v = bindSplice n $ return [X.Text v]
 
 
 ------------------------------------------------------------------------------

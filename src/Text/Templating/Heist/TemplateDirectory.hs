@@ -18,7 +18,6 @@ module Text.Templating.Heist.TemplateDirectory
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
-import           Data.ByteString.Char8 (ByteString)
 import           Text.Templating.Heist
 import           Text.Templating.Heist.Splices.Static
 
