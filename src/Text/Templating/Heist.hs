@@ -22,8 +22,11 @@
   @getUser :: MyAppMonad (Maybe ByteString)@ that gets the current user.
   You can implement this functionality with a 'Splice' as follows:
 
-  >
-  > import Text.XML.Expat.Tree
+  > import             Data.ByteString.Char8 (ByteString)
+  > import qualified   Data.ByteString.Char8 as B
+  > import qualified   Text.XML.Expat.Tree as X
+  > 
+  > import             Text.Templating.Heist
   >
   > link :: ByteString -> ByteString -> Node
   > link target text = X.Element "a" [("href", target)] [X.Text text]
