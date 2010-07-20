@@ -106,6 +106,7 @@ module Text.Templating.Heist
   , callTemplate
   , renderTemplate
   , bindStrings
+  , bindString
 
     -- * Misc functions
   , getDoc
