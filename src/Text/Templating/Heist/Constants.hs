@@ -12,7 +12,7 @@ import           Text.XML.Expat.Tree
 heistExpatOptions :: ParserOptions ByteString ByteString
 heistExpatOptions =
     defaultParserOptions {
-           parserEncoding = Just UTF8
+           overrideEncoding = Just UTF8
          , entityDecoder  = Just (\k -> Map.lookup k htmlEntityLookupTable)
          }
 
