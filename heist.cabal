@@ -88,7 +88,7 @@ Library
     Text.Templating.Heist.Types
 
   build-depends:
-    attoparsec >= 0.8.0.2 && < 0.9,
+    attoparsec >= 0.8.1 && < 0.9,
     base >= 4 && < 5,
     bytestring,
     containers,
