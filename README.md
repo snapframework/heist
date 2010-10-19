@@ -21,8 +21,9 @@ gives you
 
     <div id="special-id">very special</div>
 
-Values can also be pulled from "Splices" (see the documentation for more
-information.
+Values can also be pulled from "Splices" (see 
+[the documentation](http://snapframework.com/docs/tutorials/heist#heist-programming) 
+for more information.)
 
 ## Building heist
 
