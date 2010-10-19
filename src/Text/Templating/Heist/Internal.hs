@@ -233,14 +233,15 @@ getContext = getsTS _curContext
 -- | Performs splice processing on a single node.
 runNode :: Monad m => Node -> Splice m
 runNode n@(X.Text _)          = return [n]
-runNode n@(X.Element nm at ch) = do
+runNode (X.Element nm at ch) = do
+    newAtts <- mapM attSubst at
+    let n = X.Element nm newAtts ch
     s <- liftM (lookupSplice nm) getTS
-    maybe runChildren (recurseSplice n) s
+    maybe (runChildren newAtts) (recurseSplice n) s
     
   where
-    runChildren = do
+    runChildren newAtts = do
         newKids <- runNodeList ch
-        newAtts <- mapM attSubst at
         return [X.Element nm newAtts newKids]
 
 
