@@ -1,11 +1,30 @@
-Heist
------
+# Heist
 
-Heist, part of the Snap Framework (http://www.snapframework.com/), is a Haskell
-library for xhtml templating. FIXME: more description here
+Heist, part of the [Snap Framework](http://www.snapframework.com/), is a 
+Haskell library for (x)html templating. It uses simple XML tags to bind values
+to your templates in a straightforward way. For example, if you were to put
+the following in a template:
 
-Building heist
---------------------
+    <bind tag="message">some text</bind>
+    <p><message/></p>
+
+in your template, the result would be
+
+    <p>some text</p>
+
+Likewise, if you need to add text to an attribute,
+
+    <bind tag="special">special-id</bind>
+    <div id="$(special)">very special</div>
+
+gives you
+
+    <div id="special-id">very special</div>
+
+Values can also be pulled from "Splices" (see the documentation for more
+information.
+
+## Building heist
 
 The heist library is built using [Cabal](http://www.haskell.org/cabal/) and
 [Hackage](http://hackage.haskell.org/packages/hackage.html). Just run
