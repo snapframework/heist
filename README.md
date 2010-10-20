@@ -8,7 +8,7 @@ the following in a template:
     <bind tag="message">some text</bind>
     <p><message/></p>
 
-the resulting would be
+the resulting xhtml would be
 
     <p>some text</p>
 
