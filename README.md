@@ -1,14 +1,14 @@
 # Heist
 
 Heist, part of the [Snap Framework](http://www.snapframework.com/), is a 
-Haskell library for (x)html templating. It uses simple XML tags to bind values
+Haskell library for xhtml templating. It uses simple XML tags to bind values
 to your templates in a straightforward way. For example, if you were to put
 the following in a template:
 
     <bind tag="message">some text</bind>
     <p><message/></p>
 
-in your template, the result would be
+the resulting would be
 
     <p>some text</p>
 
@@ -55,6 +55,5 @@ To build the test suite, `cd` into the `test/` directory and run
 From here you can invoke the testsuite by running:
 
     $ ./runTestsAndCoverage.sh 
-
 
 The testsuite generates an `hpc` test coverage report in `test/dist/hpc`.
