@@ -40,7 +40,8 @@ tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_sim
         , testCase "fsLoadTest" fsLoadTest
         , testCase "renderNoNameTest" renderNoNameTest
         , testCase "doctypeTest" doctypeTest
-        , testCase "attributeSubstitution" attrSubst
+        , testCase "attributeSubstitution" attrSubstTest
+        , testCase "bindAttribute" attrSubstTest
         , testCase "applyTest" applyTest
         ]
 
@@ -76,7 +77,7 @@ loadTest = do
   ets <- loadT "templates"
   either (error "Error loading templates")
          (\ts -> do let tm = _templateMap ts
-                    H.assertBool "loadTest size" $ Map.size tm == 15
+                    H.assertBool "loadTest size" $ Map.size tm == 16
          ) ets
 
 renderNoNameTest :: H.Assertion
@@ -114,8 +115,8 @@ doctypeTest = do
     ioc <- renderTemplate ts "ioc"
     H.assertBool "doctype test ioc" $ hasDoctype $ fromJust ioc
 
-attrSubst :: H.Assertion
-attrSubst = do
+attrSubstTest :: H.Assertion
+attrSubstTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
     check (setTs "meaning_of_everything" ts) "pre_meaning_of_everything_post"
@@ -128,6 +129,21 @@ attrSubst = do
             not $ B.null $ snd $ B.breakSubstring str $ fromJust res
         H.assertBool ("attr subst foo") $
             not $ B.null $ snd $ B.breakSubstring "$(foo)" $ fromJust res
+
+
+bindAttrTest :: H.Assertion
+bindAttrTest = do
+    ets <- loadT "templates"
+    let ts = either (error "Error loading templates") id ets
+    check ts "pre__post"
+  where
+    check ts str = do
+        res <- renderTemplate ts "bind-attrs"
+        H.assertBool ("attr subst " ++ (show str)) $
+            not $ B.null $ snd $ B.breakSubstring str $ fromJust res
+        H.assertBool ("attr subst bar") $
+            not $ B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
+
 
 -- dotdotTest :: H.Assertion
 -- dotdotTest = do
