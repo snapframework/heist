@@ -44,6 +44,7 @@ tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_sim
         , testCase "doctypeTest" doctypeTest
         , testCase "attributeSubstitutionTest" attrSubstTest
         , testCase "bindAttributeTest" bindAttrTest
+        , testCase "markdownTest" markdownTest
         , testCase "applyTest" applyTest
         ]
 
@@ -92,7 +93,7 @@ loadTest = do
     ets <- loadT "templates"
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertBool "loadTest size" $ Map.size tm == 16
+                      H.assertBool "loadTest size" $ Map.size tm == 17
            ) ets
 
 
@@ -155,6 +156,17 @@ bindAttrTest = do
             not $ B.null $ snd $ B.breakSubstring str $ fromJust res
         H.assertBool ("attr subst bar") $
             B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
+
+    
+markdownTest :: H.Assertion
+markdownTest = do
+    ets <- loadT "templates"
+    let ts = either (error "Error loading templates") id ets
+    check ts "\n<div class=\"markdown\">\n<p>This <em>is</em> a test.</p>\n</div>\n\n"
+  where
+    check ts str = do
+        result <- renderTemplate ts "markdown"
+        H.assertEqual ("Should match " ++ (show str)) str (fromJust result)
 
 
 applyTest :: H.Assertion
