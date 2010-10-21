@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings, TypeSynonymInstances, GeneralizedNewtypeDeriving #-}
+
 module Text.Templating.Heist.Tests
   ( tests
   , quickRender
@@ -41,7 +42,7 @@ tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_sim
         , testCase "renderNoNameTest" renderNoNameTest
         , testCase "doctypeTest" doctypeTest
         , testCase "attributeSubstitution" attrSubstTest
-        , testCase "bindAttribute" attrSubstTest
+        , testCase "bindAttribute" bindAttrTest
         , testCase "applyTest" applyTest
         ]
 
@@ -135,14 +136,14 @@ bindAttrTest :: H.Assertion
 bindAttrTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
-    check ts "pre__post"
+    check ts "<div id=\"zzzzz\""
   where
     check ts str = do
         res <- renderTemplate ts "bind-attrs"
         H.assertBool ("attr subst " ++ (show str)) $
             not $ B.null $ snd $ B.breakSubstring str $ fromJust res
         H.assertBool ("attr subst bar") $
-            not $ B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
+            B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
 
 
 -- dotdotTest :: H.Assertion
@@ -161,10 +162,10 @@ newtype Name = Name { unName :: B.ByteString } deriving (Show)
 
 instance Arbitrary Name where
   arbitrary = do
-    first <- elements identStartChar
-    n <- choose (4,10)
-    rest <- vectorOf n $ elements identChar
-    return $ Name $ B.pack $ first : rest
+    x     <- elements identStartChar
+    n     <- choose (4,10)
+    rest  <- vectorOf n $ elements identChar
+    return $ Name $ B.pack (x:rest)
 
 instance Arbitrary Node where
   arbitrary = limitedDepth 3

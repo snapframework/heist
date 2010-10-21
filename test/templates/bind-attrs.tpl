@@ -1,2 +1,2 @@
-<bind tag="bar">meaning_of_everything</bind>
+<bind tag="bar">zzzzz</bind>
 <div id="$(bar)"> </div>
