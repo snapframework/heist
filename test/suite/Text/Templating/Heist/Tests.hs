@@ -188,13 +188,13 @@ bindAttrTest = do
         H.assertBool ("attr subst bar") $
             B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
 
-    
+
 ------------------------------------------------------------------------------
 markdownTest :: H.Assertion
 markdownTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
-    
+
     check ts "<div class=\"markdown\"><p>This <em>is</em> a test.</p></div>"
 
   where
@@ -210,8 +210,8 @@ applyTest = do
     let es = emptyTemplateState :: TemplateState IO
     res <- evalTemplateMonad applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
-    H.assertEqual "apply nothing" res []
-    
+    H.assertEqual "apply nothing" [] res
+
 
 ------------------------------------------------------------------------------
 -- Utility functions
