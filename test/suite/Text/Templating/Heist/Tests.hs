@@ -42,6 +42,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testProperty "heist/simpleApply"           simpleApplyTest
         , testCase     "heist/stateMonoid"           monoidTest
         , testCase     "heist/templateAdd"           addTest
+        , testCase     "heist/hasTemplate"           hasTemplateTest
         , testCase     "heist/getDoc"                getDocTest
         , testCase     "heist/load"                  loadTest
         , testCase     "heist/fsLoad"                fsLoadTest
@@ -99,6 +100,15 @@ addTest = do
 
   where
     ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
+
+
+------------------------------------------------------------------------------
+hasTemplateTest :: H.Assertion
+hasTemplateTest = do
+    ets <- loadT "templates"
+    let tm = either (error "Error loading templates") _templateMap ets
+    let ts = setTemplates tm emptyTemplateState :: TemplateState IO
+    H.assertBool "hasTemplate ts" (hasTemplate "index" ts)
 
 
 ------------------------------------------------------------------------------
