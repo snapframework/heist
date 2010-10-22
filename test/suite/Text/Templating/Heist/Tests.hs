@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
+{-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 module Text.Templating.Heist.Tests
   ( tests
@@ -32,40 +35,51 @@ import           Text.XML.Expat.Format
 import qualified Text.XML.Expat.Tree as X
 
 
+------------------------------------------------------------------------------
 tests :: [Test]
-tests = [ testProperty "simpleBindTest" $ monadicIO $ forAllM arbitrary prop_simpleBindTest
-        , testProperty "simpleApplyTest" $ monadicIO $ forAllM arbitrary prop_simpleApplyTest
-        , testCase "stateMonoidTest" monoidTest
-        , testCase "templateAddTest" addTest
-        , testCase "getDocTest" getDocTest
-        , testCase "loadTest" loadTest
-        , testCase "fsLoadTest" fsLoadTest
-        , testCase "renderNoNameTest" renderNoNameTest
-        , testCase "doctypeTest" doctypeTest
-        , testCase "attributeSubstitutionTest" attrSubstTest
-        , testCase "bindAttributeTest" bindAttrTest
-        , testCase "markdownTest" markdownTest
-        , testCase "applyTest" applyTest
+tests = [ testProperty "heist/simpleBind"            simpleBindTest
+        , testProperty "heist/simpleApply"           simpleApplyTest
+        , testCase     "heist/stateMonoid"           monoidTest
+        , testCase     "heist/templateAdd"           addTest
+        , testCase     "heist/getDoc"                getDocTest
+        , testCase     "heist/load"                  loadTest
+        , testCase     "heist/fsLoad"                fsLoadTest
+        , testCase     "heist/renderNoName"          renderNoNameTest
+        , testCase     "heist/doctype"               doctypeTest
+        , testCase     "heist/attributeSubstitution" attrSubstTest
+        , testCase     "heist/bindAttribute"         bindAttrTest
+        , testCase     "heist/markdown"              markdownTest
+        , testCase     "heist/apply"                 applyTest
         ]
 
 
-prop_simpleBindTest :: Bind -> PropertyM IO ()
-prop_simpleBindTest bind = do
-    let template = buildBindTemplate bind
-        result = buildResult bind
-    spliceResult <- run $ evalTemplateMonad (runNodeList template)
-                                            (X.Text "")
-                                            emptyTemplateState
-    assert $ result == spliceResult
+------------------------------------------------------------------------------
+simpleBindTest :: Property
+simpleBindTest = monadicIO $ forAllM arbitrary prop
+  where
+    prop :: Bind -> PropertyM IO ()
+    prop bind = do
+        let template = buildBindTemplate bind
+        let result   = buildResult bind
+
+        spliceResult <- run $ evalTemplateMonad (runNodeList template)
+                                                (X.Text "")
+                                                emptyTemplateState
+        assert $ result == spliceResult
 
 
-prop_simpleApplyTest :: Apply -> PropertyM IO ()
-prop_simpleApplyTest apply = do
-    let correct = calcCorrect apply
-    result <- run $ calcResult apply
-    assert $ correct == result
+------------------------------------------------------------------------------
+simpleApplyTest :: Property
+simpleApplyTest = monadicIO $ forAllM arbitrary prop
+  where
+    prop :: Apply -> PropertyM IO ()
+    prop apply = do
+        let correct = calcCorrect apply
+        result <- run $ calcResult apply
+        assert $ correct == result
 
 
+------------------------------------------------------------------------------
 monoidTest :: IO ()
 monoidTest = do
     H.assertBool "left monoid identity" $ mempty `mappend` es == es
@@ -73,13 +87,19 @@ monoidTest = do
   where es = emptyTemplateState :: TemplateState IO
 
 
+------------------------------------------------------------------------------
 addTest :: IO ()
 addTest = do
-    H.assertBool "lookup test" $ Just [] == (fmap (_itNodes . fst) $ lookupTemplate "aoeu" ts)
-    H.assertBool "splice touched" $ Map.size (_spliceMap ts) == 0
-  where ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
+    H.assertEqual "lookup test" (Just []) $
+        fmap (_itNodes . fst) $ lookupTemplate "aoeu" ts
+
+    H.assertEqual "splice touched" 0 $ Map.size (_spliceMap ts)
+
+  where
+    ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
 
 
+------------------------------------------------------------------------------
 getDocTest :: H.Assertion
 getDocTest = do
     d <- getDoc "bkteoar"
@@ -88,6 +108,7 @@ getDocTest = do
     H.assertBool "index doc" $ not $ isLeft f
 
 
+------------------------------------------------------------------------------
 loadTest :: H.Assertion
 loadTest = do
     ets <- loadT "templates"
@@ -97,18 +118,24 @@ loadTest = do
            ) ets
 
 
+------------------------------------------------------------------------------
 fsLoadTest :: H.Assertion
 fsLoadTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
     let ts = setTemplates tm emptyTemplateState :: TemplateState IO
-        f p n = H.assertBool ("loading template " ++ n) $ p $ lookupTemplate (B.pack n) ts
+    let f  = g ts
+
     f isNothing "abc/def/xyz"
     f isJust "a"
     f isJust "bar/a"
     f isJust "/bar/a"
 
+  where
+    g ts p n = H.assertBool ("loading template " ++ n) $ p $
+               lookupTemplate (B.pack n) ts
 
+------------------------------------------------------------------------------
 renderNoNameTest :: H.Assertion
 renderNoNameTest = do
     ets <- loadT "templates"
@@ -118,6 +145,7 @@ renderNoNameTest = do
            ) ets
 
 
+------------------------------------------------------------------------------
 doctypeTest :: H.Assertion
 doctypeTest = do
     ets <- loadT "templates"
@@ -128,12 +156,14 @@ doctypeTest = do
     H.assertBool "doctype test ioc" $ hasDoctype $ fromJust ioc
 
 
+------------------------------------------------------------------------------
 attrSubstTest :: H.Assertion
 attrSubstTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
     check (setTs "meaning_of_everything" ts) "pre_meaning_of_everything_post"
     check ts "pre__post"
+
   where
     setTs val = bindSplice "foo" (return [X.Text val])
     check ts str = do
@@ -144,6 +174,7 @@ attrSubstTest = do
             not $ B.null $ snd $ B.breakSubstring "$(foo)" $ fromJust res
 
 
+------------------------------------------------------------------------------
 bindAttrTest :: H.Assertion
 bindAttrTest = do
     ets <- loadT "templates"
@@ -158,6 +189,7 @@ bindAttrTest = do
             B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
 
     
+------------------------------------------------------------------------------
 markdownTest :: H.Assertion
 markdownTest = do
     ets <- loadT "templates"
@@ -172,6 +204,7 @@ markdownTest = do
         H.assertEqual ("Should match " ++ (show str)) str (fromJust result)
 
 
+------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
     let es = emptyTemplateState :: TemplateState IO
@@ -180,52 +213,53 @@ applyTest = do
     H.assertEqual "apply nothing" res []
     
 
--- dotdotTest :: H.Assertion
--- dotdotTest = do
---   ets <- loadT "templates"
---   let tm = either (error "Error loading templates") _templateMap ets
---   let ts = setTemplates tm emptyTemplateState :: TemplateState IO
---       f p n = H.assertBool ("loading template "++n) $ p $ lookupTemplate (B.pack n) ts
-
-
-{-
+------------------------------------------------------------------------------
 -- Utility functions
--}
+
 isLeft :: Either a b -> Bool
 isLeft (Left _) = True
 isLeft (Right _) = False
 
 
+------------------------------------------------------------------------------
 loadT :: String -> IO (Either String (TemplateState IO))
 loadT s = loadTemplates s emptyTemplateState
 
 
+------------------------------------------------------------------------------
 loadTS :: FilePath -> IO (TemplateState IO)
 loadTS baseDir = do
     etm <- loadTemplates baseDir emptyTemplateState
     return $ either error id etm
 
 
+------------------------------------------------------------------------------
 identStartChar :: [Char]
 identStartChar = ['a'..'z']
 
 
+------------------------------------------------------------------------------
 identChar :: [Char]
 identChar = '_' : identStartChar
 
 
+------------------------------------------------------------------------------
 textGen :: Gen [Char]
 textGen = listOf $ elements ((replicate 5 ' ') ++ identStartChar)
 
 
+------------------------------------------------------------------------------
 limitedDepth :: Int -> Gen Node
 limitedDepth 0 = liftM (X.Text . B.pack) textGen
-limitedDepth n = oneof [ liftM (X.Text . B.pack) textGen
-                       , liftM3 X.Element arbitrary
-                                          (liftM (take 2) arbitrary)
-                                          (liftM (take 3) $ listOf $ limitedDepth (n - 1))
-                       ]
+limitedDepth n =
+    oneof [ liftM (X.Text . B.pack) textGen
+          , liftM3 X.Element arbitrary
+                       (liftM (take 2) arbitrary)
+                       (liftM (take 3) $ listOf $ limitedDepth (n - 1))
+          ]
 
+
+------------------------------------------------------------------------------
 -- | Returns the number of unique insertion points in the tree.
 -- If h = insertAt f n g", the following property holds:
 -- insSize h == (insSize f) + (insSize g) - 1
@@ -235,6 +269,7 @@ insSize ns = 1 + (sum $ map nodeSize ns)
         nodeSize (X.Element _ _ c) = 1 + (insSize c)
 
 
+------------------------------------------------------------------------------
 insertAt :: [Node] -> Int -> [Node] -> [Node]
 insertAt elems 0 ns = elems ++ ns
 insertAt elems _ [] = elems
@@ -242,23 +277,34 @@ insertAt elems n list = maybe [] (toForest . root) $
     evalState (processNode elems $ fromJust $ fromForest list) n
 
 
+------------------------------------------------------------------------------
 move :: Insert ()
 move = modify (\x -> x-1)
 
 
+------------------------------------------------------------------------------
 processNode :: [Node] -> Loc -> Insert (Maybe Loc)
-processNode elems loc = liftM2 mplus (move >> goDown loc) (move >> goRight loc)
-  where goDown l = case current l of
+processNode elems loc =
+    liftM2 mplus (move >> goDown loc) (move >> goRight loc)
+
+  where
+    goDown l =
+        case current l of
           X.Text _        -> modify (+1) >> return Nothing
-          X.Element _ _ _ -> doneCheck (insertManyFirstChild elems) firstChild l
-        goRight = doneCheck (Just . insertManyRight elems) right
-        doneCheck insertFunc next l = do
-          s <- get
-          if s == 0
-            then return $ insertFunc l
-            else maybe (return Nothing) (processNode elems) $ next l
+          X.Element _ _ _ -> doneCheck (insertManyFirstChild elems)
+                                       firstChild
+                                       l
+
+    goRight = doneCheck (Just . insertManyRight elems) right
+
+    doneCheck insertFunc next l = do
+      s <- get
+      if s == 0
+        then return $ insertFunc l
+        else maybe (return Nothing) (processNode elems) $ next l
 
 
+------------------------------------------------------------------------------
 -- | Reloads the templates from disk and renders the specified
 -- template.  (Old convenience code.)
 quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
@@ -267,6 +313,7 @@ quickRender baseDir name = do
     renderTemplate ts name
 
 
+------------------------------------------------------------------------------
 newtype Name = Name { unName :: B.ByteString } deriving (Show)
 
 instance Arbitrary Name where
@@ -284,20 +331,18 @@ instance Arbitrary Node where
   shrink (X.Element n (_:as) []) = [X.Element n as []]
   shrink (X.Element n as cs) = [X.Element n as (tail cs), X.Element n (tail as) cs]
 
-
 instance Arbitrary B.ByteString where
   arbitrary = liftM unName arbitrary
 
-{-
- - Code for inserting nodes into any point of a tree
- -}
+--
+-- Code for inserting nodes into any point of a tree
+--
 type Loc = Cursor B.ByteString B.ByteString
 type Insert a = State Int a
 
 
-{-
- - <bind> tests
- -}
+------------------------------------------------------------------------------
+-- <bind> tests
 
 -- Data type encapsulating the parameters for a bind operation
 data Bind = Bind
@@ -307,6 +352,20 @@ data Bind = Bind
     , _bindPos :: Int
     , _bindRefPos :: Int
     } -- deriving (Show)
+
+
+instance Arbitrary Bind where
+  arbitrary = do
+    name <- arbitrary
+    kids <- liftM (take 3) arbitrary
+    doc <- liftM (take 5) arbitrary
+    let s = insSize doc
+    loc <- choose (0, s-1)
+    loc2 <- choose (0, s-loc-1)
+    return $ Bind name kids doc loc loc2
+  shrink (Bind e [c] (_:ds) p r) = [Bind e [c] ds p r]
+  shrink (Bind e (_:cs) d p r) = [Bind e cs d p r]
+  shrink _ = []
 
 
 instance Show Bind where
@@ -330,32 +389,22 @@ instance Show Bind where
     ]
 
 
+------------------------------------------------------------------------------
 buildNode :: B.ByteString -> B.ByteString -> Bind -> Node
 buildNode tag attr (Bind s c _ _ _) = X.Element tag [(attr, unName s)] c
 
 
+------------------------------------------------------------------------------
 buildBind :: Bind -> Node
 buildBind = buildNode "bind" "tag"
 
 
-instance Arbitrary Bind where
-  arbitrary = do
-    name <- arbitrary
-    kids <- liftM (take 3) arbitrary
-    doc <- liftM (take 5) arbitrary
-    let s = insSize doc
-    loc <- choose (0, s-1)
-    loc2 <- choose (0, s-loc-1)
-    return $ Bind name kids doc loc loc2
-  shrink (Bind e [c] (_:ds) p r) = [Bind e [c] ds p r]
-  shrink (Bind e (_:cs) d p r) = [Bind e cs d p r]
-  shrink _ = []
-
-
+------------------------------------------------------------------------------
 empty :: tag -> X.Node tag text
 empty n = X.Element n [] []
 
 
+------------------------------------------------------------------------------
 buildBindTemplate :: Bind -> [Node]
 buildBindTemplate s@(Bind n _ d b r) =
     insertAt [empty $ unName $ n] pos $ withBind
@@ -365,13 +414,14 @@ buildBindTemplate s@(Bind n _ d b r) =
         pos = b + bindSize - 1 + r
 
 
+------------------------------------------------------------------------------
 buildResult :: Bind -> [Node]
 buildResult (Bind _ c d b r) = insertAt c (b + r) d
 
 
-{-
- - <apply> tests
- -}
+------------------------------------------------------------------------------
+-- <apply> tests
+
 data Apply = Apply
     { _applyName :: Name
     , _applyCaller :: [Node]
@@ -392,15 +442,18 @@ instance Arbitrary Apply where
       return $ Apply name caller callee kids loc
 
 
+------------------------------------------------------------------------------
 buildApplyCaller :: Apply -> [Node]
 buildApplyCaller (Apply name caller _ kids pos) =
     insertAt [X.Element "apply" [("template", unName name)] kids] pos caller
 
 
+------------------------------------------------------------------------------
 calcCorrect :: Apply -> [Node]
 calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 
 
+------------------------------------------------------------------------------
 calcResult :: (MonadIO m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
     evalTemplateMonad (runNodeList $ buildApplyCaller apply)
