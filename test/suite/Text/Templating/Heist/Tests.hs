@@ -162,10 +162,13 @@ markdownTest :: H.Assertion
 markdownTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
-    check ts "\n<div class=\"markdown\">\n<p>This <em>is</em> a test.</p>\n</div>\n\n"
+    
+    check ts "<div class=\"markdown\"><p>This <em>is</em> a test.</p></div>"
+
   where
     check ts str = do
-        result <- renderTemplate ts "markdown"
+        result <- liftM (fmap $ B.filter (/= '\n')) $
+                  renderTemplate ts "markdown"
         H.assertEqual ("Should match " ++ (show str)) str (fromJust result)
 
 
