@@ -31,6 +31,7 @@ import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Types
 import           Text.Templating.Heist.Splices.Apply
 import           Text.Templating.Heist.Splices.Ignore
+import           Text.Templating.Heist.Splices.Markdown
 import           Text.XML.Expat.Cursor
 import           Text.XML.Expat.Format
 import qualified Text.XML.Expat.Tree as X
@@ -51,6 +52,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attributeSubstitution" attrSubstTest
         , testCase     "heist/bindAttribute"         bindAttrTest
         , testCase     "heist/markdown"              markdownTest
+        , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
         , testCase     "heist/ignore"                ignoreTest
         ]
@@ -203,12 +205,18 @@ bindAttrTest = do
 
 
 ------------------------------------------------------------------------------
+htmlExpected :: ByteString
+htmlExpected = "<div class=\"markdown\"><p>This <em>is</em> a test.</p></div>"
+
+
+------------------------------------------------------------------------------
+-- | Markdown test on a file
 markdownTest :: H.Assertion
 markdownTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
 
-    check ts "<div class=\"markdown\"><p>This <em>is</em> a test.</p></div>"
+    check ts htmlExpected
 
   where
     check ts str = do
@@ -218,11 +226,22 @@ markdownTest = do
 
 
 ------------------------------------------------------------------------------
+-- | Markdown test on supplied text
+markdownTextTest :: H.Assertion
+markdownTextTest = do
+    result <- evalTemplateMonad markdownSplice
+            (X.Text "This *is* a test.") emptyTemplateState
+    H.assertEqual "Markdown text" htmlExpected 
+      (B.filter (/= '\n') $ formatList' result)
+
+
+------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
     let es = emptyTemplateState :: TemplateState IO
     res <- evalTemplateMonad applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
+
     H.assertEqual "apply nothing" [] res
 
 
