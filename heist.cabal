@@ -95,7 +95,7 @@ Library
     directory,
     directory-tree,
     filepath,
-    hexpat >= 0.18.2 && <0.20,
+    hexpat >= 0.19 && <0.20,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     monads-fd,
     process,
