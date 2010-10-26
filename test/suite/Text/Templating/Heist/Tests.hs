@@ -30,6 +30,8 @@ import           Text.Templating.Heist
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Types
 import           Text.Templating.Heist.Splices.Apply
+import           Text.Templating.Heist.Splices.Ignore
+import           Text.Templating.Heist.Splices.Markdown
 import           Text.XML.Expat.Cursor
 import           Text.XML.Expat.Format
 import qualified Text.XML.Expat.Tree as X
@@ -41,6 +43,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testProperty "heist/simpleApply"           simpleApplyTest
         , testCase     "heist/stateMonoid"           monoidTest
         , testCase     "heist/templateAdd"           addTest
+        , testCase     "heist/hasTemplate"           hasTemplateTest
         , testCase     "heist/getDoc"                getDocTest
         , testCase     "heist/load"                  loadTest
         , testCase     "heist/fsLoad"                fsLoadTest
@@ -49,7 +52,9 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attributeSubstitution" attrSubstTest
         , testCase     "heist/bindAttribute"         bindAttrTest
         , testCase     "heist/markdown"              markdownTest
+        , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
+        , testCase     "heist/ignore"                ignoreTest
         ]
 
 
@@ -97,6 +102,15 @@ addTest = do
 
   where
     ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
+
+
+------------------------------------------------------------------------------
+hasTemplateTest :: H.Assertion
+hasTemplateTest = do
+    ets <- loadT "templates"
+    let tm = either (error "Error loading templates") _templateMap ets
+    let ts = setTemplates tm emptyTemplateState :: TemplateState IO
+    H.assertBool "hasTemplate ts" (hasTemplate "index" ts)
 
 
 ------------------------------------------------------------------------------
@@ -180,6 +194,7 @@ bindAttrTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
     check ts "<div id=\"zzzzz\""
+
   where
     check ts str = do
         res <- renderTemplate ts "bind-attrs"
@@ -188,14 +203,20 @@ bindAttrTest = do
         H.assertBool ("attr subst bar") $
             B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
 
-    
+
 ------------------------------------------------------------------------------
+htmlExpected :: ByteString
+htmlExpected = "<div class=\"markdown\"><p>This <em>is</em> a test.</p></div>"
+
+
+------------------------------------------------------------------------------
+-- | Markdown test on a file
 markdownTest :: H.Assertion
 markdownTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
-    
-    check ts "<div class=\"markdown\"><p>This <em>is</em> a test.</p></div>"
+
+    check ts htmlExpected
 
   where
     check ts str = do
@@ -205,13 +226,34 @@ markdownTest = do
 
 
 ------------------------------------------------------------------------------
+-- | Markdown test on supplied text
+markdownTextTest :: H.Assertion
+markdownTextTest = do
+    result <- evalTemplateMonad markdownSplice
+            (X.Text "This *is* a test.") emptyTemplateState
+    H.assertEqual "Markdown text" htmlExpected 
+      (B.filter (/= '\n') $ formatList' result)
+
+
+------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
     let es = emptyTemplateState :: TemplateState IO
     res <- evalTemplateMonad applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
-    H.assertEqual "apply nothing" res []
-    
+
+    H.assertEqual "apply nothing" [] res
+
+
+------------------------------------------------------------------------------
+ignoreTest :: H.Assertion
+ignoreTest = do
+    let es = emptyTemplateState :: TemplateState IO
+    res <- evalTemplateMonad ignoreImpl
+        (X.Element "ignore" [("tag", "ignorable")] 
+          [X.Text "This should be ignored"]) es
+    H.assertEqual "<ignore> tag" [] res
+
 
 ------------------------------------------------------------------------------
 -- Utility functions
@@ -279,7 +321,7 @@ insertAt elems n list = maybe [] (toForest . root) $
 
 ------------------------------------------------------------------------------
 move :: Insert ()
-move = modify (\x -> x-1)
+move = modify (\x -> x - 1)
 
 
 ------------------------------------------------------------------------------
@@ -360,8 +402,8 @@ instance Arbitrary Bind where
     kids <- liftM (take 3) arbitrary
     doc <- liftM (take 5) arbitrary
     let s = insSize doc
-    loc <- choose (0, s-1)
-    loc2 <- choose (0, s-loc-1)
+    loc <- choose (0, s - 1)
+    loc2 <- choose (0, s - loc - 1)
     return $ Bind name kids doc loc loc2
   shrink (Bind e [c] (_:ds) p r) = [Bind e [c] ds p r]
   shrink (Bind e (_:cs) d p r) = [Bind e cs d p r]
@@ -438,7 +480,7 @@ instance Arbitrary Apply where
       caller <- liftM (take 5) arbitrary
       callee <- liftM (take 1) $ listOf $ limitedDepth 3
       let s = insSize caller
-      loc <- choose (0, s-1)
+      loc <- choose (0, s - 1)
       return $ Apply name caller callee kids loc
 
 
@@ -458,6 +500,7 @@ calcResult :: (MonadIO m) => Apply -> m [Node]
 calcResult apply@(Apply name _ callee _ _) =
     evalTemplateMonad (runNodeList $ buildApplyCaller apply)
         (X.Text "") ts
+
   where ts = setTemplates (Map.singleton [unName name]
                           (InternalTemplate Nothing callee))
                           emptyTemplateState
