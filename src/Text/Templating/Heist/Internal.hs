@@ -8,8 +8,9 @@ module Text.Templating.Heist.Internal where
 ------------------------------------------------------------------------------
 import             Control.Applicative
 import             Control.Exception (SomeException)
+import             Control.Monad
 import             Control.Monad.CatchIO
-import "monads-fd" Control.Monad.RWS.Strict
+import             Control.Monad.Trans
 import qualified   Data.Attoparsec.Char8 as AP
 import             Data.ByteString.Char8 (ByteString)
 import qualified   Data.ByteString.Char8 as B
@@ -19,6 +20,7 @@ import qualified   Data.Foldable as F
 import             Data.List
 import qualified   Data.Map as Map
 import             Data.Maybe
+import             Data.Monoid
 import             Prelude hiding (catch)
 import             System.Directory.Tree hiding (name)
 import             System.FilePath
@@ -413,7 +415,8 @@ bindString n v = bindSplice n $ return [X.Text v]
 
 ------------------------------------------------------------------------------
 -- | Renders a template with the specified parameters.  This is the function
--- to use when you want to "call" a template and pass in parameters from code.
+-- to use when you want to "call" a template and pass in parameters from
+-- inside a splice.
 callTemplate :: Monad m
              => ByteString                 -- ^ The name of the template
              -> [(ByteString, ByteString)] -- ^ Association list of
@@ -458,6 +461,20 @@ renderTemplate ts name = do
                 (\t -> liftM Just $ renderInternal =<< toInternalTemplate t)
                 mt
         ) (X.Text "") ts
+
+
+------------------------------------------------------------------------------
+-- | Renders a template with the specified arguments passed to it.  This is a
+-- convenience function for the common pattern of calling renderTemplate after
+-- using bindString, bindStrings, or bindSplice to set up the arguments to the
+-- template.
+renderWithArgs :: Monad m
+                   => [(ByteString, ByteString)]
+                   -> TemplateState m
+                   -> ByteString
+                   -> m (Maybe ByteString)
+renderWithArgs args ts = renderTemplate (bindStrings args ts)
+
 
 ------------------------------------------------------------------------------
 -- Template loading

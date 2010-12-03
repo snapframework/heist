@@ -9,9 +9,9 @@ import           Text.XML.Expat.Tree
 
 ------------------------------------------------------------------------------
 -- | Options passed to hexpat for XML parsing.
-heistExpatOptions :: ParserOptions ByteString ByteString
+heistExpatOptions :: ParseOptions ByteString ByteString
 heistExpatOptions =
-    defaultParserOptions {
+    defaultParseOptions {
            overrideEncoding = Just UTF8
          , entityDecoder  = Just (\k -> Map.lookup k htmlEntityLookupTable)
          }

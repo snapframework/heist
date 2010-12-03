@@ -23,11 +23,11 @@ module Text.Templating.Heist.Types where
 
 ------------------------------------------------------------------------------
 import             Control.Applicative
-import "monads-fd" Control.Monad.Cont
-import "monads-fd" Control.Monad.Error
-import "monads-fd" Control.Monad.Reader
-import "monads-fd" Control.Monad.State
-import "monads-fd" Control.Monad.Trans
+import             Control.Monad.Cont
+import             Control.Monad.Error
+import             Control.Monad.Reader
+import             Control.Monad.State
+import             Control.Monad.Trans
 import             Data.ByteString.Char8 (ByteString)
 import qualified   Data.Map as Map
 import             Data.Map (Map)

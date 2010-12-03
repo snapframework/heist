@@ -3,7 +3,6 @@
 module Text.Templating.Heist.Splices.Bind where
 
 ------------------------------------------------------------------------------
-import           Control.Monad.RWS.Strict
 import           Data.ByteString.Char8 (ByteString)
 import qualified Text.XML.Expat.Tree as X
 

@@ -3,7 +3,6 @@
 module Text.Templating.Heist.Splices.Apply where
 
 ------------------------------------------------------------------------------
-import           Control.Monad.RWS.Strict
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import           Data.Maybe
