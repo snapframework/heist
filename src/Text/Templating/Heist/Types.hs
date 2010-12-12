@@ -27,7 +27,6 @@ import             Control.Monad.Cont
 import             Control.Monad.Error
 import             Control.Monad.Reader
 import             Control.Monad.State
-import             Control.Monad.Trans
 import             Data.ByteString.Char8 (ByteString)
 import qualified   Data.Map as Map
 import             Data.Map (Map)
@@ -361,7 +360,7 @@ modifyTS f = TemplateMonad $ \_ s -> return ((), f s)
 -- scope" as opposed to the template call "local scope" of state items such
 -- as recursionDepth, curContext, and spliceMap.
 restoreTS :: Monad m => TemplateState m -> TemplateMonad m ()
-restoreTS ts1 = 
+restoreTS ts1 =
     modifyTS (\ts2 -> ts2
         { _recursionDepth = _recursionDepth ts1
         , _curContext = _curContext ts1
