@@ -16,6 +16,7 @@ import           Data.Typeable
 import           Prelude hiding (catch)
 import           System.Directory
 import           System.Exit
+import           System.FilePath.Posix
 import           System.IO
 import           System.Process
 import           Text.XML.Expat.Tree hiding (Node)
@@ -51,8 +52,8 @@ markdownTag = "markdown"
 
 ------------------------------------------------------------------------------
 -- | Implementation of the markdown splice.
-markdownSplice :: MonadIO m => Splice m
-markdownSplice = do
+markdownSplice :: MonadIO m => FilePath -> Splice m
+markdownSplice templatePath = do
     pdMD <- liftIO $ findExecutable "pandoc"
 
     when (isNothing pdMD) $ liftIO $ throwIO PandocMissingException
@@ -60,7 +61,7 @@ markdownSplice = do
     tree <- getParamNode
     markup <- liftIO $
         case getAttribute tree "file" of
-            Just f  -> pandoc (fromJust pdMD) $ BC.unpack f
+            Just f  -> pandoc (fromJust pdMD) templatePath $ BC.unpack f
             Nothing -> pandocBS (fromJust pdMD) $ textContent tree
 
     let ee = parse' heistExpatOptions markup
@@ -70,8 +71,8 @@ markdownSplice = do
       (Right n) -> return [n]
 
 
-pandoc :: FilePath -> FilePath -> IO ByteString
-pandoc pandocPath inputFile = do
+pandoc :: FilePath -> FilePath -> FilePath -> IO ByteString
+pandoc pandocPath templatePath inputFile = do
     (ex, sout, serr) <- readProcessWithExitCode' pandocPath args ""
 
     when (isFail ex) $ throw $ MarkdownException serr
@@ -83,8 +84,7 @@ pandoc pandocPath inputFile = do
     isFail ExitSuccess = False
     isFail _           = True
 
-    -- FIXME: hardcoded path
-    args = [ "-S", "--no-wrap", "templates/"++inputFile ]
+    args = [ "-S", "--no-wrap", templatePath </> inputFile ]
 
 
 pandocBS :: FilePath -> ByteString -> IO ByteString
