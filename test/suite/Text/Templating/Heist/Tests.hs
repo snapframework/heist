@@ -69,7 +69,7 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
 
         spliceResult <- run $ evalTemplateMonad (runNodeList template)
                                                 (X.Text "")
-                                                emptyTemplateState
+                                                (emptyTemplateState ".")
         assert $ result == spliceResult
 
 
@@ -89,7 +89,7 @@ monoidTest :: IO ()
 monoidTest = do
     H.assertBool "left monoid identity" $ mempty `mappend` es == es
     H.assertBool "right monoid identity" $ es `mappend` mempty == es
-  where es = emptyTemplateState :: TemplateState IO
+  where es = (emptyTemplateState ".") :: TemplateState IO
 
 
 ------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ hasTemplateTest :: H.Assertion
 hasTemplateTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    let ts = setTemplates tm emptyTemplateState :: TemplateState IO
+    let ts = setTemplates tm (emptyTemplateState ".") :: TemplateState IO
     H.assertBool "hasTemplate ts" (hasTemplate "index" ts)
 
 
@@ -137,7 +137,7 @@ fsLoadTest :: H.Assertion
 fsLoadTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    let ts = setTemplates tm emptyTemplateState :: TemplateState IO
+    let ts = setTemplates tm (emptyTemplateState ".") :: TemplateState IO
     let f  = g ts
 
     f isNothing "abc/def/xyz"
@@ -229,8 +229,9 @@ markdownTest = do
 -- | Markdown test on supplied text
 markdownTextTest :: H.Assertion
 markdownTextTest = do
-    result <- evalTemplateMonad markdownSplice
-            (X.Text "This *is* a test.") emptyTemplateState
+    result <- evalTemplateMonad (markdownSplice ".")
+                                (X.Text "This *is* a test.")
+                                (emptyTemplateState ".")
     H.assertEqual "Markdown text" htmlExpected 
       (B.filter (/= '\n') $ formatList' result)
 
@@ -238,7 +239,7 @@ markdownTextTest = do
 ------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
-    let es = emptyTemplateState :: TemplateState IO
+    let es = (emptyTemplateState ".") :: TemplateState IO
     res <- evalTemplateMonad applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
 
@@ -248,7 +249,7 @@ applyTest = do
 ------------------------------------------------------------------------------
 ignoreTest :: H.Assertion
 ignoreTest = do
-    let es = emptyTemplateState :: TemplateState IO
+    let es = (emptyTemplateState ".") :: TemplateState IO
     res <- evalTemplateMonad ignoreImpl
         (X.Element "ignore" [("tag", "ignorable")] 
           [X.Text "This should be ignored"]) es
@@ -265,13 +266,13 @@ isLeft (Right _) = False
 
 ------------------------------------------------------------------------------
 loadT :: String -> IO (Either String (TemplateState IO))
-loadT s = loadTemplates s emptyTemplateState
+loadT s = loadTemplates s (emptyTemplateState s)
 
 
 ------------------------------------------------------------------------------
 loadTS :: FilePath -> IO (TemplateState IO)
 loadTS baseDir = do
-    etm <- loadTemplates baseDir emptyTemplateState
+    etm <- loadTemplates baseDir $ emptyTemplateState baseDir
     return $ either error id etm
 
 
@@ -425,7 +426,7 @@ instance Show Bind where
     , "Splice result:"
     , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $
         evalTemplateMonad (runNodeList $ buildBindTemplate b)
-                          (X.Text "") emptyTemplateState
+                          (X.Text "") (emptyTemplateState ".")
     , "Template:"
     , L.unpack $ L.concat $ map formatNode $ buildBindTemplate b
     ]
@@ -503,7 +504,7 @@ calcResult apply@(Apply name _ callee _ _) =
 
   where ts = setTemplates (Map.singleton [unName name]
                           (InternalTemplate Nothing callee))
-                          emptyTemplateState
+                          (emptyTemplateState ".")
 
 
 
@@ -522,7 +523,7 @@ postRun = hookG "Inserted on postRun"
 
 ts :: IO (Either String (TemplateState IO))
 ts = loadTemplates "test/templates" $
-    foldr ($) emptyTemplateState
+    foldr ($) (emptyTemplateState ".")
     [setOnLoadHook onLoad
     ,setPreRunHook preRun
     ,setPostRunHook postRun
