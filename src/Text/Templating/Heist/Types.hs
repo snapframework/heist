@@ -31,34 +31,23 @@ import             Data.ByteString.Char8 (ByteString)
 import qualified   Data.Map as Map
 import             Data.Map (Map)
 import             Data.Monoid
+import             Data.Text (Text)
 import             Data.Typeable
 import             Prelude hiding (catch)
-import qualified   Text.XML.Expat.Tree as X
-
-
-------------------------------------------------------------------------------
--- | Heist templates are XML documents. The hexpat library is polymorphic over
--- the type of strings, so here we define a 'Node' alias to fix the string
--- types of the tag names and tag bodies to 'ByteString'.
-type Node = X.Node ByteString ByteString
+import qualified   Text.XmlHtml as X
 
 
 ------------------------------------------------------------------------------
 -- | A 'Template' is a forest of XML nodes.  Here we deviate from the "single
 -- root node" constraint of well-formed XML because we want to allow templates
 -- to contain fragments of a document that may not have a single root.
-type Template = [Node]
+type Template = [X.Node]
 
 
 ------------------------------------------------------------------------------
--- | An 'InternalTemplate' carries a doctype with it that we get from the
--- template at load time.  The tricks that we're playing so templates don't
--- have to have a single root node screw up doctypes, so we have to handle
--- them manually.
-data InternalTemplate = InternalTemplate {
-    _itDoctype :: Maybe ByteString,
-    _itNodes   :: [Node]
-} deriving (Eq, Show)
+-- | An 'InternalTemplate' carries a doctype and character encoding with it
+-- that we get from the template at load time.
+type InternalTemplate = X.Document
 
 
 ------------------------------------------------------------------------------
@@ -79,7 +68,7 @@ type Splice m = TemplateMonad m Template
 
 ------------------------------------------------------------------------------
 -- | SpliceMap associates a name and a Splice.
-type SpliceMap m = Map ByteString (Splice m)
+type SpliceMap m = Map Text (Splice m)
 
 
 ------------------------------------------------------------------------------
@@ -106,7 +95,7 @@ data TemplateState m = TemplateState {
     -- | A hook run on all templates just after they are rendered.
     , _postRunHook    :: Template -> m Template
     -- | The doctypes encountered during template processing.
-    , _doctypes       :: [ByteString]
+    , _doctypes       :: [X.DocType]
 }
 
 
@@ -149,7 +138,7 @@ instance (Typeable1 m) => Typeable (TemplateState m) where
 -- provides \"passthrough\" instances for many of the monads you might use in
 -- the inner monad.
 newtype TemplateMonad m a = TemplateMonad {
-    runTemplateMonad :: Node
+    runTemplateMonad :: X.Node
                      -> TemplateState m
                      -> m (a, TemplateState m)
 }
@@ -159,7 +148,7 @@ newtype TemplateMonad m a = TemplateMonad {
 -- | Evaluates a template monad as a computation in the underlying monad.
 evalTemplateMonad :: Monad m
                   => TemplateMonad m a
-                  -> Node
+                  -> X.Node
                   -> TemplateState m
                   -> m a
 evalTemplateMonad m r s = do
@@ -314,14 +303,14 @@ instance (Typeable1 m) => Typeable1 (TemplateMonad m) where
 -- getChildren@ returns a list containing one 'Text' node containing part of
 -- Hamlet's speech.  @getParamNode >>= getAttribute \"author\"@ would return
 -- @Just "Shakespeare"@.
-getParamNode :: Monad m => TemplateMonad m Node
+getParamNode :: Monad m => TemplateMonad m X.Node
 getParamNode = TemplateMonad $ \r s -> return (r,s)
 
 
 ------------------------------------------------------------------------------
 -- | TemplateMonad's 'local'.
 localParamNode :: Monad m
-               => (Node -> Node)
+               => (X.Node -> X.Node)
                -> TemplateMonad m a
                -> TemplateMonad m a
 localParamNode f m = TemplateMonad $ \r s -> runTemplateMonad m (f r) s

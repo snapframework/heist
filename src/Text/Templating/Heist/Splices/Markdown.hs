@@ -6,6 +6,9 @@ module Text.Templating.Heist.Splices.Markdown where
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Data.Maybe
 import           Control.Concurrent
 import           Control.Exception (throwIO)
@@ -19,10 +22,9 @@ import           System.Exit
 import           System.FilePath.Posix
 import           System.IO
 import           System.Process
-import           Text.XML.Expat.Tree hiding (Node)
+import           Text.XmlHtml
 
 ------------------------------------------------------------------------------
-import           Text.Templating.Heist.Constants
 import           Text.Templating.Heist.Types
 
 data PandocMissingException = PandocMissingException
@@ -47,7 +49,7 @@ instance Exception MarkdownException
 
 ------------------------------------------------------------------------------
 -- | Default name for the markdown splice.
-markdownTag :: ByteString
+markdownTag :: Text
 markdownTag = "markdown"
 
 ------------------------------------------------------------------------------
@@ -60,15 +62,15 @@ markdownSplice templatePath = do
 
     tree <- getParamNode
     markup <- liftIO $
-        case getAttribute tree "file" of
-            Just f  -> pandoc (fromJust pdMD) templatePath $ BC.unpack f
-            Nothing -> pandocBS (fromJust pdMD) $ textContent tree
+        case getAttribute "file" tree of
+            Just f  -> pandoc   (fromJust pdMD) templatePath $ T.unpack f
+            Nothing -> pandocBS (fromJust pdMD) $ T.encodeUtf8 $ nodeText tree
 
-    let ee = parse' heistExpatOptions markup
+    let ee = parseHTML markup
     case ee of
-      (Left e) -> throw $ MarkdownException
-                        $ BC.pack ("Error parsing markdown output: " ++ show e)
-      (Right n) -> return [n]
+      Left e  -> throw $ MarkdownException
+                       $ BC.pack ("Error parsing markdown output: " ++ e)
+      Right d -> return (docContent d)
 
 
 pandoc :: FilePath -> FilePath -> FilePath -> IO ByteString
@@ -77,8 +79,8 @@ pandoc pandocPath templatePath inputFile = do
 
     when (isFail ex) $ throw $ MarkdownException serr
     return $ BC.concat [ "<div class=\"markdown\">\n"
-                       , sout
-                       , "\n</div>" ]
+                         , sout
+                         , "\n</div>" ]
 
   where
     isFail ExitSuccess = False

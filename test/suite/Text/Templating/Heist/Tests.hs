@@ -9,6 +9,7 @@ module Text.Templating.Heist.Tests
   ) where
 
 ------------------------------------------------------------------------------
+import           Blaze.ByteString.Builder
 import           Control.Monad.State
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
@@ -16,6 +17,9 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import           Data.Text (Text)
 import           System.IO.Unsafe
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
@@ -32,9 +36,8 @@ import           Text.Templating.Heist.Types
 import           Text.Templating.Heist.Splices.Apply
 import           Text.Templating.Heist.Splices.Ignore
 import           Text.Templating.Heist.Splices.Markdown
-import           Text.XML.Expat.Cursor
-import           Text.XML.Expat.Format
-import qualified Text.XML.Expat.Tree as X
+import qualified Text.XmlHtml        as X
+import qualified Text.XmlHtml.Cursor as X
 
 
 ------------------------------------------------------------------------------
@@ -68,7 +71,7 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
         let result   = buildResult bind
 
         spliceResult <- run $ evalTemplateMonad (runNodeList template)
-                                                (X.Text "")
+                                                (X.TextNode "")
                                                 (emptyTemplateState ".")
         assert $ result == spliceResult
 
@@ -96,7 +99,7 @@ monoidTest = do
 addTest :: IO ()
 addTest = do
     H.assertEqual "lookup test" (Just []) $
-        fmap (_itNodes . fst) $ lookupTemplate "aoeu" ts
+        fmap (X.docContent . fst) $ lookupTemplate "aoeu" ts
 
     H.assertEqual "splice touched" 0 $ Map.size (_spliceMap ts)
 
@@ -165,10 +168,13 @@ doctypeTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
     index <- renderTemplate ts "index"
-    H.assertBool "doctype test index" $ hasDoctype $ fromJust index
+    H.assertBool "doctype test index" $ isJust $
+        X.docType $ fromRight $ X.parseHTML $ fromJust index
     ioc <- renderTemplate ts "ioc"
-    H.assertBool "doctype test ioc" $ hasDoctype $ fromJust ioc
-
+    H.assertBool "doctype test ioc" $ isJust $
+        X.docType $ fromRight $ X.parseHTML $ fromJust ioc
+  where fromRight (Right x) = x
+        fromRight (Left  s) = error s
 
 ------------------------------------------------------------------------------
 attrSubstTest :: H.Assertion
@@ -179,7 +185,7 @@ attrSubstTest = do
     check ts "pre__post"
 
   where
-    setTs val = bindSplice "foo" (return [X.Text val])
+    setTs val = bindSplice "foo" (return [X.TextNode val])
     check ts str = do
         res <- renderTemplate ts "attrs"
         H.assertBool ("attr subst " ++ (show str)) $
@@ -193,7 +199,7 @@ bindAttrTest :: H.Assertion
 bindAttrTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
-    check ts "<div id=\"zzzzz\""
+    check ts "<div id=\'zzzzz\'"
 
   where
     check ts str = do
@@ -206,7 +212,7 @@ bindAttrTest = do
 
 ------------------------------------------------------------------------------
 htmlExpected :: ByteString
-htmlExpected = "<div class=\"markdown\"><p>This <em>is</em> a test.</p></div>"
+htmlExpected = "<div class=\'markdown\'><p>This <em>is</em> a test.</p></div>"
 
 
 ------------------------------------------------------------------------------
@@ -230,10 +236,11 @@ markdownTest = do
 markdownTextTest :: H.Assertion
 markdownTextTest = do
     result <- evalTemplateMonad (markdownSplice ".")
-                                (X.Text "This *is* a test.")
+                                (X.TextNode "This *is* a test.")
                                 (emptyTemplateState ".")
     H.assertEqual "Markdown text" htmlExpected 
-      (B.filter (/= '\n') $ formatList' result)
+      (B.filter (/= '\n') $ toByteString $
+        X.render (X.HtmlDocument X.UTF8 Nothing result))
 
 
 ------------------------------------------------------------------------------
@@ -252,7 +259,7 @@ ignoreTest = do
     let es = (emptyTemplateState ".") :: TemplateState IO
     res <- evalTemplateMonad ignoreImpl
         (X.Element "ignore" [("tag", "ignorable")] 
-          [X.Text "This should be ignored"]) es
+          [X.TextNode "This should be ignored"]) es
     H.assertEqual "<ignore> tag" [] res
 
 
@@ -292,10 +299,10 @@ textGen = listOf $ elements ((replicate 5 ' ') ++ identStartChar)
 
 
 ------------------------------------------------------------------------------
-limitedDepth :: Int -> Gen Node
-limitedDepth 0 = liftM (X.Text . B.pack) textGen
+limitedDepth :: Int -> Gen X.Node
+limitedDepth 0 = liftM (X.TextNode . T.pack) textGen
 limitedDepth n =
-    oneof [ liftM (X.Text . B.pack) textGen
+    oneof [ liftM (X.TextNode . T.pack) textGen
           , liftM3 X.Element arbitrary
                        (liftM (take 2) arbitrary)
                        (liftM (take 3) $ listOf $ limitedDepth (n - 1))
@@ -306,18 +313,18 @@ limitedDepth n =
 -- | Returns the number of unique insertion points in the tree.
 -- If h = insertAt f n g", the following property holds:
 -- insSize h == (insSize f) + (insSize g) - 1
-insSize :: [X.Node tag text] -> Int
+insSize :: [X.Node] -> Int
 insSize ns = 1 + (sum $ map nodeSize ns)
-  where nodeSize (X.Text _) = 1
+  where nodeSize (X.TextNode _)    = 1
         nodeSize (X.Element _ _ c) = 1 + (insSize c)
 
 
 ------------------------------------------------------------------------------
-insertAt :: [Node] -> Int -> [Node] -> [Node]
+insertAt :: [X.Node] -> Int -> [X.Node] -> [X.Node]
 insertAt elems 0 ns = elems ++ ns
 insertAt elems _ [] = elems
-insertAt elems n list = maybe [] (toForest . root) $
-    evalState (processNode elems $ fromJust $ fromForest list) n
+insertAt elems n list = maybe [] X.topNodes $
+    evalState (processNode elems $ fromJust $ X.fromNodes list) n
 
 
 ------------------------------------------------------------------------------
@@ -326,19 +333,19 @@ move = modify (\x -> x - 1)
 
 
 ------------------------------------------------------------------------------
-processNode :: [Node] -> Loc -> Insert (Maybe Loc)
+processNode :: [X.Node] -> X.Cursor -> Insert (Maybe X.Cursor)
 processNode elems loc =
     liftM2 mplus (move >> goDown loc) (move >> goRight loc)
 
   where
     goDown l =
-        case current l of
-          X.Text _        -> modify (+1) >> return Nothing
-          X.Element _ _ _ -> doneCheck (insertManyFirstChild elems)
-                                       firstChild
+        case X.current l of
+          X.TextNode _    -> modify (+1) >> return Nothing
+          X.Element _ _ _ -> doneCheck (X.insertManyFirstChild elems)
+                                       X.firstChild
                                        l
 
-    goRight = doneCheck (Just . insertManyRight elems) right
+    goRight = doneCheck (Just . X.insertManyRight elems) X.right
 
     doneCheck insertFunc next l = do
       s <- get
@@ -357,30 +364,29 @@ quickRender baseDir name = do
 
 
 ------------------------------------------------------------------------------
-newtype Name = Name { unName :: B.ByteString } deriving (Show)
+newtype Name = Name { unName :: Text } deriving (Show)
 
 instance Arbitrary Name where
   arbitrary = do
     x     <- elements identStartChar
     n     <- choose (4,10)
     rest  <- vectorOf n $ elements identChar
-    return $ Name $ B.pack (x:rest)
+    return $ Name $ T.pack (x:rest)
 
-instance Arbitrary Node where
+instance Arbitrary X.Node where
   arbitrary = limitedDepth 3
-  shrink (X.Text _) = []
+  shrink (X.TextNode _) = []
   shrink (X.Element _ [] []) = []
   shrink (X.Element n [] (_:cs)) = [X.Element n [] cs]
   shrink (X.Element n (_:as) []) = [X.Element n as []]
   shrink (X.Element n as cs) = [X.Element n as (tail cs), X.Element n (tail as) cs]
 
-instance Arbitrary B.ByteString where
+instance Arbitrary T.Text where
   arbitrary = liftM unName arbitrary
 
 --
 -- Code for inserting nodes into any point of a tree
 --
-type Loc = Cursor B.ByteString B.ByteString
 type Insert a = State Int a
 
 
@@ -390,8 +396,8 @@ type Insert a = State Int a
 -- Data type encapsulating the parameters for a bind operation
 data Bind = Bind
     { _bindElemName :: Name
-    , _bindChildren :: [Node]
-    , _bindDoc :: [Node]
+    , _bindChildren :: [X.Node]
+    , _bindDoc :: [X.Node]
     , _bindPos :: Int
     , _bindRefPos :: Int
     } -- deriving (Show)
@@ -426,29 +432,31 @@ instance Show Bind where
     , "Splice result:"
     , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $
         evalTemplateMonad (runNodeList $ buildBindTemplate b)
-                          (X.Text "") (emptyTemplateState ".")
+                          (X.TextNode "") (emptyTemplateState ".")
     , "Template:"
     , L.unpack $ L.concat $ map formatNode $ buildBindTemplate b
     ]
-
+    where
+      formatNode n = toLazyByteString $ X.render
+                                      $ X.HtmlDocument X.UTF8 Nothing [n]
 
 ------------------------------------------------------------------------------
-buildNode :: B.ByteString -> B.ByteString -> Bind -> Node
+buildNode :: Text -> Text -> Bind -> X.Node
 buildNode tag attr (Bind s c _ _ _) = X.Element tag [(attr, unName s)] c
 
 
 ------------------------------------------------------------------------------
-buildBind :: Bind -> Node
+buildBind :: Bind -> X.Node
 buildBind = buildNode "bind" "tag"
 
 
 ------------------------------------------------------------------------------
-empty :: tag -> X.Node tag text
+empty :: Text -> X.Node
 empty n = X.Element n [] []
 
 
 ------------------------------------------------------------------------------
-buildBindTemplate :: Bind -> [Node]
+buildBindTemplate :: Bind -> [X.Node]
 buildBindTemplate s@(Bind n _ d b r) =
     insertAt [empty $ unName $ n] pos $ withBind
   where bind = [buildBind s]
@@ -458,7 +466,7 @@ buildBindTemplate s@(Bind n _ d b r) =
 
 
 ------------------------------------------------------------------------------
-buildResult :: Bind -> [Node]
+buildResult :: Bind -> [X.Node]
 buildResult (Bind _ c d b r) = insertAt c (b + r) d
 
 
@@ -467,9 +475,9 @@ buildResult (Bind _ c d b r) = insertAt c (b + r) d
 
 data Apply = Apply
     { _applyName :: Name
-    , _applyCaller :: [Node]
+    , _applyCaller :: [X.Node]
     , _applyCallee :: Template
-    , _applyChildren :: [Node]
+    , _applyChildren :: [X.Node]
     , _applyPos :: Int
     } deriving (Show)
 
@@ -486,24 +494,24 @@ instance Arbitrary Apply where
 
 
 ------------------------------------------------------------------------------
-buildApplyCaller :: Apply -> [Node]
+buildApplyCaller :: Apply -> [X.Node]
 buildApplyCaller (Apply name caller _ kids pos) =
     insertAt [X.Element "apply" [("template", unName name)] kids] pos caller
 
 
 ------------------------------------------------------------------------------
-calcCorrect :: Apply -> [Node]
+calcCorrect :: Apply -> [X.Node]
 calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 
 
 ------------------------------------------------------------------------------
-calcResult :: (MonadIO m) => Apply -> m [Node]
+calcResult :: (MonadIO m) => Apply -> m [X.Node]
 calcResult apply@(Apply name _ callee _ _) =
     evalTemplateMonad (runNodeList $ buildApplyCaller apply)
-        (X.Text "") ts
+        (X.TextNode "") ts
 
-  where ts = setTemplates (Map.singleton [unName name]
-                          (InternalTemplate Nothing callee))
+  where ts = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
+                          (X.HtmlDocument X.UTF8 Nothing callee))
                           (emptyTemplateState ".")
 
 

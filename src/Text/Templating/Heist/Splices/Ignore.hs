@@ -3,7 +3,7 @@
 module Text.Templating.Heist.Splices.Ignore where
 
 ------------------------------------------------------------------------------
-import           Data.ByteString.Char8 (ByteString)
+import           Data.Text (Text)
 
 ------------------------------------------------------------------------------
 import           Text.Templating.Heist.Types
@@ -11,7 +11,7 @@ import           Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | Default name for the ignore splice.
-ignoreTag :: ByteString
+ignoreTag :: Text
 ignoreTag = "ignore"
 
 

@@ -85,23 +85,25 @@ Library
 
   other-modules:
     Text.Templating.Heist.Internal,
-    Text.Templating.Heist.Constants,
     Text.Templating.Heist.Types
 
   build-depends:
     attoparsec >= 0.8.1 && < 0.9,
+    attoparsec-text >= 0.8 && < 0.9,
     base >= 4 && < 5,
+    blaze-builder == 0.2.*,
     bytestring,
     containers,
     directory,
     directory-tree,
     filepath,
-    hexpat >= 0.19.5 && <0.20,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
     mtl >= 2.0 && < 2.1,
     process,
     random,
-    transformers
+    text >= 0.10 && < 0.12,
+    transformers,
+    xmlhtml == 0.1.*
 
   if impl(ghc >= 6.12.0)
     ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2

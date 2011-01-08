@@ -66,8 +66,7 @@
 module Text.Templating.Heist
   (
     -- * Types
-    Node
-  , Template
+    Template
   , Splice
   , TemplateMonad
   , TemplateState

@@ -6,35 +6,36 @@
 module Text.Templating.Heist.Internal where
 
 ------------------------------------------------------------------------------
+import             Blaze.ByteString.Builder
 import             Control.Applicative
 import             Control.Exception (SomeException)
 import             Control.Monad
 import             Control.Monad.CatchIO
 import             Control.Monad.Trans
-import qualified   Data.Attoparsec.Char8 as AP
-import             Data.ByteString.Char8 (ByteString)
-import qualified   Data.ByteString.Char8 as B
-import qualified   Data.ByteString.Lazy as L
+import qualified   Data.Attoparsec.Text as AP
+import             Data.ByteString (ByteString)
+import qualified   Data.ByteString as B
+import qualified   Data.ByteString.Char8 as BC
 import             Data.Either
 import qualified   Data.Foldable as F
 import             Data.List
 import qualified   Data.Map as Map
 import             Data.Maybe
 import             Data.Monoid
+import qualified   Data.Text as T
+import             Data.Text (Text)
 import             Prelude hiding (catch)
 import             System.Directory.Tree hiding (name)
 import             System.FilePath
-import             Text.XML.Expat.Format
-import qualified   Text.XML.Expat.Tree as X
+import qualified   Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
-import             Text.Templating.Heist.Constants
 import             Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
-addDoctype :: Monad m => [ByteString] -> TemplateMonad m ()
+addDoctype :: Monad m => [X.DocType] -> TemplateMonad m ()
 addDoctype dt = do
     modifyTS (\s -> s { _doctypes = _doctypes s `mappend` dt })
 
@@ -74,7 +75,7 @@ addPostRunHook hook ts = ts { _postRunHook = _postRunHook ts >=> hook }
 ------------------------------------------------------------------------------
 -- | Binds a new splice declaration to a tag name within a 'TemplateState'.
 bindSplice :: Monad m =>
-              ByteString        -- ^ tag name
+              Text              -- ^ tag name
            -> Splice m          -- ^ splice action
            -> TemplateState m   -- ^ source state
            -> TemplateState m
@@ -84,8 +85,8 @@ bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'TemplateState'.
 bindSplices :: Monad m =>
-               [(ByteString, Splice m)] -- ^ splices to bind
-            -> TemplateState m   -- ^ start state
+               [(Text, Splice m)] -- ^ splices to bind
+            -> TemplateState m    -- ^ start state
             -> TemplateState m
 bindSplices ss ts = foldl' (flip id) ts acts 
   where
@@ -95,7 +96,7 @@ bindSplices ss ts = foldl' (flip id) ts acts
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a splice.
 lookupSplice :: Monad m =>
-                ByteString
+                Text
              -> TemplateState m
              -> Maybe (Splice m)
 lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
@@ -108,9 +109,9 @@ lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 --
 -- FIXME @\"..\"@ currently doesn't work in paths, the solution is non-trivial
 splitPathWith :: Char -> ByteString -> TPath
-splitPathWith s p = if B.null p then [] else (reverse $ B.split s path)
+splitPathWith s p = if BC.null p then [] else (reverse $ BC.split s path)
   where
-    path = if B.head p == s then B.tail p else p
+    path = if BC.head p == s then BC.tail p else p
 
 -- | Converts a path into an array of the elements in reverse order using the
 -- path separator of the local operating system. See 'splitPathWith' for more
@@ -168,7 +169,7 @@ lookupTemplate nameStr ts =
                        [] -> [""]
                        ps -> ps
         path = p ++ (_curContext ts)
-        f = if '/' `B.elem` nameStr
+        f = if '/' `BC.elem` nameStr
                 then singleLookup
                 else traversePath
 
@@ -198,7 +199,18 @@ addTemplate :: Monad m =>
             -> TemplateState m
             -> TemplateState m
 addTemplate n t st = insertTemplate (splitTemplatePath n)
-                                    (InternalTemplate Nothing t) st
+                                    (X.HtmlDocument X.UTF8 Nothing t) st
+
+
+------------------------------------------------------------------------------
+-- | Adds an XML format template to the template state.
+addXMLTemplate :: Monad m =>
+                  ByteString
+               -> Template
+               -> TemplateState m
+               -> TemplateState m
+addXMLTemplate n t st = insertTemplate (splitTemplatePath n)
+                                    (X.XmlDocument X.UTF8 Nothing t) st
 
 
 ------------------------------------------------------------------------------
@@ -233,24 +245,23 @@ getContext = getsTS _curContext
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a single node.
-runNode :: Monad m => Node -> Splice m
-runNode n@(X.Text _)          = return [n]
+runNode :: Monad m => X.Node -> Splice m
 runNode (X.Element nm at ch) = do
     newAtts <- mapM attSubst at
     let n = X.Element nm newAtts ch
     s <- liftM (lookupSplice nm) getTS
     maybe (runChildren newAtts) (recurseSplice n) s
-    
   where
     runChildren newAtts = do
         newKids <- runNodeList ch
         return [X.Element nm newAtts newKids]
+runNode n                    = return [n]
 
 
 ------------------------------------------------------------------------------
 -- | Helper function for substituting a parsed attribute into an attribute
 -- tuple.
-attSubst :: (Monad m) => (t, ByteString) -> TemplateMonad m (t, ByteString)
+attSubst :: (Monad m) => (t, Text) -> TemplateMonad m (t, Text)
 attSubst (n,v) = do
     v' <- parseAtt v
     return (n,v')
@@ -259,24 +270,24 @@ attSubst (n,v) = do
 ------------------------------------------------------------------------------
 -- | Parses an attribute for any identifier expressions and performs
 -- appropriate substitution.
-parseAtt :: (Monad m) => ByteString -> TemplateMonad m ByteString
+parseAtt :: (Monad m) => Text -> TemplateMonad m Text
 parseAtt bs = do
     let ast = case AP.feed (AP.parse attParser bs) "" of
             (AP.Fail _ _ _) -> []
             (AP.Done _ res) -> res
             (AP.Partial _)  -> []
     chunks <- mapM cvt ast
-    return $ B.concat chunks
+    return $ T.concat chunks
   where
     cvt (Literal x) = return x
-    cvt (Ident x) = getAttributeSplice x
+    cvt (Ident x)   = getAttributeSplice x
 
 
 ------------------------------------------------------------------------------
 -- | AST to hold attribute parsing structure.  This is necessary because
 -- attoparsec doesn't support parsers running in another monad.
-data AttAST = Literal ByteString |
-              Ident ByteString
+data AttAST = Literal Text |
+              Ident   Text
     deriving (Show)
 
 
@@ -287,14 +298,14 @@ attParser = AP.many1 (identParser <|> litParser)
   where
     escChar = (AP.char '\\' *> AP.anyChar) <|>
               AP.satisfy (AP.notInClass "\\$")
-    litParser = Literal <$> (B.pack <$> AP.many1 escChar)
+    litParser = Literal <$> (T.pack <$> AP.many1 escChar)
     identParser = AP.string "$(" *>
         (Ident <$> AP.takeWhile (/=')')) <* AP.string ")"
 
 
 ------------------------------------------------------------------------------
 -- | Get's the attribute value.  If the splice's result list contains non-text
--- nodes, this will translate them into text nodes with textContent and
+-- nodes, this will translate them into text nodes with nodeText and
 -- concatenate them together.
 --
 -- Originally, this only took the first node from the splices's result list,
@@ -314,15 +325,15 @@ attParser = AP.many1 (identParser <|> litParser)
 -- it would be for the former user to accept that
 -- \"some \<b\>text\<\/b\> foobar\" is being rendered as \"some \" because
 -- it's \"more intuitive\".
-getAttributeSplice :: Monad m => ByteString -> TemplateMonad m ByteString
+getAttributeSplice :: Monad m => Text -> TemplateMonad m Text
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) getTS
     nodes <- maybe (return []) id s
-    return $ B.concat $ map X.textContent nodes
+    return $ T.concat $ map X.nodeText nodes
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
-runNodeList :: Monad m => [Node] -> Splice m
+runNodeList :: Monad m => [X.Node] -> Splice m
 runNodeList nodes = liftM concat $ sequence (map runNode nodes)
 
 
@@ -335,7 +346,7 @@ mAX_RECURSION_DEPTH = 50
 ------------------------------------------------------------------------------
 -- | Checks the recursion flag and recurses accordingly.  Does not recurse
 -- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
-recurseSplice :: Monad m => Node -> Splice m -> Splice m
+recurseSplice :: Monad m => X.Node -> Splice m -> Splice m
 recurseSplice node splice = do
     result <- localParamNode (const node) splice
     ts' <- getTS
@@ -372,7 +383,7 @@ evalTemplate name = lookupAndRun name
     (\(t,ctx) -> do
         ts <- getTS
         putTS (ts {_curContext = ctx})
-        res <- runNodeList $ _itNodes t
+        res <- runNodeList $ X.docContent t
         restoreTS ts
         return $ Just res)
 
@@ -385,9 +396,9 @@ evalWithHooks :: Monad m
             -> TemplateMonad m (Maybe Template)
 evalWithHooks name = lookupAndRun name
     (\(t,ctx) -> do
-        addDoctype $ maybeToList $ _itDoctype t
+        addDoctype $ maybeToList $ X.docType t
         ts <- getTS
-        nodes <- lift $ _preRunHook ts $ _itNodes t
+        nodes <- lift $ _preRunHook ts $ X.docContent t
         putTS (ts {_curContext = ctx})
         res <- runNodeList nodes
         restoreTS ts
@@ -397,7 +408,7 @@ evalWithHooks name = lookupAndRun name
 ------------------------------------------------------------------------------
 -- | Binds a list of constant string splices.
 bindStrings :: Monad m
-            => [(ByteString, ByteString)]
+            => [(Text, Text)]
             -> TemplateState m
             -> TemplateState m
 bindStrings pairs ts = foldr (uncurry bindString) ts pairs
@@ -406,11 +417,11 @@ bindStrings pairs ts = foldr (uncurry bindString) ts pairs
 ------------------------------------------------------------------------------
 -- | Binds a single constant string splice.
 bindString :: Monad m
-            => ByteString
-            -> ByteString
+            => Text
+            -> Text
             -> TemplateState m
             -> TemplateState m
-bindString n v = bindSplice n $ return [X.Text v]
+bindString n v = bindSplice n $ return [X.TextNode v]
 
 
 ------------------------------------------------------------------------------
@@ -418,9 +429,9 @@ bindString n v = bindSplice n $ return [X.Text v]
 -- to use when you want to "call" a template and pass in parameters from
 -- inside a splice.
 callTemplate :: Monad m
-             => ByteString                 -- ^ The name of the template
-             -> [(ByteString, ByteString)] -- ^ Association list of
-                                           -- (name,value) parameter pairs
+             => ByteString     -- ^ The name of the template
+             -> [(Text, Text)] -- ^ Association list of
+                               -- (name,value) parameter pairs
              -> TemplateMonad m (Maybe Template)
 callTemplate name params = do
     modifyTS $ bindStrings params
@@ -433,19 +444,13 @@ callTemplate name params = do
 toInternalTemplate :: Monad m => Template -> TemplateMonad m InternalTemplate
 toInternalTemplate t = do
     dts <- getsTS _doctypes
-    return $ InternalTemplate {
-        _itDoctype = listToMaybe dts,
-        _itNodes = t
-    }
+    return $ X.HtmlDocument X.UTF8 (listToMaybe dts) t
 
 
 ------------------------------------------------------------------------------
 -- | Renders an internal template by prepending the appropriate doctype.
 renderInternal :: Monad m => InternalTemplate -> TemplateMonad m ByteString
-renderInternal (InternalTemplate dt nodes) =
-    return $ maybe bs (flip B.append bs) dt
-  where
-    bs = formatList' nodes
+renderInternal d = return (toByteString (X.render d))
 
 
 ------------------------------------------------------------------------------
@@ -460,7 +465,7 @@ renderTemplate ts name = do
             maybe (return Nothing)
                 (\t -> liftM Just $ renderInternal =<< toInternalTemplate t)
                 mt
-        ) (X.Text "") ts
+        ) (X.TextNode "") ts
 
 
 ------------------------------------------------------------------------------
@@ -469,7 +474,7 @@ renderTemplate ts name = do
 -- using bindString, bindStrings, or bindSplice to set up the arguments to the
 -- template.
 renderWithArgs :: Monad m
-                   => [(ByteString, ByteString)]
+                   => [(Text, Text)]
                    -> TemplateState m
                    -> ByteString
                    -> m (Maybe ByteString)
@@ -480,63 +485,21 @@ renderWithArgs args ts = renderTemplate (bindStrings args ts)
 -- Template loading
 ------------------------------------------------------------------------------
 
--- | Turns an in-memory XML/XHTML bytestring into a (doctype,'[Node]') pair.
-parseDoc :: ByteString -> IO (Either String (Maybe ByteString,[Node]))
-parseDoc bs = do
-    let (doctype,rest) = extractDoctype bs
-    let wrap b = B.concat ["<snap:root>\n", b, "\n</snap:root>"]
-
-    return $
-      mapRight (\n -> (doctype,X.getChildren n)) $
-      mapLeft genErrorMsg $
-      X.parse' heistExpatOptions (wrap rest)
-
-  where
-    genErrorMsg (X.XMLParseError str loc) = locMsg loc ++ ": " ++ translate str
-
-    locMsg (X.XMLParseLocation line col _ _) =
-        "(line " ++ show (line-1) ++ ", col " ++ show col ++ ")"
-
-    translate "junk after document element" = "document must have a single root element"
-    translate s = s
-
-
--- | Reads an XML document from disk.
+-- | Reads an HTML template from disk.
 getDoc :: String -> IO (Either String InternalTemplate)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
 
-    d' <- either (return . Left)
-                 parseDoc
-                 bs
-
-    let d = mapLeft (\s -> f ++ " " ++ s) d'
-
-    return $ either Left
-               (\(doctype, nodes) -> Right $ InternalTemplate {
-                    _itDoctype = doctype,
-                    _itNodes = nodes
-                })
-               d
+    let d = either Left X.parseHTML bs
+    return $ mapLeft (\s -> f ++ " " ++ s) d
 
 
 ------------------------------------------------------------------------------
--- | Checks whether the bytestring has a doctype.
-hasDoctype :: ByteString -> Bool
-hasDoctype bs = "<!DOCTYPE" `B.isPrefixOf` bs
+-- | Turns an in-memory HTML 'ByteString' into a template.
+parseDoc :: ByteString -> IO (Either String InternalTemplate)
+parseDoc = return . X.parseHTML
 
-
-------------------------------------------------------------------------------
--- | Converts a ByteString into a tuple containing a possible doctype
--- ByteString and the rest of the document.
-extractDoctype :: ByteString -> (Maybe ByteString, ByteString)
-extractDoctype bs = 
-    if hasDoctype bs
-        then (Just $ B.snoc (B.takeWhile p bs) '>',B.tail $ B.dropWhile p bs)
-        else (Nothing, bs)
-  where
-    p = (/='>')
 
 ------------------------------------------------------------------------------
 mapLeft :: (a -> b) -> Either a c -> Either b c
@@ -554,7 +517,7 @@ loadTemplate :: String -- ^ path of the template root
 loadTemplate templateRoot fname
     | ".tpl" `isSuffixOf` fname = do
         c <- getDoc fname
-        return [fmap (\t -> (splitLocalPath $ B.pack tName, t)) c]
+        return [fmap (\t -> (splitLocalPath $ BC.pack tName, t)) c]
     | otherwise = return []
   where -- tName is path relative to the template root directory
         correction = if last templateRoot == '/' then 0 else 1
@@ -582,8 +545,8 @@ runHookInternal :: Monad m => (Template -> m Template)
                 -> InternalTemplate
                 -> m InternalTemplate
 runHookInternal f t = do
-    n <- f $ _itNodes t
-    return $ t { _itNodes = n }
+    n <- f $ X.docContent t
+    return $ t { X.docContent = n }
 
 
 ------------------------------------------------------------------------------
@@ -594,18 +557,4 @@ loadHook ts (tp, t) = do
     t' <- runHookInternal (_onLoadHook ts) t
     return $ insertTemplate tp t' ts
 
-
-------------------------------------------------------------------------------
--- These are here until we can get them into hexpat.
-------------------------------------------------------------------------------
-
-formatList :: (X.GenericXMLString tag, X.GenericXMLString text) =>
-              [X.Node tag text]
-           -> L.ByteString
-formatList nodes = foldl L.append L.empty $ map formatNode nodes
-
-formatList' :: (X.GenericXMLString tag, X.GenericXMLString text) =>
-               [X.Node tag text]
-            -> B.ByteString
-formatList' = B.concat . L.toChunks . formatList
 

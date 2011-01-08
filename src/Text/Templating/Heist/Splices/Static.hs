@@ -10,16 +10,16 @@ module Text.Templating.Heist.Splices.Static
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
 import           Data.IORef
 import qualified Data.Map as Map
 import           Data.Map (Map)
 import           Data.Maybe
 import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           System.Random
-import           Text.XML.Expat.Cursor
-import           Text.XML.Expat.Tree hiding (Node)
+import           Text.XmlHtml.Cursor
+import           Text.XmlHtml hiding (Node)
 
 
 ------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ import           Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | State for storing static tag information
-newtype StaticTagState = STS (MVar (Map ByteString Template))
+newtype StaticTagState = STS (MVar (Map Text Template))
 
 
 ------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ staticImpl :: (MonadIO m)
            -> TemplateMonad m Template
 staticImpl (STS mv) = do
     tree <- getParamNode
-    let i = fromJust $ getAttribute tree "id"
+    let i = fromJust $ getAttribute "id" tree
 
     mp <- liftIO $ readMVar mv
 
@@ -56,7 +56,7 @@ staticImpl (STS mv) = do
                    let mbn = Map.lookup i mp
                    case mbn of
                        Nothing -> do
-                           nodes' <- runNodeList $ getChildren tree
+                           nodes' <- runNodeList $ childNodes tree
                            return $! (Map.insert i nodes' mp, nodes')
                        (Just n) -> do
                            stopRecursion
@@ -89,10 +89,10 @@ bindStaticTag ts = do
 
     assignIds setref = mapM f
         where
-          f node = g $ fromTree node
+          f node = g $ fromNode node
 
           getId = do
-              i  <- liftM (B.pack . show) generateId
+              i  <- liftM (T.pack . show) generateId
               st <- readIORef setref
               if Set.member i st
                 then getId
@@ -102,13 +102,13 @@ bindStaticTag ts = do
 
           g curs = do
               let node = current curs
-              curs' <- if getName node == "static"
+              curs' <- if tagName node == Just "static"
                          then do
                              i <- getId
-                             return $ modifyContent (setAttribute "id" i) curs
+                             return $ modifyNode (setAttribute "id" i) curs
                          else return curs
               let mbc = nextDF curs'
-              maybe (return $ toTree curs') g mbc
+              maybe (return $ topNode curs') g mbc
 
 
 
