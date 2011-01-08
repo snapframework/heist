@@ -491,7 +491,7 @@ getDoc f = do
     bs <- catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
 
-    let d = either Left X.parseHTML bs
+    let d = either Left (X.parseHTML f) bs
     return $ mapLeft (\s -> f ++ " " ++ s) d
 
 

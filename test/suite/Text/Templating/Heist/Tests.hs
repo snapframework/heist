@@ -169,10 +169,10 @@ doctypeTest = do
     let ts = either (error "Error loading templates") id ets
     index <- renderTemplate ts "index"
     H.assertBool "doctype test index" $ isJust $
-        X.docType $ fromRight $ X.parseHTML $ fromJust index
+        X.docType $ fromRight $ (X.parseHTML "index") $ fromJust index
     ioc <- renderTemplate ts "ioc"
     H.assertBool "doctype test ioc" $ isJust $
-        X.docType $ fromRight $ X.parseHTML $ fromJust ioc
+        X.docType $ fromRight $ (X.parseHTML "index") $ fromJust ioc
   where fromRight (Right x) = x
         fromRight (Left  s) = error s
 

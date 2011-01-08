@@ -61,12 +61,16 @@ markdownSplice templatePath = do
     when (isNothing pdMD) $ liftIO $ throwIO PandocMissingException
 
     tree <- getParamNode
-    markup <- liftIO $
+    (source,markup) <- liftIO $
         case getAttribute "file" tree of
-            Just f  -> pandoc   (fromJust pdMD) templatePath $ T.unpack f
-            Nothing -> pandocBS (fromJust pdMD) $ T.encodeUtf8 $ nodeText tree
+            Just f  -> do
+                m <- pandoc (fromJust pdMD) templatePath $ T.unpack f
+                return (T.unpack f,m)
+            Nothing -> do
+                m <- pandocBS (fromJust pdMD) $ T.encodeUtf8 $ nodeText tree
+                return ("inline_splice",m)
 
-    let ee = parseHTML markup
+    let ee = parseHTML source markup
     case ee of
       Left e  -> throw $ MarkdownException
                        $ BC.pack ("Error parsing markdown output: " ++ e)
