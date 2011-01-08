@@ -131,7 +131,7 @@ splitTemplatePath = splitPathWith '/'
 singleLookup :: TemplateMap
              -> TPath
              -> ByteString
-             -> Maybe (InternalTemplate, TPath)
+             -> Maybe (X.Document, TPath)
 singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 
 
@@ -141,7 +141,7 @@ singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 traversePath :: TemplateMap
              -> TPath
              -> ByteString
-             -> Maybe (InternalTemplate, TPath)
+             -> Maybe (X.Document, TPath)
 traversePath tm [] name = fmap (\a -> (a,[])) (Map.lookup [name] tm)
 traversePath tm path name =
     singleLookup tm path name `mplus`
@@ -162,7 +162,7 @@ hasTemplate nameStr ts = isJust $ lookupTemplate nameStr ts
 lookupTemplate :: Monad m =>
                   ByteString
                -> TemplateState m
-               -> Maybe (InternalTemplate, TPath)
+               -> Maybe (X.Document, TPath)
 lookupTemplate nameStr ts = 
     f (_templateMap ts) path name
   where (name:p) = case splitTemplatePath nameStr of
@@ -184,7 +184,7 @@ setTemplates m ts = ts { _templateMap = m }
 -- | Adds a template to the template state.
 insertTemplate :: Monad m =>
                TPath
-            -> InternalTemplate
+            -> X.Document
             -> TemplateState m
             -> TemplateState m
 insertTemplate p t st =
@@ -366,7 +366,7 @@ recurseSplice node splice = do
 -- | Looks up a template name runs a TemplateMonad computation on it.
 lookupAndRun :: Monad m
              => ByteString
-             -> ((InternalTemplate, TPath) -> TemplateMonad m (Maybe a))
+             -> ((X.Document, TPath) -> TemplateMonad m (Maybe a))
              -> TemplateMonad m (Maybe a)
 lookupAndRun name k = do
     ts <- getTS
@@ -439,18 +439,18 @@ callTemplate name params = do
 
 
 ------------------------------------------------------------------------------
--- | Converts a Template to an InternalTemplate.  This can only be done inside
+-- | Converts a Template to a X.Document.  This can only be done inside
 -- TemplateMonad where the doctype is available.
-toInternalTemplate :: Monad m => Template -> TemplateMonad m InternalTemplate
-toInternalTemplate t = do
+toDocument :: Monad m => Template -> TemplateMonad m X.Document
+toDocument t = do
     dts <- getsTS _doctypes
     return $ X.HtmlDocument X.UTF8 (listToMaybe dts) t
 
 
 ------------------------------------------------------------------------------
--- | Renders an internal template by prepending the appropriate doctype.
-renderInternal :: Monad m => InternalTemplate -> TemplateMonad m ByteString
-renderInternal d = return (toByteString (X.render d))
+-- | Renders a document by prepending the appropriate doctype.
+renderDocument :: Monad m => X.Document -> TemplateMonad m ByteString
+renderDocument d = return (toByteString (X.render d))
 
 
 ------------------------------------------------------------------------------
@@ -463,7 +463,7 @@ renderTemplate ts name = do
     evalTemplateMonad
         (do mt <- evalWithHooks name
             maybe (return Nothing)
-                (\t -> liftM Just $ renderInternal =<< toInternalTemplate t)
+                (\t -> liftM Just $ renderDocument =<< toDocument t)
                 mt
         ) (X.TextNode "") ts
 
@@ -486,19 +486,13 @@ renderWithArgs args ts = renderTemplate (bindStrings args ts)
 ------------------------------------------------------------------------------
 
 -- | Reads an HTML template from disk.
-getDoc :: String -> IO (Either String InternalTemplate)
+getDoc :: String -> IO (Either String X.Document)
 getDoc f = do
     bs <- catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
 
     let d = either Left X.parseHTML bs
     return $ mapLeft (\s -> f ++ " " ++ s) d
-
-
-------------------------------------------------------------------------------
--- | Turns an in-memory HTML 'ByteString' into a template.
-parseDoc :: ByteString -> IO (Either String InternalTemplate)
-parseDoc = return . X.parseHTML
 
 
 ------------------------------------------------------------------------------
@@ -513,7 +507,7 @@ mapRight g = either Left (Right . g)
 -- template is only loaded if it has a ".tpl" extension.
 loadTemplate :: String -- ^ path of the template root
              -> String -- ^ full file path (includes the template root)
-             -> IO [Either String (TPath, InternalTemplate)] --TemplateMap
+             -> IO [Either String (TPath, X.Document)] --TemplateMap
 loadTemplate templateRoot fname
     | ".tpl" `isSuffixOf` fname = do
         c <- getDoc fname
@@ -541,10 +535,10 @@ loadTemplates dir ts = do
 
 ------------------------------------------------------------------------------
 -- | Reversed list of directories.  This holds the path to the template
-runHookInternal :: Monad m => (Template -> m Template)
-                -> InternalTemplate
-                -> m InternalTemplate
-runHookInternal f t = do
+runHook :: Monad m => (Template -> m Template)
+        -> X.Document
+        -> m X.Document
+runHook f t = do
     n <- f $ X.docContent t
     return $ t { X.docContent = n }
 
@@ -552,9 +546,9 @@ runHookInternal f t = do
 ------------------------------------------------------------------------------
 -- | Runs the onLoad hook on the template and returns the `TemplateState`
 -- with the result inserted.
-loadHook :: Monad m => TemplateState m -> (TPath, InternalTemplate) -> IO (TemplateState m)
+loadHook :: Monad m => TemplateState m -> (TPath, X.Document) -> IO (TemplateState m)
 loadHook ts (tp, t) = do
-    t' <- runHookInternal (_onLoadHook ts) t
+    t' <- runHook (_onLoadHook ts) t
     return $ insertTemplate tp t' ts
 
 

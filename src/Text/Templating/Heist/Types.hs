@@ -45,20 +45,14 @@ type Template = [X.Node]
 
 
 ------------------------------------------------------------------------------
--- | An 'InternalTemplate' carries a doctype and character encoding with it
--- that we get from the template at load time.
-type InternalTemplate = X.Document
-
-
-------------------------------------------------------------------------------
 -- | Reversed list of directories.  This holds the path to the template
 -- currently being processed.
 type TPath = [ByteString]
 
 
 ------------------------------------------------------------------------------
--- | All templates are stored in a map.
-type TemplateMap = Map TPath InternalTemplate
+-- | All documents representing templates are stored in a map.
+type TemplateMap = Map TPath X.Document
 
 
 ------------------------------------------------------------------------------
