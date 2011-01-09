@@ -192,7 +192,7 @@ insertTemplate p t st =
 
 
 ------------------------------------------------------------------------------
--- | Adds a template to the template state.
+-- | Adds an HTML format template to the template state.
 addTemplate :: Monad m =>
                ByteString
             -> Template
@@ -485,14 +485,33 @@ renderWithArgs args ts = renderTemplate (bindStrings args ts)
 -- Template loading
 ------------------------------------------------------------------------------
 
--- | Reads an HTML template from disk.
-getDoc :: String -> IO (Either String X.Document)
-getDoc f = do
+
+------------------------------------------------------------------------------
+-- | Type synonym for parsers.
+type ParserFun = String -> ByteString -> Either String X.Document
+
+
+------------------------------------------------------------------------------
+-- | Reads an HTML or XML template from disk.
+getDocWith :: ParserFun -> String -> IO (Either String X.Document)
+getDocWith parser f = do
     bs <- catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
 
-    let d = either Left (X.parseHTML f) bs
+    let d = either Left (parser f) bs
     return $ mapLeft (\s -> f ++ " " ++ s) d
+
+
+------------------------------------------------------------------------------
+-- | Reads an HTML template from disk.
+getDoc :: String -> IO (Either String X.Document)
+getDoc = getDocWith X.parseHTML
+
+
+------------------------------------------------------------------------------
+-- | Reads an XML template from disk.
+getXMLDoc :: String -> IO (Either String X.Document)
+getXMLDoc = getDocWith X.parseHTML
 
 
 ------------------------------------------------------------------------------
@@ -504,25 +523,31 @@ mapRight g = either Left (Right . g)
 
 ------------------------------------------------------------------------------
 -- | Loads a template with the specified path and filename.  The
--- template is only loaded if it has a ".tpl" extension.
+-- template is only loaded if it has a ".tpl" or ".xtpl" extension.
 loadTemplate :: String -- ^ path of the template root
              -> String -- ^ full file path (includes the template root)
              -> IO [Either String (TPath, X.Document)] --TemplateMap
 loadTemplate templateRoot fname
-    | ".tpl" `isSuffixOf` fname = do
+    | isHTMLTemplate = do
         c <- getDoc fname
+        return [fmap (\t -> (splitLocalPath $ BC.pack tName, t)) c]
+    | isXMLTemplate = do
+        c <- getXMLDoc fname
         return [fmap (\t -> (splitLocalPath $ BC.pack tName, t)) c]
     | otherwise = return []
   where -- tName is path relative to the template root directory
+        isHTMLTemplate = ".tpl"  `isSuffixOf` fname
+        isXMLTemplate  = ".xtpl" `isSuffixOf` fname
         correction = if last templateRoot == '/' then 0 else 1
+        extLen     = if isHTMLTemplate then 4 else 5
         tName = drop ((length templateRoot)+correction) $
                 -- We're only dropping the template root, not the whole path
-                take ((length fname) - 4) fname
+                take ((length fname) - extLen) fname
 
 
 ------------------------------------------------------------------------------
 -- | Traverses the specified directory structure and builds a
--- TemplateState by loading all the files with a ".tpl" extension.
+-- TemplateState by loading all the files with a ".tpl" or ".xtpl" extension.
 loadTemplates :: Monad m => FilePath -> TemplateState m -> IO (Either String (TemplateState m))
 loadTemplates dir ts = do
     d <- readDirectoryWith (loadTemplate dir) dir

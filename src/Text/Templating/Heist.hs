@@ -4,10 +4,10 @@
 
   This module contains the core definitions for the Heist template system.
 
-  The Heist template system is based on XML\/xhtml.  It allows you to build
-  custom XML-based markup languages.  With Heist you can define your own
-  domain-specific XML tags implemented with Haskell and use them in your
-  templates.  
+  The Heist template system is based on HTML and XML.  It allows you to build
+  custom HTML and XML based markup languages.  With Heist you can define your
+  own domain-specific HTML and XML tags implemented with Haskell and use them
+  in your templates.
 
   The most important concept in Heist is the 'Splice'.  Splices can be thought
   of as functions that transform a node into a list of nodes.  Heist then
@@ -19,23 +19,25 @@
   Suppose you have a place on your page where you want to display a link with
   the text \"Logout username\" if the user is currently logged in or a link to
   the login page if no user is logged in.  Assume you have a function
-  @getUser :: MyAppMonad (Maybe ByteString)@ that gets the current user.
+  @getUser :: MyAppMonad (Maybe Text)@ that gets the current user.
   You can implement this functionality with a 'Splice' as follows:
 
   > import             Data.ByteString.Char8 (ByteString)
   > import qualified   Data.ByteString.Char8 as B
-  > import qualified   Text.XML.Expat.Tree as X
+  > import             Data.Text (Text)
+  > import qualified   Data.Text as T
+  > import qualified   Text.XmlHtml as X
   > 
   > import             Text.Templating.Heist
   >
-  > link :: ByteString -> ByteString -> Node
-  > link target text = X.Element "a" [("href", target)] [X.Text text]
+  > link :: Text -> Text -> Node
+  > link target text = X.Element "a" [("href", target)] [X.TextNode text]
   > 
   > loginLink :: Node
   > loginLink = link "/login" "Login"
   > 
-  > logoutLink :: ByteString -> Node
-  > logoutLink user = link "/logout" (B.append "Logout " user)
+  > logoutLink :: Text -> Node
+  > logoutLink user = link "/logout" (T.append "Logout " user)
   > 
   > loginLogoutSplice :: Splice MyAppMonad
   > loginLogoutSplice = do
@@ -43,7 +45,7 @@
   >     return $ [maybe loginLink logoutLink user]
   >
 
-  Next, you need to bind that splice to an XML tag.  Heist stores information
+  Next, you need to bind that splice to a tag.  Heist stores information
   about splices and templates in the 'TemplateState' data structure.  The
   following code demonstrates how this splice would be used.
 
@@ -73,6 +75,7 @@ module Text.Templating.Heist
 
     -- * Functions and declarations on TemplateState values
   , addTemplate
+  , addXMLTemplate
   , emptyTemplateState
   , bindSplice
   , bindSplices
@@ -110,6 +113,7 @@ module Text.Templating.Heist
 
     -- * Misc functions
   , getDoc
+  , getXMLDoc
   , bindStaticTag
 
   ) where
