@@ -460,24 +460,14 @@ callTemplate name params = do
 
 ------------------------------------------------------------------------------
 -- | Renders a template from the specified TemplateState to a 'Builder'.
-renderTemplateBuilder :: Monad m
-                      => TemplateState m
-                      -> ByteString
-                      -> m (Maybe Builder)
-renderTemplateBuilder ts name = evalTemplateMonad tpl (X.TextNode "") ts
-  where tpl = do mt <- evalWithHooksInternal name
-                 case mt of Nothing  -> return Nothing
-                            Just doc -> return $ Just $ X.render doc
-
-
-------------------------------------------------------------------------------
--- | Renders a template from the specified TemplateState to a 'ByteString'.
 renderTemplate :: Monad m
                => TemplateState m
                -> ByteString
-               -> m (Maybe ByteString)
-renderTemplate ts name =
-    liftM (liftM toByteString) (renderTemplateBuilder ts name)
+               -> m (Maybe Builder)
+renderTemplate ts name = evalTemplateMonad tpl (X.TextNode "") ts
+  where tpl = do mt <- evalWithHooksInternal name
+                 case mt of Nothing  -> return Nothing
+                            Just doc -> return $ Just $ X.render doc
 
 
 ------------------------------------------------------------------------------
@@ -489,21 +479,8 @@ renderWithArgs :: Monad m
                    => [(Text, Text)]
                    -> TemplateState m
                    -> ByteString
-                   -> m (Maybe ByteString)
+                   -> m (Maybe Builder)
 renderWithArgs args ts = renderTemplate (bindStrings args ts)
-
-
-------------------------------------------------------------------------------
--- | Renders a template with the specified arguments passed to it, and output
--- as a 'Builder'.  This is a convenience function for the common pattern of
--- calling renderTemplateBuilder after using bindString, bindStrings, or
--- bindSplice to set up the arguments to the template.
-renderWithArgsBuilder :: Monad m
-                      => [(Text, Text)]
-                      -> TemplateState m
-                      -> ByteString
-                      -> m (Maybe Builder)
-renderWithArgsBuilder args ts = renderTemplateBuilder (bindStrings args ts)
 
 
 ------------------------------------------------------------------------------

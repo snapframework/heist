@@ -158,7 +158,7 @@ renderNoNameTest = do
     ets <- loadT "templates"
     either (error "Error loading templates")
            (\ts -> do t <- renderTemplate ts ""
-                      H.assertBool "renderNoName" $ t == Nothing
+                      H.assertBool "renderNoName" $ isNothing t
            ) ets
 
 
@@ -168,11 +168,11 @@ doctypeTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
     index <- renderTemplate ts "index"
-    H.assertBool "doctype test index" $ isJust $
-        X.docType $ fromRight $ (X.parseHTML "index") $ fromJust index
+    H.assertBool "doctype test index" $ isJust $ X.docType $
+        fromRight $ (X.parseHTML "index") $ toByteString $ fromJust index
     ioc <- renderTemplate ts "ioc"
-    H.assertBool "doctype test ioc" $ isJust $
-        X.docType $ fromRight $ (X.parseHTML "index") $ fromJust ioc
+    H.assertBool "doctype test ioc" $ isJust $ X.docType $
+        fromRight $ (X.parseHTML "index") $ toByteString $ fromJust ioc
   where fromRight (Right x) = x
         fromRight (Left  s) = error s
 
@@ -188,10 +188,10 @@ attrSubstTest = do
     setTs val = bindSplice "foo" (return [X.TextNode val])
     check ts str = do
         res <- renderTemplate ts "attrs"
-        H.assertBool ("attr subst " ++ (show str)) $
-            not $ B.null $ snd $ B.breakSubstring str $ fromJust res
-        H.assertBool ("attr subst foo") $
-            not $ B.null $ snd $ B.breakSubstring "$(foo)" $ fromJust res
+        H.assertBool ("attr subst " ++ (show str)) $ not $ B.null $
+            snd $ B.breakSubstring str $ toByteString $ fromJust res
+        H.assertBool ("attr subst foo") $ not $ B.null $
+            snd $ B.breakSubstring "$(foo)" $ toByteString $ fromJust res
 
 
 ------------------------------------------------------------------------------
@@ -204,10 +204,10 @@ bindAttrTest = do
   where
     check ts str = do
         res <- renderTemplate ts "bind-attrs"
-        H.assertBool ("attr subst " ++ (show str)) $
-            not $ B.null $ snd $ B.breakSubstring str $ fromJust res
-        H.assertBool ("attr subst bar") $
-            B.null $ snd $ B.breakSubstring "$(bar)" $ fromJust res
+        H.assertBool ("attr subst " ++ (show str)) $ not $ B.null $
+            snd $ B.breakSubstring str $ toByteString $ fromJust res
+        H.assertBool ("attr subst bar") $ B.null $
+            snd $ B.breakSubstring "$(bar)" $ toByteString $ fromJust res
 
 
 ------------------------------------------------------------------------------
@@ -227,7 +227,7 @@ markdownTest = do
   where
     check ts str = do
         result <- liftM (fmap $ B.filter (/= '\n')) $
-                  renderTemplate ts "markdown"
+                  liftM (fmap toByteString) $ renderTemplate ts "markdown"
         H.assertEqual ("Should match " ++ (show str)) str (fromJust result)
 
 
@@ -360,7 +360,7 @@ processNode elems loc =
 quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
 quickRender baseDir name = do
     ts <- loadTS baseDir
-    renderTemplate ts name
+    fmap (fmap toByteString) (renderTemplate ts name)
 
 
 ------------------------------------------------------------------------------
