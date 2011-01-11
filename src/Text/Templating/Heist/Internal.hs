@@ -210,7 +210,7 @@ addXMLTemplate :: Monad m =>
                -> TemplateState m
                -> TemplateState m
 addXMLTemplate n t st = insertTemplate (splitTemplatePath n)
-                                    (X.XmlDocument X.UTF8 Nothing t) st
+                                       (X.XmlDocument X.UTF8 Nothing t) st
 
 
 ------------------------------------------------------------------------------
@@ -389,20 +389,40 @@ evalTemplate name = lookupAndRun name
 
 
 ------------------------------------------------------------------------------
+-- | Sets the document type of a 'X.Document' based on the 'TemplateMonad'
+-- value.
+fixDocType :: Monad m => X.Document -> TemplateMonad m X.Document
+fixDocType d = do
+    dts <- getsTS _doctypes
+    return $ d { X.docType = listToMaybe dts }
+
+
+------------------------------------------------------------------------------
+-- | Same as evalWithHooks, but returns the entire 'X.Document' rather than
+-- just the nodes.  This is the right thing to do if we are starting at the
+-- top level.
+evalWithHooksInternal :: Monad m
+                      => ByteString
+                      -> TemplateMonad m (Maybe X.Document)
+evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
+    addDoctype $ maybeToList $ X.docType t
+    ts <- getTS
+    nodes <- lift $ _preRunHook ts $ X.docContent t
+    putTS (ts {_curContext = ctx})
+    res <- runNodeList nodes
+    restoreTS ts
+    newNodes <- lift (_postRunHook ts res)
+    newDoc   <- fixDocType $ t { X.docContent = newNodes }
+    return (Just newDoc)
+
+
+------------------------------------------------------------------------------
 -- | Looks up a template name evaluates it by calling runNodeList.  This also
 -- executes pre- and post-run hooks and adds the doctype.
 evalWithHooks :: Monad m
             => ByteString
             -> TemplateMonad m (Maybe Template)
-evalWithHooks name = lookupAndRun name
-    (\(t,ctx) -> do
-        addDoctype $ maybeToList $ X.docType t
-        ts <- getTS
-        nodes <- lift $ _preRunHook ts $ X.docContent t
-        putTS (ts {_curContext = ctx})
-        res <- runNodeList nodes
-        restoreTS ts
-        return . Just =<< lift (_postRunHook ts res))
+evalWithHooks name = liftM (liftM X.docContent) (evalWithHooksInternal name)
 
 
 ------------------------------------------------------------------------------
@@ -439,33 +459,25 @@ callTemplate name params = do
 
 
 ------------------------------------------------------------------------------
--- | Converts a Template to a X.Document.  This can only be done inside
--- TemplateMonad where the doctype is available.
-toDocument :: Monad m => Template -> TemplateMonad m X.Document
-toDocument t = do
-    dts <- getsTS _doctypes
-    return $ X.HtmlDocument X.UTF8 (listToMaybe dts) t
+-- | Renders a template from the specified TemplateState to a 'Builder'.
+renderTemplateBuilder :: Monad m
+                      => TemplateState m
+                      -> ByteString
+                      -> m (Maybe Builder)
+renderTemplateBuilder ts name = evalTemplateMonad tpl (X.TextNode "") ts
+  where tpl = do mt <- evalWithHooksInternal name
+                 case mt of Nothing  -> return Nothing
+                            Just doc -> return $ Just $ X.render doc
 
 
 ------------------------------------------------------------------------------
--- | Renders a document by prepending the appropriate doctype.
-renderDocument :: Monad m => X.Document -> TemplateMonad m ByteString
-renderDocument d = return (toByteString (X.render d))
-
-
-------------------------------------------------------------------------------
--- | Renders a template from the specified TemplateState.
+-- | Renders a template from the specified TemplateState to a 'ByteString'.
 renderTemplate :: Monad m
                => TemplateState m
                -> ByteString
                -> m (Maybe ByteString)
-renderTemplate ts name = do
-    evalTemplateMonad
-        (do mt <- evalWithHooks name
-            maybe (return Nothing)
-                (\t -> liftM Just $ renderDocument =<< toDocument t)
-                mt
-        ) (X.TextNode "") ts
+renderTemplate ts name =
+    liftM (liftM toByteString) (renderTemplateBuilder ts name)
 
 
 ------------------------------------------------------------------------------
@@ -479,6 +491,19 @@ renderWithArgs :: Monad m
                    -> ByteString
                    -> m (Maybe ByteString)
 renderWithArgs args ts = renderTemplate (bindStrings args ts)
+
+
+------------------------------------------------------------------------------
+-- | Renders a template with the specified arguments passed to it, and output
+-- as a 'Builder'.  This is a convenience function for the common pattern of
+-- calling renderTemplateBuilder after using bindString, bindStrings, or
+-- bindSplice to set up the arguments to the template.
+renderWithArgsBuilder :: Monad m
+                      => [(Text, Text)]
+                      -> TemplateState m
+                      -> ByteString
+                      -> m (Maybe Builder)
+renderWithArgsBuilder args ts = renderTemplateBuilder (bindStrings args ts)
 
 
 ------------------------------------------------------------------------------

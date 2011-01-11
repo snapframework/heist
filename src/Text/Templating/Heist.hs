@@ -107,7 +107,9 @@ module Text.Templating.Heist
   , evalTemplate
   , callTemplate
   , renderTemplate
+  , renderTemplateBuilder
   , renderWithArgs
+  , renderWithArgsBuilder
   , bindStrings
   , bindString
 
