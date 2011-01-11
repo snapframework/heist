@@ -473,7 +473,11 @@ mimeType d = case d of
 
 
 ------------------------------------------------------------------------------
--- | Renders a template from the specified TemplateState to a 'Builder'.
+-- | Renders a template from the specified TemplateState to a 'Builder'.  The
+-- MIME type returned is based on the detected character encoding, and whether
+-- the root template was an HTML or XML format template.  It will always be
+-- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
+-- particular XML application, it must be provided by the application.
 renderTemplate :: Monad m
                => TemplateState m
                -> ByteString
