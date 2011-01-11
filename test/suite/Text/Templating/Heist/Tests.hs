@@ -167,12 +167,12 @@ doctypeTest :: H.Assertion
 doctypeTest = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
-    index <- renderTemplate ts "index"
+    Just (indexDoc, indexMIME) <- renderTemplate ts "index"
     H.assertBool "doctype test index" $ isJust $ X.docType $
-        fromRight $ (X.parseHTML "index") $ toByteString $ fromJust index
-    ioc <- renderTemplate ts "ioc"
+        fromRight $ (X.parseHTML "index") $ toByteString $ indexDoc
+    Just (iocDoc, iocMIME) <- renderTemplate ts "ioc"
     H.assertBool "doctype test ioc" $ isJust $ X.docType $
-        fromRight $ (X.parseHTML "index") $ toByteString $ fromJust ioc
+        fromRight $ (X.parseHTML "index") $ toByteString $ iocDoc
   where fromRight (Right x) = x
         fromRight (Left  s) = error s
 
@@ -187,11 +187,11 @@ attrSubstTest = do
   where
     setTs val = bindSplice "foo" (return [X.TextNode val])
     check ts str = do
-        res <- renderTemplate ts "attrs"
+        Just (resDoc, resMIME) <- renderTemplate ts "attrs"
         H.assertBool ("attr subst " ++ (show str)) $ not $ B.null $
-            snd $ B.breakSubstring str $ toByteString $ fromJust res
+            snd $ B.breakSubstring str $ toByteString $ resDoc
         H.assertBool ("attr subst foo") $ not $ B.null $
-            snd $ B.breakSubstring "$(foo)" $ toByteString $ fromJust res
+            snd $ B.breakSubstring "$(foo)" $ toByteString $ resDoc
 
 
 ------------------------------------------------------------------------------
@@ -203,11 +203,11 @@ bindAttrTest = do
 
   where
     check ts str = do
-        res <- renderTemplate ts "bind-attrs"
+        Just (resDoc, resMIME) <- renderTemplate ts "bind-attrs"
         H.assertBool ("attr subst " ++ (show str)) $ not $ B.null $
-            snd $ B.breakSubstring str $ toByteString $ fromJust res
+            snd $ B.breakSubstring str $ toByteString $ resDoc
         H.assertBool ("attr subst bar") $ B.null $
-            snd $ B.breakSubstring "$(bar)" $ toByteString $ fromJust res
+            snd $ B.breakSubstring "$(bar)" $ toByteString $ resDoc
 
 
 ------------------------------------------------------------------------------
@@ -226,9 +226,9 @@ markdownTest = do
 
   where
     check ts str = do
-        result <- liftM (fmap $ B.filter (/= '\n')) $
-                  liftM (fmap toByteString) $ renderTemplate ts "markdown"
-        H.assertEqual ("Should match " ++ (show str)) str (fromJust result)
+        Just (doc, mime) <- renderTemplate ts "markdown"
+        let result = B.filter (/= '\n') (toByteString doc)
+        H.assertEqual ("Should match " ++ (show str)) str result
 
 
 ------------------------------------------------------------------------------
@@ -359,8 +359,9 @@ processNode elems loc =
 -- template.  (Old convenience code.)
 quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
 quickRender baseDir name = do
-    ts <- loadTS baseDir
-    fmap (fmap toByteString) (renderTemplate ts name)
+    ts  <- loadTS baseDir
+    res <- renderTemplate ts name
+    return (fmap (toByteString . fst) res)
 
 
 ------------------------------------------------------------------------------

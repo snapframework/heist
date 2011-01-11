@@ -45,6 +45,11 @@ type Template = [X.Node]
 
 
 ------------------------------------------------------------------------------
+-- | MIME Type.  The type alias is here to make the API clearer.
+type MIMEType = ByteString
+
+
+------------------------------------------------------------------------------
 -- | Reversed list of directories.  This holds the path to the template
 -- currently being processed.
 type TPath = [ByteString]
