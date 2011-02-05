@@ -32,13 +32,14 @@ applyImpl = do
     node <- getParamNode
     case X.getAttribute applyAttr node of
         Nothing   -> return [] -- TODO: error handling
-        Just attr -> do 
+        Just attr -> do
             st <- getTS
             maybe (return []) -- TODO: error handling
                   (\(t,ctx) -> do
                       addDoctype $ maybeToList $ X.docType t
                       processedChildren <- runNodeList $ X.childNodes node
-                      modifyTS (bindSplice "content" $ return processedChildren)
+                      modifyTS (bindSplice "content" $
+                                return processedChildren)
                       setContext ctx
                       result <- runNodeList $ X.docContent t
                       restoreTS st

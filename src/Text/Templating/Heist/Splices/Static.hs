@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Text.Templating.Heist.Splices.Static 
+module Text.Templating.Heist.Splices.Static
   ( StaticTagState
   , bindStaticTag
   , clearStaticTagCache
@@ -40,8 +40,8 @@ clearStaticTagCache (STS staticMVar) =
 
 
 ------------------------------------------------------------------------------
--- | The \"static\" splice ensures that its contents are evaluated once and then
--- cached.  The cached contents are returned every time the splice is
+-- | The \"static\" splice ensures that its contents are evaluated once and
+-- then cached.  The cached contents are returned every time the splice is
 -- referenced.
 staticImpl :: (MonadIO m)
            => StaticTagState

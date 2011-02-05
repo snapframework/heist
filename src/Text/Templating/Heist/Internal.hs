@@ -88,7 +88,7 @@ bindSplices :: Monad m =>
                [(Text, Splice m)] -- ^ splices to bind
             -> TemplateState m    -- ^ start state
             -> TemplateState m
-bindSplices ss ts = foldl' (flip id) ts acts 
+bindSplices ss ts = foldl' (flip id) ts acts
   where
     acts = map (uncurry bindSplice) ss
 
@@ -136,8 +136,8 @@ singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 
 
 ------------------------------------------------------------------------------
--- | Searches for a template by looking in the full path then backing up into each
--- of the parent directories until the template is found.
+-- | Searches for a template by looking in the full path then backing up into
+-- each of the parent directories until the template is found.
 traversePath :: TemplateMap
              -> TPath
              -> ByteString
@@ -163,7 +163,7 @@ lookupTemplate :: Monad m =>
                   ByteString
                -> TemplateState m
                -> Maybe (X.Document, TPath)
-lookupTemplate nameStr ts = 
+lookupTemplate nameStr ts =
     f (_templateMap ts) path name
   where (name:p) = case splitTemplatePath nameStr of
                        [] -> [""]
@@ -241,7 +241,7 @@ setContext c = modifyTS (\st -> st { _curContext = c })
 -- | Gets the current context
 getContext :: Monad m => TemplateMonad m TPath
 getContext = getsTS _curContext
-  
+
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a single node.
@@ -314,7 +314,7 @@ attParser = AP.many1 (identParser <|> litParser)
 -- then fixed to take the first consecutive bunch of text nodes, and return
 -- their concatenation. This was seen as more useful than throwing an error,
 -- and more intuitive than trying to render all the nodes as text.
--- 
+--
 -- However, it was decided in the end to render all the nodes as text, and
 -- then concatenate them. If a splice returned
 -- \"some \<b\>text\<\/b\> foobar\", the user would almost certainly want
@@ -569,7 +569,8 @@ loadTemplate templateRoot fname
 ------------------------------------------------------------------------------
 -- | Traverses the specified directory structure and builds a
 -- TemplateState by loading all the files with a ".tpl" or ".xtpl" extension.
-loadTemplates :: Monad m => FilePath -> TemplateState m -> IO (Either String (TemplateState m))
+loadTemplates :: Monad m => FilePath -> TemplateState m
+              -> IO (Either String (TemplateState m))
 loadTemplates dir ts = do
     d <- readDirectoryWith (loadTemplate dir) dir
     let tlist = F.fold (free d)
@@ -592,7 +593,8 @@ runHook f t = do
 ------------------------------------------------------------------------------
 -- | Runs the onLoad hook on the template and returns the `TemplateState`
 -- with the result inserted.
-loadHook :: Monad m => TemplateState m -> (TPath, X.Document) -> IO (TemplateState m)
+loadHook :: Monad m => TemplateState m -> (TPath, X.Document)
+         -> IO (TemplateState m)
 loadHook ts (tp, t) = do
     t' <- runHook (_onLoadHook ts) t
     return $ insertTemplate tp t' ts

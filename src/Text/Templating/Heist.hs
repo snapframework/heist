@@ -27,18 +27,18 @@
   > import             Data.Text (Text)
   > import qualified   Data.Text as T
   > import qualified   Text.XmlHtml as X
-  > 
+  >
   > import             Text.Templating.Heist
   >
   > link :: Text -> Text -> Node
   > link target text = X.Element "a" [("href", target)] [X.TextNode text]
-  > 
+  >
   > loginLink :: Node
   > loginLink = link "/login" "Login"
-  > 
+  >
   > logoutLink :: Text -> Node
   > logoutLink user = link "/logout" (T.append "Logout " user)
-  > 
+  >
   > loginLogoutSplice :: Splice MyAppMonad
   > loginLogoutSplice = do
   >     user <- lift getUser
@@ -50,7 +50,7 @@
   following code demonstrates how this splice would be used.
 
   > mySplices = [ ("loginLogout", loginLogoutSplice) ]
-  > 
+  >
   > main = do
   >     ets <- loadTemplates "templates" $
   >            foldr (uncurry bindSplice) emptyTemplateState mySplices
