@@ -1,5 +1,5 @@
 name:           heist
-version:        0.5.0.0
+version:        0.5.0.1
 synopsis:       An xhtml templating system
 description:    An xhtml templating system
 license:        BSD3
@@ -12,6 +12,7 @@ homepage:       http://snapframework.com/
 category:       Web
 
 extra-source-files:
+  .ghci,
   CONTRIBUTORS,
   docs/Makefile,
   docs/templates.css,
@@ -31,20 +32,27 @@ extra-source-files:
   LICENSE,
   README.md,
   README.SNAP.md,
+  test/.ghci,
   test/heist-testsuite.cabal,
   test/README,
   test/runTestsAndCoverage.sh,
   test/suite/TestSuite.hs,
   test/suite/Text/Templating/Heist/Tests.hs,
   test/templates/a.tpl,
+  test/templates/attrs.tpl,
   test/templates/bar/a.tpl,
   test/templates/bar/index.tpl,
+  test/templates/bind-attrs.tpl,
   test/templates/etc.tpl,
   test/templates/foo/a.tpl,
   test/templates/foo/b.tpl,
   test/templates/index.tpl,
+  test/templates/ioc.tpl,
+  test/templates/markdown.tpl,
   test/templates/noroot.tpl,
+  test/templates/page.tpl,
   test/templates/readme.txt,
+  test/templates/test.md,
   test/templates/user/admin/main.tpl,
   test/templates/user/admin/menu.tpl,
   test/templates/user/main.tpl,
