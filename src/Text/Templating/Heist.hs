@@ -22,6 +22,7 @@
   @getUser :: MyAppMonad (Maybe Text)@ that gets the current user.
   You can implement this functionality with a 'Splice' as follows:
 
+  > import             Blaze.ByteString.Builder
   > import             Data.ByteString.Char8 (ByteString)
   > import qualified   Data.ByteString.Char8 as B
   > import             Data.Text (Text)
@@ -30,19 +31,19 @@
   >
   > import             Text.Templating.Heist
   >
-  > link :: Text -> Text -> Node
+  > link :: Text -> Text -> X.Node
   > link target text = X.Element "a" [("href", target)] [X.TextNode text]
   >
-  > loginLink :: Node
+  > loginLink :: X.Node
   > loginLink = link "/login" "Login"
   >
-  > logoutLink :: Text -> Node
+  > logoutLink :: Text -> X.Node
   > logoutLink user = link "/logout" (T.append "Logout " user)
   >
   > loginLogoutSplice :: Splice MyAppMonad
   > loginLogoutSplice = do
   >     user <- lift getUser
-  >     return $ [maybe loginLink logoutLink user]
+  >     return [maybe loginLink logoutLink user]
   >
 
   Next, you need to bind that splice to a tag.  Heist stores information
@@ -53,10 +54,10 @@
   >
   > main = do
   >     ets <- loadTemplates "templates" $
-  >            foldr (uncurry bindSplice) emptyTemplateState mySplices
+  >            bindSplices mySplices (emptyTemplateState "templates")
   >     let ts = either error id ets
   >     t <- runMyAppMonad $ renderTemplate ts "index"
-  >     print $ maybe "Page not found" id t
+  >     print $ maybe "Page not found" (toByteString . fst) t
 
   Here we build up our 'TemplateState' by starting with emptyTemplateState and
   applying bindSplice for all the splices we want to add.  Then we pass this
