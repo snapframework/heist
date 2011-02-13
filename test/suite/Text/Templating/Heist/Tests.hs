@@ -55,6 +55,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attributeSubstitution" attrSubstTest
         , testCase     "heist/bindAttribute"         bindAttrTest
         , testCase     "heist/markdown"              markdownTest
+        , testCase     "heist/title_expansion"       titleExpansion
         , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
         , testCase     "heist/ignore"                ignoreTest
@@ -131,7 +132,7 @@ loadTest = do
     ets <- loadT "templates"
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertBool "loadTest size" $ Map.size tm == 17
+                      H.assertBool "loadTest size" $ Map.size tm == 18
            ) ets
 
 
@@ -236,6 +237,12 @@ renderTest templateName expectedResult = do
         Just (doc, _) <- renderTemplate ts templateName
         let result = B.filter (/= '\n') (toByteString doc)
         H.assertEqual ("Should match " ++ (show str)) str result
+
+
+------------------------------------------------------------------------------
+-- | Expansion of a bound name inside a title-tag
+titleExpansion :: H.Assertion
+titleExpansion = renderTest "title_expansion" "<title>foo</title>"
 
 
 ------------------------------------------------------------------------------
