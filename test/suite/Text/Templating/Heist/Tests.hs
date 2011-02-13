@@ -218,15 +218,22 @@ htmlExpected = "<div class=\'markdown\'><p>This <em>is</em> a test.</p></div>"
 ------------------------------------------------------------------------------
 -- | Markdown test on a file
 markdownTest :: H.Assertion
-markdownTest = do
+markdownTest = renderTest "markdown" htmlExpected
+
+
+-- | Render a template and assert that it matches an expected result
+renderTest  :: ByteString   -- ^ template name
+            -> ByteString   -- ^ expected result
+            -> H.Assertion
+renderTest templateName expectedResult = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
 
-    check ts htmlExpected
+    check ts expectedResult
 
   where
     check ts str = do
-        Just (doc, mime) <- renderTemplate ts "markdown"
+        Just (doc, _) <- renderTemplate ts templateName
         let result = B.filter (/= '\n') (toByteString doc)
         H.assertEqual ("Should match " ++ (show str)) str result
 
