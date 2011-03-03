@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Text.Templating.Heist.Splices.Apply where
 
 ------------------------------------------------------------------------------

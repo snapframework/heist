@@ -102,6 +102,8 @@ Library
   else
     ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2
 
+  Extensions: OverloadedStrings
+
 
 source-repository head
   type:     git

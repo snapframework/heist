@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Text.Templating.Heist.Splices.Html where
 
 ------------------------------------------------------------------------------
@@ -8,7 +6,8 @@ import           Data.Text (Text)
 import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
-import           Text.Templating.Heist
+import           Text.Templating.Heist.Internal
+import           Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
