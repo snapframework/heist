@@ -131,7 +131,8 @@ import           Text.Templating.Heist.Types
 -- | The default set of built-in splices.
 defaultSpliceMap :: MonadIO m => FilePath -> SpliceMap m
 defaultSpliceMap templatePath = Map.fromList
-    [(applyTag, applyImpl)
+    [(htmlTag, htmlImpl)
+    ,(applyTag, applyImpl)
     ,(bindTag, bindImpl)
     ,(ignoreTag, ignoreImpl)
     ,(markdownTag, markdownSplice templatePath)
