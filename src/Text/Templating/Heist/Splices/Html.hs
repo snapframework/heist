@@ -1,6 +1,7 @@
 module Text.Templating.Heist.Splices.Html where
 
 ------------------------------------------------------------------------------
+import           Data.List
 import           Data.Maybe
 import           Data.Text (Text)
 import qualified Text.XmlHtml as X
@@ -25,7 +26,8 @@ htmlImpl = do
     node <- getParamNode
     children <- runNodeList $ X.childNodes node
     let (heads, mnode) = extractHeads $ node { X.elementChildren = children }
-        new (X.Element t a c) = X.Element t a (X.Element "head" [] heads : c)
+        new (X.Element t a c) = X.Element t a $
+            X.Element "head" [] (nub heads) : c
         new n = n
     return [maybe node new mnode]
 
