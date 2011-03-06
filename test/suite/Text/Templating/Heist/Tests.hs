@@ -55,6 +55,8 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attributeSubstitution" attrSubstTest
         , testCase     "heist/bindAttribute"         bindAttrTest
         , testCase     "heist/markdown"              markdownTest
+        , testCase     "heist/title_expansion"       titleExpansion
+        , testCase     "heist/textarea_expansion"    textareaExpansion
         , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
         , testCase     "heist/ignore"                ignoreTest
@@ -131,7 +133,7 @@ loadTest = do
     ets <- loadT "templates"
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertBool "loadTest size" $ Map.size tm == 17
+                      H.assertBool "loadTest size" $ Map.size tm == 19
            ) ets
 
 
@@ -218,17 +220,36 @@ htmlExpected = "<div class=\'markdown\'><p>This <em>is</em> a test.</p></div>"
 ------------------------------------------------------------------------------
 -- | Markdown test on a file
 markdownTest :: H.Assertion
-markdownTest = do
+markdownTest = renderTest "markdown" htmlExpected
+
+
+-- | Render a template and assert that it matches an expected result
+renderTest  :: ByteString   -- ^ template name
+            -> ByteString   -- ^ expected result
+            -> H.Assertion
+renderTest templateName expectedResult = do
     ets <- loadT "templates"
     let ts = either (error "Error loading templates") id ets
 
-    check ts htmlExpected
+    check ts expectedResult
 
   where
     check ts str = do
-        Just (doc, mime) <- renderTemplate ts "markdown"
+        Just (doc, _) <- renderTemplate ts templateName
         let result = B.filter (/= '\n') (toByteString doc)
         H.assertEqual ("Should match " ++ (show str)) str result
+
+
+------------------------------------------------------------------------------
+-- | Expansion of a bound name inside a title-tag
+titleExpansion :: H.Assertion
+titleExpansion = renderTest "title_expansion" "<title>foo</title>"
+
+
+------------------------------------------------------------------------------
+-- | Expansion of a bound name inside a textarea-tag
+textareaExpansion :: H.Assertion
+textareaExpansion = renderTest "textarea_expansion" "<textarea>foo</textarea>"
 
 
 ------------------------------------------------------------------------------
