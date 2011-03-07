@@ -7,6 +7,7 @@ module Text.Templating.Heist.Internal where
 ------------------------------------------------------------------------------
 import             Blaze.ByteString.Builder
 import             Control.Applicative
+import             Control.Arrow
 import             Control.Exception (SomeException)
 import             Control.Monad
 import             Control.Monad.CatchIO
@@ -90,6 +91,23 @@ bindSplices :: Monad m =>
 bindSplices ss ts = foldl' (flip id) ts acts
   where
     acts = map (uncurry bindSplice) ss
+
+
+------------------------------------------------------------------------------
+-- | Convenient abstraction for applying multiple splice generating functions
+-- before running the contents of the splice's child node.  This allows a
+-- splice to be passed in the view that it should use to render the dynamic
+-- data it is responsible for.
+mapBind :: (Monad m) => (a -> [(Text, Splice m)]) -> [a] -> Splice m
+mapBind f vs = localTS (bindSplices (concat $ map f vs))
+                       (runNodeList =<< liftM X.childNodes getParamNode)
+
+
+------------------------------------------------------------------------------
+-- | Specialization of mapBind that takes a template generating function
+-- instead of a splice generating function.
+mapValues :: (Monad m) => (a -> [(Text, Template)]) -> [a] -> Splice m
+mapValues f = mapBind (map (second return) . f)
 
 
 ------------------------------------------------------------------------------
@@ -303,7 +321,7 @@ attParser = AP.many1 (identParser <|> litParser)
 
 
 ------------------------------------------------------------------------------
--- | Get's the attribute value.  If the splice's result list contains non-text
+-- | Gets the attribute value.  If the splice's result list contains non-text
 -- nodes, this will translate them into text nodes with nodeText and
 -- concatenate them together.
 --

@@ -104,6 +104,7 @@ module Text.Templating.Heist
   , putTS
   , modifyTS
   , restoreTS
+  , localTS
 
     -- * Functions for running splices and templates
   , evalTemplate
@@ -112,6 +113,8 @@ module Text.Templating.Heist
   , renderWithArgs
   , bindStrings
   , bindString
+  , mapBind
+  , mapValues
 
     -- * Misc functions
   , getDoc

@@ -341,15 +341,26 @@ modifyTS f = TemplateMonad $ \_ s -> return ((), f s)
 
 
 ------------------------------------------------------------------------------
--- | Restores the components of TemplateState that can get modified in
--- template calls.  You should use this function instead of @putTS@ to restore
--- an old state.  Thas was needed because doctypes needs to be in a "global
--- scope" as opposed to the template call "local scope" of state items such
--- as recursionDepth, curContext, and spliceMap.
+-- | Restores the TemplateState.  This function is almost like putTS except it
+-- preserves the current doctypes.  You should use this function instead of
+-- @putTS@ to restore an old state.  This was needed because doctypes needs to
+-- be in a "global scope" as opposed to the template call "local scope" of
+-- state items such as recursionDepth, curContext, and spliceMap.
 restoreTS :: Monad m => TemplateState m -> TemplateMonad m ()
-restoreTS ts1 =
-    modifyTS (\ts2 -> ts2
-        { _recursionDepth = _recursionDepth ts1
-        , _curContext = _curContext ts1
-        , _spliceMap = _spliceMap ts1
-        })
+restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
+
+
+------------------------------------------------------------------------------
+-- | Abstracts the common pattern of running a TemplateMonad computation with
+-- a modified template state.
+localTS :: Monad m
+        => (TemplateState m -> TemplateState m)
+        -> TemplateMonad m a
+        -> TemplateMonad m a
+localTS f k = do
+    ts <- getTS
+    putTS $ f ts
+    res <- k
+    restoreTS ts
+    return res
+
