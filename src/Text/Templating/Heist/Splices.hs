@@ -9,6 +9,7 @@ module Text.Templating.Heist.Splices
 
 import Text.Templating.Heist.Splices.Apply
 import Text.Templating.Heist.Splices.Bind
+import Text.Templating.Heist.Splices.Cache
 import Text.Templating.Heist.Splices.Html
 import Text.Templating.Heist.Splices.Ignore
 import Text.Templating.Heist.Splices.Markdown

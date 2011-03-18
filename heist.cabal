@@ -68,6 +68,7 @@ Library
     Text.Templating.Heist.Splices,
     Text.Templating.Heist.Splices.Apply,
     Text.Templating.Heist.Splices.Bind,
+    Text.Templating.Heist.Splices.Cache,
     Text.Templating.Heist.Splices.Html,
     Text.Templating.Heist.Splices.Ignore,
     Text.Templating.Heist.Splices.Markdown,
@@ -93,6 +94,7 @@ Library
     process,
     random,
     text >= 0.10 && < 0.12,
+    time >= 1.1 && < 1.3,
     transformers,
     xmlhtml == 0.1.*
 
