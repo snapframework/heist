@@ -113,8 +113,13 @@ module Text.Templating.Heist
   , renderWithArgs
   , bindStrings
   , bindString
-  , mapBind
-  , mapValues
+
+  , runChildren
+  , runChildrenWith
+  , runChildrenWithTrans
+  , runChildrenWithTemplates
+  , runChildrenWithText
+  , mapSplices
 
     -- * Misc functions
   , getDoc

@@ -94,20 +94,61 @@ bindSplices ss ts = foldl' (flip id) ts acts
 
 
 ------------------------------------------------------------------------------
--- | Convenient abstraction for applying multiple splice generating functions
--- before running the contents of the splice's child node.  This allows a
--- splice to be passed in the view that it should use to render the dynamic
--- data it is responsible for.
-mapBind :: (Monad m) => (a -> [(Text, Splice m)]) -> [a] -> Splice m
-mapBind f vs = localTS (bindSplices (concat $ map f vs))
-                       (runNodeList =<< liftM X.childNodes getParamNode)
+-- | Runs the parameter node's children and returns the resulting node list.
+-- By itself this function is a simple passthrough splice that makes the
+-- spliced node disappear.  In combination with locally bound splices, this
+-- function makes it easier to pass the desired view into your splices.
+runChildren :: Monad m => Splice m
+runChildren = runNodeList . X.childNodes =<< getParamNode
 
 
 ------------------------------------------------------------------------------
--- | Specialization of mapBind that takes a template generating function
--- instead of a splice generating function.
-mapValues :: (Monad m) => (a -> [(Text, Template)]) -> [a] -> Splice m
-mapValues f = mapBind (map (second return) . f)
+-- | Binds a list of splices before using the children of the spliced node as
+-- a view.
+runChildrenWith :: (Monad m)
+                => [(Text, Splice m)]
+                -- ^ List of splices to bind before running the param nodes.
+                -> Splice m
+                -- ^ Returns the passed in view.
+runChildrenWith splices = localTS (bindSplices splices) runChildren
+
+
+------------------------------------------------------------------------------
+-- | Wrapper around runChildrenWith that applies a transformation function to the
+-- second item in each of the tuples before calling runChildrenWith.
+runChildrenWithTrans :: (Monad m)
+          => (b -> Splice m)
+          -- ^ Splice generating function
+          -> [(Text, b)]
+          -- ^ List of tuples to be bound
+          -> Splice m
+runChildrenWithTrans f = runChildrenWith . map (second f)
+
+
+------------------------------------------------------------------------------
+-- | Like runChildrenWith but using constant templates rather than dynamic
+-- splices.
+runChildrenWithTemplates :: (Monad m) => [(Text, Template)] -> Splice m
+runChildrenWithTemplates = runChildrenWithTrans return
+
+
+------------------------------------------------------------------------------
+-- | Like runChildrenWith but using literal text rather than dynamic splices.
+runChildrenWithText :: (Monad m) => [(Text, Text)] -> Splice m
+runChildrenWithText = runChildrenWithTrans (return . (:[]) . X.TextNode)
+
+
+------------------------------------------------------------------------------
+-- | Maps a splice generating function over a list and concatenates the
+-- results.
+mapSplices :: (Monad m)
+        => (a -> Splice m)
+        -- ^ Splice generating function
+        -> [a]
+        -- ^ List of items to generate splices for
+        -> Splice m
+        -- ^ The result of all splices concatenated together.
+mapSplices f vs = liftM concat $ mapM f vs
 
 
 ------------------------------------------------------------------------------
@@ -267,9 +308,9 @@ runNode (X.Element nm at ch) = do
     newAtts <- mapM attSubst at
     let n = X.Element nm newAtts ch
     s <- liftM (lookupSplice nm) getTS
-    maybe (runChildren newAtts) (recurseSplice n) s
+    maybe (runKids newAtts) (recurseSplice n) s
   where
-    runChildren newAtts = do
+    runKids newAtts = do
         newKids <- runNodeList ch
         return [X.Element nm newAtts newKids]
 runNode n                    = return [n]
@@ -351,7 +392,8 @@ getAttributeSplice name = do
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
 runNodeList :: Monad m => [X.Node] -> Splice m
-runNodeList nodes = liftM concat $ sequence (map runNode nodes)
+runNodeList = mapSplices runNode
+--runNodeList nodes = liftM concat $ sequence (map runNode nodes)
 
 
 ------------------------------------------------------------------------------

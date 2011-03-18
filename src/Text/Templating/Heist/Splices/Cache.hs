@@ -97,9 +97,6 @@ cacheImpl (CTS mv) = do
     return ns
 
 
-mkCacheTagState :: IO CacheTagState
-mkCacheTagState = liftM CTS $ newMVar Map.empty
-
 ------------------------------------------------------------------------------
 -- | Modifies a TemplateState to include a \"cache\" tag.  The cache tag is
 -- not bound automatically with the other default Heist tags.  This is because
