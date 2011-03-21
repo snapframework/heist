@@ -393,7 +393,6 @@ getAttributeSplice name = do
 -- | Performs splice processing on a list of nodes.
 runNodeList :: Monad m => [X.Node] -> Splice m
 runNodeList = mapSplices runNode
---runNodeList nodes = liftM concat $ sequence (map runNode nodes)
 
 
 ------------------------------------------------------------------------------
@@ -439,12 +438,8 @@ evalTemplate :: Monad m
             => ByteString
             -> TemplateMonad m (Maybe Template)
 evalTemplate name = lookupAndRun name
-    (\(t,ctx) -> do
-        ts <- getTS
-        putTS (ts {_curContext = ctx})
-        res <- runNodeList $ X.docContent t
-        restoreTS ts
-        return $ Just res)
+    (\(t,ctx) -> localTS (\ts -> ts {_curContext = ctx})
+                         (liftM Just $ runNodeList $ X.docContent t))
 
 
 ------------------------------------------------------------------------------
