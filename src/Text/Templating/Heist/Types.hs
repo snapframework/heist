@@ -298,9 +298,9 @@ instance (Typeable1 m) => Typeable1 (TemplateMonad m) where
 --
 -- When you call @getParamNode@ inside the code for the @speech@ splice, it
 -- returns the Node for the @speech@ tag and its children.  @getParamNode >>=
--- getChildren@ returns a list containing one 'Text' node containing part of
--- Hamlet's speech.  @getParamNode >>= getAttribute \"author\"@ would return
--- @Just "Shakespeare"@.
+-- childNodes@ returns a list containing one 'TextNode' containing part of
+-- Hamlet's speech.  @liftM (getAttribute \"author\") getParamNode@ would
+-- return @Just "Shakespeare"@.
 getParamNode :: Monad m => TemplateMonad m X.Node
 getParamNode = TemplateMonad $ \r s -> return (r,s)
 
