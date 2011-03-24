@@ -94,6 +94,12 @@ bindSplices ss ts = foldl' (flip id) ts acts
 
 
 ------------------------------------------------------------------------------
+-- | Converts 'Text' to a splice returning a single 'TextNode'.
+textSplice :: (Monad m) => Text -> Splice m
+textSplice = return . (:[]) . X.TextNode
+
+
+------------------------------------------------------------------------------
 -- | Runs the parameter node's children and returns the resulting node list.
 -- By itself this function is a simple passthrough splice that makes the
 -- spliced node disappear.  In combination with locally bound splices, this
@@ -135,7 +141,7 @@ runChildrenWithTemplates = runChildrenWithTrans return
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using literal text rather than dynamic splices.
 runChildrenWithText :: (Monad m) => [(Text, Text)] -> Splice m
-runChildrenWithText = runChildrenWithTrans (return . (:[]) . X.TextNode)
+runChildrenWithText = runChildrenWithTrans textSplice
 
 
 ------------------------------------------------------------------------------

@@ -114,6 +114,8 @@ module Text.Templating.Heist
   , bindStrings
   , bindString
 
+    -- * Functions for creating splices
+  , textSplice
   , runChildren
   , runChildrenWith
   , runChildrenWithTrans
