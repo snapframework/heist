@@ -24,6 +24,19 @@ applyAttr = "template"
 
 
 ------------------------------------------------------------------------------
+-- | Raw core of apply functionality.  This is abstracted for use in other
+-- places like an enhanced (from the original) bind
+rawApply calledNodes newContext paramNodes = do
+    st <- getTS  -- Can't use localTS here because the modifier is not pure
+    processedParams <- runNodeList paramNodes
+    modifyTS (bindSplice "content" $ return processedParams)
+    setContext newContext
+    result <- runNodeList calledNodes
+    restoreTS st
+    return result
+
+
+------------------------------------------------------------------------------
 -- | Applies a template as if the supplied nodes were the children of the
 -- <apply> tag.
 applyNodes :: Monad m => Template -> Text -> Splice m
@@ -32,13 +45,7 @@ applyNodes nodes template = do
     maybe (return []) -- TODO: error handling
           (\(t,ctx) -> do
               addDoctype $ maybeToList $ X.docType t
-              processedChildren <- runNodeList nodes
-              modifyTS (bindSplice "content" $
-                        return processedChildren)
-              setContext ctx
-              result <- runNodeList $ X.docContent t
-              restoreTS st
-              return result)
+              rawApply (X.docContent t) ctx nodes)
           (lookupTemplate (T.encodeUtf8 template)
                           (st {_curContext = nextCtx template st}))
   where nextCtx name st
