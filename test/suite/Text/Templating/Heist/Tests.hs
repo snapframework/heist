@@ -57,6 +57,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/markdown"              markdownTest
         , testCase     "heist/title_expansion"       titleExpansion
         , testCase     "heist/textarea_expansion"    textareaExpansion
+        , testCase     "heist/bind_param"            bindParam
         , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
         , testCase     "heist/ignore"                ignoreTest
@@ -133,7 +134,7 @@ loadTest = do
     ets <- loadT "templates"
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertBool "loadTest size" $ Map.size tm == 19
+                      H.assertBool "loadTest size" $ Map.size tm == 21
            ) ets
 
 
@@ -250,6 +251,12 @@ titleExpansion = renderTest "title_expansion" "<title>foo</title>"
 -- | Expansion of a bound name inside a textarea-tag
 textareaExpansion :: H.Assertion
 textareaExpansion = renderTest "textarea_expansion" "<textarea>foo</textarea>"
+
+
+------------------------------------------------------------------------------
+-- | Handling of <content> and bound parameters in a bonud tag.
+bindParam :: H.Assertion
+bindParam = renderTest "bind_param" "<li>Hi there world</li>"
 
 
 ------------------------------------------------------------------------------
