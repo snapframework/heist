@@ -57,6 +57,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/markdown"              markdownTest
         , testCase     "heist/title_expansion"       titleExpansion
         , testCase     "heist/textarea_expansion"    textareaExpansion
+        , testCase     "heist/div_expansion"         divExpansion
         , testCase     "heist/bind_param"            bindParam
         , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
@@ -251,6 +252,12 @@ titleExpansion = renderTest "title_expansion" "<title>foo</title>"
 -- | Expansion of a bound name inside a textarea-tag
 textareaExpansion :: H.Assertion
 textareaExpansion = renderTest "textarea_expansion" "<textarea>foo</textarea>"
+
+
+------------------------------------------------------------------------------
+-- | Expansion of a bound name inside a div-tag
+divExpansion :: H.Assertion
+divExpansion = renderTest "div_expansion" "<div>foo</div>"
 
 
 ------------------------------------------------------------------------------
