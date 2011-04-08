@@ -23,26 +23,17 @@ bindAttr = "tag"
 ------------------------------------------------------------------------------
 -- | Implementation of the bind splice.
 bindImpl :: Monad m => Splice m
-bindImpl = generalBind add
-  where
-    add node nm = do
-        modifyTS $ bindSplice nm (return $ X.childNodes node)
-        return []
-
-
-generalBind :: Monad m => (X.Node -> Text -> Splice m) -> Splice m
-generalBind k = do
+bindImpl = do
     node <- getParamNode
-    maybe (return [])
-          (k node)
+    maybe (return ())
+          (add node)
           (X.getAttribute bindAttr node)
+    return []
 
-
-bindImplNew :: Monad m => Splice m
-bindImplNew = generalBind action
   where
-    action node nm = do --unused nm might be a bug
+    add node nm = modifyTS $ bindSplice nm $ do
         caller <- getParamNode
         ctx <- getContext
         rawApply (X.childNodes node) ctx (X.childNodes caller)
+
 
