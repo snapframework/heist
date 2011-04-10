@@ -46,11 +46,7 @@ applyNodes nodes template = do
           (\(t,ctx) -> do
               addDoctype $ maybeToList $ X.docType t
               rawApply (X.docContent t) ctx nodes)
-          (lookupTemplate (T.encodeUtf8 template)
-                          (st {_curContext = nextCtx template st}))
-  where nextCtx name st
-            | T.isPrefixOf "/" name = []
-            | otherwise             = _curContext st
+          (lookupTemplate (T.encodeUtf8 template) st)
 
 
 ------------------------------------------------------------------------------

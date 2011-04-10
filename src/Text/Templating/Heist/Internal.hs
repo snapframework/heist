@@ -232,7 +232,8 @@ lookupTemplate nameStr ts =
   where (name:p) = case splitTemplatePath nameStr of
                        [] -> [""]
                        ps -> ps
-        path = p ++ (_curContext ts)
+        ctx = if B.isPrefixOf "/" nameStr then [] else _curContext ts
+        path = p ++ ctx
         f = if '/' `BC.elem` nameStr
                 then singleLookup
                 else traversePath

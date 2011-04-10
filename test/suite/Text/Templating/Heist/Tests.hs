@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
+{-# LANGUAGE NoMonomorphismRestriction  #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 module Text.Templating.Heist.Tests
@@ -62,6 +63,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
         , testCase     "heist/ignore"                ignoreTest
+        , testCase     "heist/lookupTemplateContext" lookupTemplateTest
         ]
 
 
@@ -296,6 +298,19 @@ ignoreTest = do
         (X.Element "ignore" [("tag", "ignorable")] 
           [X.TextNode "This should be ignored"]) es
     H.assertEqual "<ignore> tag" [] res
+
+
+--localTSTest :: H.Assertion
+--localTSTest = do
+--    let es = (emptyTemplateState ".") :: TemplateState IO
+
+lookupTemplateTest = do
+    ts <- loadTS "templates"
+    let k = do
+            setContext ["foo"]
+            getsTS $ lookupTemplate "/user/menu"
+    res <- runTemplateMonad k (X.TextNode "") ts
+    H.assertBool "lookup context test" $ isJust $ fst res
 
 
 ------------------------------------------------------------------------------
