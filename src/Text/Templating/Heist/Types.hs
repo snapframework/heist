@@ -22,6 +22,7 @@ module Text.Templating.Heist.Types where
 
 ------------------------------------------------------------------------------
 import             Control.Applicative
+import             Control.Arrow
 import             Control.Monad.Cont
 import             Control.Monad.Error
 import             Control.Monad.Reader
@@ -152,11 +153,6 @@ evalTemplateMonad :: Monad m
 evalTemplateMonad m r s = do
     (a, _) <- runTemplateMonad m r s
     return a
-
-------------------------------------------------------------------------------
--- | Helper function for the functor instance
-first :: (a -> b) -> (a, c) -> (b, c)
-first f (a,b) = (f a, b)
 
 
 ------------------------------------------------------------------------------
