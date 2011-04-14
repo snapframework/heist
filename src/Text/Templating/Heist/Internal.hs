@@ -96,7 +96,7 @@ bindSplices ss ts = foldl' (flip id) ts acts
 ------------------------------------------------------------------------------
 -- | Converts 'Text' to a splice returning a single 'TextNode'.
 textSplice :: (Monad m) => Text -> Splice m
-textSplice = return . (:[]) . X.TextNode
+textSplice t = return [X.TextNode t]
 
 
 ------------------------------------------------------------------------------
@@ -502,7 +502,7 @@ bindString :: Monad m
             -> Text
             -> TemplateState m
             -> TemplateState m
-bindString n v = bindSplice n $ return [X.TextNode v]
+bindString n = bindSplice n . textSplice
 
 
 ------------------------------------------------------------------------------
