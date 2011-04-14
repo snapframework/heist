@@ -27,8 +27,9 @@ htmlImpl = do
     children <- runNodeList $ X.childNodes node
     let (heads, mnode) = extractHeads $ node { X.elementChildren = children }
         new (X.Element t a c) = X.Element t a $
-            X.Element "head" [] (nub heads) : c
+            X.Element "head" [] heads : c
         new n = n
+    stopRecursion
     return [maybe node new mnode]
 
 ------------------------------------------------------------------------------
