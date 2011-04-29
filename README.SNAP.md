@@ -1,16 +1,15 @@
 Snap Framework
 --------------
 
-This is the first developer prerelease of the Snap framework.  Snap is a simple
-and fast web development framework and server written in Haskell. For more
-information or to download the latest version, you can visit the Snap project
-website at http://snapframework.com/.
+Snap is a simple and fast web development framework and server written in
+Haskell. For more information or to download the latest version, you can visit
+the Snap project website at http://snapframework.com/.
 
 
 Snap Status and Features
 ------------------------
 
-This developer prerelease contains only the Snap core system, namely:
+The Snap core system consists of:
 
   * a high-speed HTTP server, with an optional high-concurrency backend using
     the [libev](http://software.schmorp.de/pkg/libev.html) library
