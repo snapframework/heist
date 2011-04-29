@@ -1,5 +1,5 @@
 name:           heist
-version:        0.5.1.1
+version:        0.5.2
 synopsis:       An xhtml templating system
 description:    An xhtml templating system
 license:        BSD3
@@ -83,7 +83,7 @@ Library
     attoparsec >= 0.8.1 && < 0.9,
     attoparsec-text >= 0.8 && < 0.9,
     base >= 4 && < 5,
-    blaze-builder == 0.2.*,
+    blaze-builder >= 0.2 && <0.4,
     bytestring,
     containers,
     directory,

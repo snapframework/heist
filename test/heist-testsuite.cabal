@@ -4,33 +4,33 @@ build-type:     Simple
 cabal-version:  >= 1.6
 
 Executable testsuite
-   hs-source-dirs:  ../src suite
-   main-is:         TestSuite.hs
+  hs-source-dirs:  ../src suite
+  main-is:         TestSuite.hs
 
-   build-depends:
-     QuickCheck >= 2,
-     attoparsec >= 0.8.1 && < 0.9,
-     attoparsec-text >= 0.8 && < 0.9,
-     base >= 4 && < 5,
-     blaze-builder == 0.2.*,
-     bytestring,
-     containers,
-     directory,
-     directory-tree,
-     process,
-     filepath,
-     xmlhtml == 0.1.*,
-     HUnit >= 1.2 && < 2,
-     mtl >= 2,
-     random,
-     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
-     test-framework >= 0.3.1 && <0.4,
-     test-framework-hunit >= 0.2.5 && < 0.3,
-     test-framework-quickcheck2 >= 0.2.6 && < 0.3,
-     text >= 0.10 && < 0.12,
-     time,
-     transformers
-     
-   ghc-options: -O2 -Wall -fhpc -fwarn-tabs -funbox-strict-fields -threaded
-   Extensions: OverloadedStrings
+  build-depends:
+    QuickCheck >= 2,
+    attoparsec >= 0.8.1 && < 0.9,
+    attoparsec-text >= 0.8 && < 0.9,
+    base >= 4 && < 5,
+    blaze-builder >= 0.2 && <0.4,
+    bytestring,
+    containers,
+    directory,
+    directory-tree,
+    process,
+    filepath,
+    xmlhtml == 0.1.*,
+    HUnit >= 1.2 && < 2,
+    mtl >= 2,
+    random,
+    MonadCatchIO-transformers >= 0.2.1 && < 0.3,
+    test-framework >= 0.3.1 && <0.4,
+    test-framework-hunit >= 0.2.5 && < 0.3,
+    test-framework-quickcheck2 >= 0.2.6 && < 0.3,
+    text >= 0.10 && < 0.12,
+    time,
+    transformers
+    
+  ghc-options: -O2 -Wall -fhpc -fwarn-tabs -funbox-strict-fields -threaded
+  Extensions: OverloadedStrings
 
