@@ -661,3 +661,12 @@ loadHook ts (tp, t) = do
     return $ insertTemplate tp t' ts
 
 
+------------------------------------------------------------------------------
+-- | 
+addTemplatePathPrefix :: ByteString
+                      -> TemplateState m -> TemplateState m
+addTemplatePathPrefix dir ts =
+    ts { _templateMap = Map.mapKeys f $ _templateMap ts }
+  where
+    f ps = ps ++ [dir]
+

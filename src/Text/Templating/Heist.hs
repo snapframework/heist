@@ -85,6 +85,7 @@ module Text.Templating.Heist
   , setTemplates
   , loadTemplates
   , hasTemplate
+  , addTemplatePathPrefix
 
     -- * Hook functions
     -- $hookDoc

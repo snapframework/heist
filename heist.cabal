@@ -1,5 +1,5 @@
 name:           heist
-version:        0.5.2
+version:        0.5.3
 synopsis:       An xhtml templating system
 description:    An xhtml templating system
 license:        BSD3
@@ -68,6 +68,7 @@ Library
     Text.Templating.Heist.Splices,
     Text.Templating.Heist.Splices.Apply,
     Text.Templating.Heist.Splices.Bind,
+    Text.Templating.Heist.Splices.BindStrict,
     Text.Templating.Heist.Splices.Cache,
     Text.Templating.Heist.Splices.Html,
     Text.Templating.Heist.Splices.Ignore,
@@ -80,7 +81,7 @@ Library
     Text.Templating.Heist.Types
 
   build-depends:
-    attoparsec >= 0.8.1 && < 0.9,
+    attoparsec >= 0.8.1 && < 0.10,
     attoparsec-text >= 0.8 && < 0.9,
     base >= 4 && < 5,
     blaze-builder >= 0.2 && <0.4,
