@@ -1,7 +1,6 @@
 module Text.Templating.Heist.Splices.Html where
 
 ------------------------------------------------------------------------------
-import           Data.List
 import           Data.Maybe
 import           Data.Text (Text)
 import qualified Text.XmlHtml as X

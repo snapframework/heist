@@ -3,7 +3,6 @@ module Text.Templating.Heist.Splices.Apply where
 ------------------------------------------------------------------------------
 import           Data.Maybe
 import           Data.Text (Text)
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Text.XmlHtml as X
 
@@ -26,6 +25,11 @@ applyAttr = "template"
 ------------------------------------------------------------------------------
 -- | Raw core of apply functionality.  This is abstracted for use in other
 -- places like an enhanced (from the original) bind
+rawApply :: (Monad m)
+         => [X.Node]
+         -> TPath
+         -> [X.Node]
+         -> TemplateMonad m Template
 rawApply calledNodes newContext paramNodes = do
     st <- getTS  -- Can't use localTS here because the modifier is not pure
     processedParams <- runNodeList paramNodes

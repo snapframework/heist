@@ -1,6 +1,7 @@
 module Text.Templating.Heist.Splices
   ( module Text.Templating.Heist.Splices.Apply
   , module Text.Templating.Heist.Splices.Bind
+  , module Text.Templating.Heist.Splices.Cache
   , module Text.Templating.Heist.Splices.Html
   , module Text.Templating.Heist.Splices.Ignore
   , module Text.Templating.Heist.Splices.Markdown
