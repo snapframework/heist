@@ -78,7 +78,7 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
 
         spliceResult <- run $ evalTemplateMonad (runNodeList template)
                                                 (X.TextNode "")
-                                                (emptyTemplateState ".")
+                                                emptyTemplateState
         assert $ result == spliceResult
 
 
@@ -98,19 +98,19 @@ monoidTest :: IO ()
 monoidTest = do
     H.assertBool "left monoid identity" $ mempty `mappend` es == es
     H.assertBool "right monoid identity" $ es `mappend` mempty == es
-  where es = (emptyTemplateState ".") :: TemplateState IO
+  where es = emptyTemplateState :: TemplateState IO
 
 
 ------------------------------------------------------------------------------
 addTest :: IO ()
 addTest = do
     H.assertEqual "lookup test" (Just []) $
-        fmap (X.docContent . fst) $ lookupTemplate "aoeu" ts
+        fmap (X.docContent . dfDoc . fst) $ lookupTemplate "aoeu" ts
 
     H.assertEqual "splice touched" 0 $ Map.size (_spliceMap ts)
 
   where
-    ts = addTemplate "aoeu" [] (mempty::TemplateState IO)
+    ts = addTemplate "aoeu" [] Nothing (mempty::TemplateState IO)
 
 
 ------------------------------------------------------------------------------
@@ -118,7 +118,7 @@ hasTemplateTest :: H.Assertion
 hasTemplateTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    let ts = setTemplates tm (emptyTemplateState ".") :: TemplateState IO
+    let ts = setTemplates tm emptyTemplateState :: TemplateState IO
     H.assertBool "hasTemplate ts" (hasTemplate "index" ts)
 
 
@@ -146,7 +146,7 @@ fsLoadTest :: H.Assertion
 fsLoadTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    let ts = setTemplates tm (emptyTemplateState ".") :: TemplateState IO
+    let ts = setTemplates tm emptyTemplateState :: TemplateState IO
     let f  = g ts
 
     f isNothing "abc/def/xyz"
@@ -272,9 +272,9 @@ bindParam = renderTest "bind_param" "<li>Hi there world</li>"
 -- | Markdown test on supplied text
 markdownTextTest :: H.Assertion
 markdownTextTest = do
-    result <- evalTemplateMonad (markdownSplice ".")
+    result <- evalTemplateMonad markdownSplice
                                 (X.TextNode "This *is* a test.")
-                                (emptyTemplateState ".")
+                                emptyTemplateState
     H.assertEqual "Markdown text" htmlExpected 
       (B.filter (/= '\n') $ toByteString $
         X.render (X.HtmlDocument X.UTF8 Nothing result))
@@ -283,7 +283,7 @@ markdownTextTest = do
 ------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
-    let es = (emptyTemplateState ".") :: TemplateState IO
+    let es = emptyTemplateState :: TemplateState IO
     res <- evalTemplateMonad applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
 
@@ -293,7 +293,7 @@ applyTest = do
 ------------------------------------------------------------------------------
 ignoreTest :: H.Assertion
 ignoreTest = do
-    let es = (emptyTemplateState ".") :: TemplateState IO
+    let es = emptyTemplateState :: TemplateState IO
     res <- evalTemplateMonad ignoreImpl
         (X.Element "ignore" [("tag", "ignorable")] 
           [X.TextNode "This should be ignored"]) es
@@ -302,7 +302,7 @@ ignoreTest = do
 
 --localTSTest :: H.Assertion
 --localTSTest = do
---    let es = (emptyTemplateState ".") :: TemplateState IO
+--    let es = emptyTemplateState :: TemplateState IO
 
 lookupTemplateTest = do
     ts <- loadTS "templates"
@@ -323,13 +323,13 @@ isLeft (Right _) = False
 
 ------------------------------------------------------------------------------
 loadT :: String -> IO (Either String (TemplateState IO))
-loadT s = loadTemplates s (emptyTemplateState s)
+loadT s = loadTemplates s emptyTemplateState
 
 
 ------------------------------------------------------------------------------
 loadTS :: FilePath -> IO (TemplateState IO)
 loadTS baseDir = do
-    etm <- loadTemplates baseDir $ emptyTemplateState baseDir
+    etm <- loadTemplates baseDir emptyTemplateState
     return $ either error id etm
 
 
@@ -483,7 +483,7 @@ instance Show Bind where
     , "Splice result:"
     , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $
         evalTemplateMonad (runNodeList $ buildBindTemplate b)
-                          (X.TextNode "") (emptyTemplateState ".")
+                          (X.TextNode "") emptyTemplateState
     , "Template:"
     , L.unpack $ L.concat $ map formatNode $ buildBindTemplate b
     ]
@@ -562,8 +562,9 @@ calcResult apply@(Apply name _ callee _ _) =
         (X.TextNode "") ts
 
   where ts = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
-                          (X.HtmlDocument X.UTF8 Nothing callee))
-                          (emptyTemplateState ".")
+                          (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
+                                        Nothing))
+                          emptyTemplateState
 
 
 

@@ -55,9 +55,14 @@ type MIMEType = ByteString
 type TPath = [ByteString]
 
 
+data DocumentFile = DocumentFile
+    { dfDoc  :: X.Document
+    , dfFile :: Maybe FilePath
+    } deriving (Eq)
+
 ------------------------------------------------------------------------------
 -- | All documents representing templates are stored in a map.
-type TemplateMap = Map TPath X.Document
+type TemplateMap = Map TPath DocumentFile
 
 
 ------------------------------------------------------------------------------
@@ -77,41 +82,44 @@ type SpliceMap m = Map Text (Splice m)
 -- @TemplateState@ in calls to @renderTemplate@.
 data TemplateState m = TemplateState {
     -- | A mapping of splice names to splice actions
-      _spliceMap      :: SpliceMap m
+      _spliceMap       :: SpliceMap m
     -- | A mapping of template names to templates
-    , _templateMap    :: TemplateMap
+    , _templateMap     :: TemplateMap
     -- | A flag to control splice recursion
-    , _recurse        :: Bool
+    , _recurse         :: Bool
     -- | The path to the template currently being processed.
-    , _curContext     :: TPath
+    , _curContext      :: TPath
     -- | A counter keeping track of the current recursion depth to prevent
     -- infinite loops.
-    , _recursionDepth :: Int
+    , _recursionDepth  :: Int
     -- | A hook run on all templates at load time.
-    , _onLoadHook     :: Template -> IO Template
+    , _onLoadHook      :: Template -> IO Template
     -- | A hook run on all templates just before they are rendered.
-    , _preRunHook     :: Template -> m Template
+    , _preRunHook      :: Template -> m Template
     -- | A hook run on all templates just after they are rendered.
-    , _postRunHook    :: Template -> m Template
+    , _postRunHook     :: Template -> m Template
     -- | The doctypes encountered during template processing.
-    , _doctypes       :: [X.DocType]
+    , _doctypes        :: [X.DocType]
+    -- | The full path to the current template's file on disk.
+    , _curTemplateFile :: Maybe FilePath
 }
 
 
 ------------------------------------------------------------------------------
 instance (Monad m) => Monoid (TemplateState m) where
     mempty = TemplateState Map.empty Map.empty True [] 0
-                           return return return []
+                           return return return [] Nothing
 
-    (TemplateState s1 t1 r1 _ d1 o1 b1 a1 dt1) `mappend`
-        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2 dt2) =
+    (TemplateState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1) `mappend`
+        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2) =
         TemplateState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
-            (dt1 `mappend` dt2)
+            (dt1 `mappend` dt2) ctf
       where
         s = s1 `mappend` s2
         t = t1 `mappend` t2
         r = r1 && r2
         d = max d1 d2
+        ctf = getLast $ Last ctf1 `mappend` Last ctf2
 
 
 ------------------------------------------------------------------------------
@@ -132,6 +140,7 @@ instance (Typeable1 m) => Typeable (TemplateState m) where
     typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
 
 
+{-# DEPRECATED TemplateMonad "NOTICE: The name TemplateMonad is being phased out in favor of the more appropriate HeistT.  Change your code now to prevent breakage in the future!" #-}
 ------------------------------------------------------------------------------
 -- | TemplateMonad is the monad used for 'Splice' processing.  TemplateMonad
 -- provides \"passthrough\" instances for many of the monads you might use in
@@ -141,6 +150,7 @@ newtype TemplateMonad m a = TemplateMonad {
                      -> TemplateState m
                      -> m (a, TemplateState m)
 }
+type HeistT = TemplateMonad
 
 
 ------------------------------------------------------------------------------

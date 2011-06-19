@@ -25,6 +25,7 @@ import           System.Process
 import           Text.XmlHtml
 
 ------------------------------------------------------------------------------
+import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Types
 
 data PandocMissingException = PandocMissingException
@@ -47,6 +48,15 @@ instance Show MarkdownException where
 instance Exception MarkdownException
 
 
+data NoMarkdownFileException = NoMarkdownFileException
+    deriving (Typeable)
+
+instance Show NoMarkdownFileException where
+    show NoMarkdownFileException =
+        "Markdown error: no file or template in context during processing of markdown tag"
+
+instance Exception NoMarkdownFileException where
+
 ------------------------------------------------------------------------------
 -- | Default name for the markdown splice.
 markdownTag :: Text
@@ -54,8 +64,9 @@ markdownTag = "markdown"
 
 ------------------------------------------------------------------------------
 -- | Implementation of the markdown splice.
-markdownSplice :: MonadIO m => FilePath -> Splice m
-markdownSplice templatePath = do
+markdownSplice :: MonadIO m => Splice m
+markdownSplice = do
+    templateDir <- liftM (fmap takeDirectory) getTemplateFilePath
     pdMD <- liftIO $ findExecutable "pandoc"
 
     when (isNothing pdMD) $ liftIO $ throwIO PandocMissingException
@@ -64,7 +75,9 @@ markdownSplice templatePath = do
     (source,markup) <- liftIO $
         case getAttribute "file" tree of
             Just f  -> do
-                m <- pandoc (fromJust pdMD) templatePath $ T.unpack f
+                m <- maybe (liftIO $ throwIO NoMarkdownFileException )
+                           (\tp -> pandoc (fromJust pdMD) tp $ T.unpack f)
+                           templateDir
                 return (T.unpack f,m)
             Nothing -> do
                 m <- pandocBS (fromJust pdMD) $ T.encodeUtf8 $ nodeText tree
@@ -78,7 +91,7 @@ markdownSplice templatePath = do
 
 
 pandoc :: FilePath -> FilePath -> FilePath -> IO ByteString
-pandoc pandocPath templatePath inputFile = do
+pandoc pandocPath templateDir inputFile = do
     (ex, sout, serr) <- readProcessWithExitCode' pandocPath args ""
 
     when (isFail ex) $ throw $ MarkdownException serr
@@ -90,7 +103,7 @@ pandoc pandocPath templatePath inputFile = do
     isFail ExitSuccess = False
     isFail _           = True
 
-    args = [ "-S", "--no-wrap", templatePath </> inputFile ]
+    args = [ "-S", "--no-wrap", templateDir </> inputFile ]
 
 
 pandocBS :: FilePath -> ByteString -> IO ByteString

@@ -13,7 +13,7 @@
   of as functions that transform a node into a list of nodes.  Heist then
   substitutes the resulting list of nodes into your template in place of the
   input node.  'Splice' is implemented as a type synonym @type Splice m =
-  TemplateMonad m [Node]@, and 'TemplateMonad' has a function 'getParamNode'
+  HeistT m [Node]@, and 'HeistT' has a function 'getParamNode'
   that lets you get the input node.
 
   Suppose you have a place on your page where you want to display a link with
@@ -73,6 +73,7 @@ module Text.Templating.Heist
   , MIMEType
   , Splice
   , TemplateMonad
+  , HeistT
   , TemplateState
 
     -- * Functions and declarations on TemplateState values
@@ -93,11 +94,12 @@ module Text.Templating.Heist
   , addPreRunHook
   , addPostRunHook
 
-    -- * TemplateMonad functions
+    -- * HeistT functions
   , stopRecursion
   , getParamNode
   , runNodeList
   , getContext
+  , getTemplateFilePath
 
   , localParamNode
   , getsTS
@@ -140,12 +142,12 @@ import           Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | The default set of built-in splices.
-defaultSpliceMap :: MonadIO m => FilePath -> SpliceMap m
-defaultSpliceMap templatePath = Map.fromList
+defaultSpliceMap :: MonadIO m => SpliceMap m
+defaultSpliceMap = Map.fromList
     [(applyTag, applyImpl)
     ,(bindTag, bindImpl)
     ,(ignoreTag, ignoreImpl)
-    ,(markdownTag, markdownSplice templatePath)
+    ,(markdownTag, markdownSplice)
     ]
 
 
@@ -153,10 +155,10 @@ defaultSpliceMap templatePath = Map.fromList
 -- | An empty template state, with Heist's default splices (@\<apply\>@,
 -- @\<bind\>@, @\<ignore\>@, and @\<markdown\>@) mapped.  The static tag is
 -- not mapped here because it must be mapped manually in your application.
-emptyTemplateState :: MonadIO m => FilePath -> TemplateState m
-emptyTemplateState templatePath =
-    TemplateState (defaultSpliceMap templatePath) Map.empty
-                  True [] 0 return return return []
+emptyTemplateState :: MonadIO m => TemplateState m
+emptyTemplateState =
+    TemplateState (defaultSpliceMap) Map.empty True [] 0
+                  return return return [] Nothing
 
 
 -- $hookDoc

@@ -29,7 +29,7 @@ rawApply :: (Monad m)
          => [X.Node]
          -> TPath
          -> [X.Node]
-         -> TemplateMonad m Template
+         -> HeistT m Template
 rawApply calledNodes newContext paramNodes = do
     st <- getTS  -- Can't use localTS here because the modifier is not pure
     processedParams <- runNodeList paramNodes
@@ -48,8 +48,8 @@ applyNodes nodes template = do
     st <- getTS
     maybe (return []) -- TODO: error handling
           (\(t,ctx) -> do
-              addDoctype $ maybeToList $ X.docType t
-              rawApply (X.docContent t) ctx nodes)
+              addDoctype $ maybeToList $ X.docType $ dfDoc t
+              rawApply (X.docContent $ dfDoc t) ctx nodes)
           (lookupTemplate (T.encodeUtf8 template) st)
 
 

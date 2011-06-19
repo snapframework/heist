@@ -35,7 +35,7 @@ import             Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
-addDoctype :: Monad m => [X.DocType] -> TemplateMonad m ()
+addDoctype :: Monad m => [X.DocType] -> HeistT m ()
 addDoctype dt = do
     modifyTS (\s -> s { _doctypes = _doctypes s `mappend` dt })
 
@@ -91,6 +91,13 @@ bindSplices :: Monad m =>
 bindSplices ss ts = foldl' (flip id) ts acts
   where
     acts = map (uncurry bindSplice) ss
+
+
+------------------------------------------------------------------------------
+-- | Sets the current template file.
+setCurTemplateFile :: Monad m
+                   => Maybe FilePath -> TemplateState m -> TemplateState m
+setCurTemplateFile fp ts = ts { _curTemplateFile = fp }
 
 
 ------------------------------------------------------------------------------
@@ -195,7 +202,7 @@ splitTemplatePath = splitPathWith '/'
 singleLookup :: TemplateMap
              -> TPath
              -> ByteString
-             -> Maybe (X.Document, TPath)
+             -> Maybe (DocumentFile, TPath)
 singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 
 
@@ -205,7 +212,7 @@ singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
 traversePath :: TemplateMap
              -> TPath
              -> ByteString
-             -> Maybe (X.Document, TPath)
+             -> Maybe (DocumentFile, TPath)
 traversePath tm [] name = fmap (\a -> (a,[])) (Map.lookup [name] tm)
 traversePath tm path name =
     singleLookup tm path name `mplus`
@@ -226,7 +233,7 @@ hasTemplate nameStr ts = isJust $ lookupTemplate nameStr ts
 lookupTemplate :: Monad m =>
                   ByteString
                -> TemplateState m
-               -> Maybe (X.Document, TPath)
+               -> Maybe (DocumentFile, TPath)
 lookupTemplate nameStr ts =
     f (_templateMap ts) path name
   where (name:p) = case splitTemplatePath nameStr of
@@ -249,7 +256,7 @@ setTemplates m ts = ts { _templateMap = m }
 -- | Adds a template to the template state.
 insertTemplate :: Monad m =>
                TPath
-            -> X.Document
+            -> DocumentFile
             -> TemplateState m
             -> TemplateState m
 insertTemplate p t st =
@@ -258,24 +265,38 @@ insertTemplate p t st =
 
 ------------------------------------------------------------------------------
 -- | Adds an HTML format template to the template state.
-addTemplate :: Monad m =>
-               ByteString
+addTemplate :: Monad m
+            -- | Path that the template will be referenced by
+            => ByteString
+            -- | The template's DOM nodes
             -> Template
+            -- | An optional path to the actual file on disk where the
+            -- template is stored
+            -> Maybe FilePath
             -> TemplateState m
             -> TemplateState m
-addTemplate n t st = insertTemplate (splitTemplatePath n)
-                                    (X.HtmlDocument X.UTF8 Nothing t) st
+addTemplate n t mfp st =
+    insertTemplate (splitTemplatePath n) doc st
+  where
+    doc = DocumentFile (X.HtmlDocument X.UTF8 Nothing t) mfp
 
 
 ------------------------------------------------------------------------------
 -- | Adds an XML format template to the template state.
-addXMLTemplate :: Monad m =>
-                  ByteString
+addXMLTemplate :: Monad m
+               -- | Path that the template will be referenced by
+               => ByteString
+               -- | The template's DOM nodes
                -> Template
+               -- | An optional path to the actual file on disk where the
+               -- template is stored
+               -> Maybe FilePath
                -> TemplateState m
                -> TemplateState m
-addXMLTemplate n t st = insertTemplate (splitTemplatePath n)
-                                       (X.XmlDocument X.UTF8 Nothing t) st
+addXMLTemplate n t mfp st =
+    insertTemplate (splitTemplatePath n) doc st
+  where
+    doc = DocumentFile (X.XmlDocument X.UTF8 Nothing t) mfp
 
 
 ------------------------------------------------------------------------------
@@ -292,20 +313,28 @@ addXMLTemplate n t st = insertTemplate (splitTemplatePath n)
 -- splice will result in a list of nodes @L@.  Normally @foo@ will recursively
 -- scan @L@ for splices and run them.  If @foo@ calls @stopRecursion@, @L@
 -- will be included in the output verbatim without running any splices.
-stopRecursion :: Monad m => TemplateMonad m ()
+stopRecursion :: Monad m => HeistT m ()
 stopRecursion = modifyTS (\st -> st { _recurse = False })
 
 
 ------------------------------------------------------------------------------
 -- | Sets the current context
-setContext :: Monad m => TPath -> TemplateMonad m ()
+setContext :: Monad m => TPath -> HeistT m ()
 setContext c = modifyTS (\st -> st { _curContext = c })
 
 
 ------------------------------------------------------------------------------
 -- | Gets the current context
-getContext :: Monad m => TemplateMonad m TPath
+getContext :: Monad m => HeistT m TPath
 getContext = getsTS _curContext
+
+
+------------------------------------------------------------------------------
+-- | Gets the full path to the file holding the template currently being
+-- processed.  Returns Nothing if the template is not associated with a file
+-- on disk or if there is no template being processed.
+getTemplateFilePath :: Monad m => HeistT m (Maybe FilePath)
+getTemplateFilePath = getsTS _curTemplateFile
 
 
 ------------------------------------------------------------------------------
@@ -326,7 +355,7 @@ runNode n                    = return [n]
 ------------------------------------------------------------------------------
 -- | Helper function for substituting a parsed attribute into an attribute
 -- tuple.
-attSubst :: (Monad m) => (t, Text) -> TemplateMonad m (t, Text)
+attSubst :: (Monad m) => (t, Text) -> HeistT m (t, Text)
 attSubst (n,v) = do
     v' <- parseAtt v
     return (n,v')
@@ -335,7 +364,7 @@ attSubst (n,v) = do
 ------------------------------------------------------------------------------
 -- | Parses an attribute for any identifier expressions and performs
 -- appropriate substitution.
-parseAtt :: (Monad m) => Text -> TemplateMonad m Text
+parseAtt :: (Monad m) => Text -> HeistT m Text
 parseAtt bs = do
     let ast = case AP.feed (AP.parse attParser bs) "" of
             (AP.Fail _ _ _) -> []
@@ -390,7 +419,7 @@ attParser = AP.many1 (identParser <|> litParser)
 -- it would be for the former user to accept that
 -- \"some \<b\>text\<\/b\> foobar\" is being rendered as \"some \" because
 -- it's \"more intuitive\".
-getAttributeSplice :: Monad m => Text -> TemplateMonad m Text
+getAttributeSplice :: Monad m => Text -> HeistT m Text
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) getTS
     nodes <- maybe (return []) id s
@@ -422,37 +451,39 @@ recurseSplice node splice = do
                 return res
         else return result
   where
-    modRecursionDepth :: Monad m => (Int -> Int) -> TemplateMonad m ()
+    modRecursionDepth :: Monad m => (Int -> Int) -> HeistT m ()
     modRecursionDepth f =
         modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
 
 ------------------------------------------------------------------------------
--- | Looks up a template name runs a TemplateMonad computation on it.
+-- | Looks up a template name runs a 'HeistT' computation on it.
 lookupAndRun :: Monad m
              => ByteString
-             -> ((X.Document, TPath) -> TemplateMonad m (Maybe a))
-             -> TemplateMonad m (Maybe a)
+             -> ((DocumentFile, TPath) -> HeistT m (Maybe a))
+             -> HeistT m (Maybe a)
 lookupAndRun name k = do
     ts <- getTS
-    maybe (return Nothing) k
-          (lookupTemplate name ts)
+    let mt = lookupTemplate name ts
+    let curPath = join $ fmap (dfFile . fst) mt
+    modifyTS (setCurTemplateFile curPath)
+    maybe (return Nothing) k mt
 
 
 ------------------------------------------------------------------------------
 -- | Looks up a template name evaluates it by calling runNodeList.
 evalTemplate :: Monad m
             => ByteString
-            -> TemplateMonad m (Maybe Template)
+            -> HeistT m (Maybe Template)
 evalTemplate name = lookupAndRun name
     (\(t,ctx) -> localTS (\ts -> ts {_curContext = ctx})
-                         (liftM Just $ runNodeList $ X.docContent t))
+                         (liftM Just $ runNodeList $ X.docContent $ dfDoc t))
 
 
 ------------------------------------------------------------------------------
--- | Sets the document type of a 'X.Document' based on the 'TemplateMonad'
+-- | Sets the document type of a 'X.Document' based on the 'HeistT'
 -- value.
-fixDocType :: Monad m => X.Document -> TemplateMonad m X.Document
+fixDocType :: Monad m => X.Document -> HeistT m X.Document
 fixDocType d = do
     dts <- getsTS _doctypes
     return $ d { X.docType = listToMaybe dts }
@@ -464,16 +495,16 @@ fixDocType d = do
 -- top level.
 evalWithHooksInternal :: Monad m
                       => ByteString
-                      -> TemplateMonad m (Maybe X.Document)
+                      -> HeistT m (Maybe X.Document)
 evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
-    addDoctype $ maybeToList $ X.docType t
+    addDoctype $ maybeToList $ X.docType $ dfDoc t
     ts <- getTS
-    nodes <- lift $ _preRunHook ts $ X.docContent t
+    nodes <- lift $ _preRunHook ts $ X.docContent $ dfDoc t
     putTS (ts {_curContext = ctx})
     res <- runNodeList nodes
     restoreTS ts
     newNodes <- lift (_postRunHook ts res)
-    newDoc   <- fixDocType $ t { X.docContent = newNodes }
+    newDoc   <- fixDocType $ (dfDoc t) { X.docContent = newNodes }
     return (Just newDoc)
 
 
@@ -482,7 +513,7 @@ evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
 -- executes pre- and post-run hooks and adds the doctype.
 evalWithHooks :: Monad m
             => ByteString
-            -> TemplateMonad m (Maybe Template)
+            -> HeistT m (Maybe Template)
 evalWithHooks name = liftM (liftM X.docContent) (evalWithHooksInternal name)
 
 
@@ -513,7 +544,7 @@ callTemplate :: Monad m
              => ByteString     -- ^ The name of the template
              -> [(Text, Text)] -- ^ Association list of
                                -- (name,value) parameter pairs
-             -> TemplateMonad m (Maybe Template)
+             -> HeistT m (Maybe Template)
 callTemplate name params = do
     modifyTS $ bindStrings params
     evalTemplate name
@@ -575,32 +606,26 @@ type ParserFun = String -> ByteString -> Either String X.Document
 
 ------------------------------------------------------------------------------
 -- | Reads an HTML or XML template from disk.
-getDocWith :: ParserFun -> String -> IO (Either String X.Document)
+getDocWith :: ParserFun -> String -> IO (Either String DocumentFile)
 getDocWith parser f = do
     bs <- catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
 
-    let d = either Left (parser f) bs
-    return $ mapLeft (\s -> f ++ " " ++ s) d
+    let eitherDoc = either Left (parser f) bs
+    return $ either (\s -> Left $ f ++ " " ++ s)
+                    (\d -> Right $ DocumentFile d (Just f)) eitherDoc
 
 
 ------------------------------------------------------------------------------
 -- | Reads an HTML template from disk.
-getDoc :: String -> IO (Either String X.Document)
+getDoc :: String -> IO (Either String DocumentFile)
 getDoc = getDocWith X.parseHTML
 
 
 ------------------------------------------------------------------------------
 -- | Reads an XML template from disk.
-getXMLDoc :: String -> IO (Either String X.Document)
+getXMLDoc :: String -> IO (Either String DocumentFile)
 getXMLDoc = getDocWith X.parseHTML
-
-
-------------------------------------------------------------------------------
-mapLeft :: (a -> b) -> Either a c -> Either b c
-mapLeft g = either (Left . g) Right
-mapRight :: (b -> c) -> Either a b -> Either a c
-mapRight g = either Left (Right . g)
 
 
 ------------------------------------------------------------------------------
@@ -608,7 +633,7 @@ mapRight g = either Left (Right . g)
 -- template is only loaded if it has a ".tpl" or ".xtpl" extension.
 loadTemplate :: String -- ^ path of the template root
              -> String -- ^ full file path (includes the template root)
-             -> IO [Either String (TPath, X.Document)] --TemplateMap
+             -> IO [Either String (TPath, DocumentFile)] --TemplateMap
 loadTemplate templateRoot fname
     | isHTMLTemplate = do
         c <- getDoc fname
@@ -642,19 +667,19 @@ loadTemplates dir ts = do
 
 
 ------------------------------------------------------------------------------
--- | Reversed list of directories.  This holds the path to the template
+-- | Runs a template modifying function on a DocumentFile.
 runHook :: Monad m => (Template -> m Template)
-        -> X.Document
-        -> m X.Document
+        -> DocumentFile
+        -> m DocumentFile
 runHook f t = do
-    n <- f $ X.docContent t
-    return $ t { X.docContent = n }
+    n <- f $ X.docContent $ dfDoc t
+    return $ t { dfDoc = (dfDoc t) { X.docContent = n } }
 
 
 ------------------------------------------------------------------------------
--- | Runs the onLoad hook on the template and returns the `TemplateState`
+-- | Runs the onLoad hook on the template and returns the 'TemplateState'
 -- with the result inserted.
-loadHook :: Monad m => TemplateState m -> (TPath, X.Document)
+loadHook :: Monad m => TemplateState m -> (TPath, DocumentFile)
          -> IO (TemplateState m)
 loadHook ts (tp, t) = do
     t' <- runHook (_onLoadHook ts) t
@@ -662,11 +687,14 @@ loadHook ts (tp, t) = do
 
 
 ------------------------------------------------------------------------------
--- | 
-addTemplatePathPrefix :: ByteString
-                      -> TemplateState m -> TemplateState m
-addTemplatePathPrefix dir ts =
-    ts { _templateMap = Map.mapKeys f $ _templateMap ts }
+-- | Adds a path prefix to all the templates in the 'TemplateState'.  If you
+-- want to add multiple levels of directories, separate them with slashes as
+-- in "foo/bar".  Using an empty string as a path prefix will leave the
+-- 'TemplateState' unchanged.
+addTemplatePathPrefix :: ByteString -> TemplateState m -> TemplateState m
+addTemplatePathPrefix dir ts
+  | B.null dir = ts
+  | otherwise  = ts { _templateMap = Map.mapKeys f $ _templateMap ts }
   where
-    f ps = ps ++ [dir]
+    f ps = ps++splitTemplatePath dir
 
