@@ -266,13 +266,13 @@ insertTemplate p t st =
 ------------------------------------------------------------------------------
 -- | Adds an HTML format template to the template state.
 addTemplate :: Monad m
-            -- | Path that the template will be referenced by
             => ByteString
-            -- | The template's DOM nodes
+            -- ^ Path that the template will be referenced by
             -> Template
-            -- | An optional path to the actual file on disk where the
-            -- template is stored
+            -- ^ The template's DOM nodes
             -> Maybe FilePath
+            -- ^ An optional path to the actual file on disk where the
+            -- template is stored
             -> TemplateState m
             -> TemplateState m
 addTemplate n t mfp st =
@@ -284,13 +284,13 @@ addTemplate n t mfp st =
 ------------------------------------------------------------------------------
 -- | Adds an XML format template to the template state.
 addXMLTemplate :: Monad m
-               -- | Path that the template will be referenced by
                => ByteString
-               -- | The template's DOM nodes
+               -- ^ Path that the template will be referenced by
                -> Template
-               -- | An optional path to the actual file on disk where the
-               -- template is stored
+               -- ^ The template's DOM nodes
                -> Maybe FilePath
+               -- ^ An optional path to the actual file on disk where the
+               -- template is stored
                -> TemplateState m
                -> TemplateState m
 addXMLTemplate n t mfp st =
