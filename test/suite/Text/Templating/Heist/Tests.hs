@@ -333,6 +333,17 @@ loadTS baseDir = do
     return $ either error id etm
 
 
+testTemplate tname = do
+    ts <- loadTS "templates"
+    Just (resDoc, _) <- renderTemplate ts tname
+    return $ toByteString resDoc
+
+
+testTemplateEval tname = do
+    ts <- loadTS "templates"
+    evalTemplateMonad (evalWithHooks tname) (X.TextNode "") ts
+
+
 ------------------------------------------------------------------------------
 identStartChar :: [Char]
 identStartChar = ['a'..'z']
