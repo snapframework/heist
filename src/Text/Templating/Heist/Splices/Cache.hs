@@ -27,8 +27,10 @@ import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Types
 
 
+------------------------------------------------------------------------------
 cacheTagName :: Text
 cacheTagName = "cache"
+
 
 ------------------------------------------------------------------------------
 -- | State for storing cache tag information
@@ -85,7 +87,7 @@ cacheImpl (CTS mv) = do
                    case mbn of
                        Nothing -> reload
                        (Just (lastUpdate,n)) -> do
-                           if ttl > 0 &&
+                           if ttl > 0 && tagName tree == Just cacheTagName
                               diffUTCTime curTime lastUpdate > fromIntegral ttl
                              then reload
                              else do
@@ -108,8 +110,12 @@ mkCacheTag = do
     sr <- newIORef $ Set.empty
     mv <- liftM CTS $ newMVar Map.empty
 
-    return $ (addOnLoadHook (assignIds sr) .
-              bindSplice cacheTagName (cacheImpl mv), mv)
+    return $ ( addOnLoadHook (assignIds sr) .
+               -- The cache tag allows the ttl attribute.
+               bindSplice cacheTagName (cacheImpl mv) .
+               -- Like the old static tag...does not allow ttl
+               bindSplice "static" (cacheImpl mv)
+             , mv)
 
   where
     generateId :: IO Int
