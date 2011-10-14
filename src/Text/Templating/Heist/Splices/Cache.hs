@@ -87,7 +87,7 @@ cacheImpl (CTS mv) = do
                    case mbn of
                        Nothing -> reload
                        (Just (lastUpdate,n)) -> do
-                           if ttl > 0 && tagName tree == Just cacheTagName
+                           if ttl > 0 && tagName tree == Just cacheTagName &&
                               diffUTCTime curTime lastUpdate > fromIntegral ttl
                              then reload
                              else do
