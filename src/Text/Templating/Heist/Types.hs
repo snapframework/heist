@@ -23,11 +23,12 @@ module Text.Templating.Heist.Types where
 ------------------------------------------------------------------------------
 import             Control.Applicative
 import             Control.Arrow
-import             Control.Monad.CatchIO
 import             Control.Monad.Cont
 import             Control.Monad.Error
+import             Control.Monad.IO.Control
 import             Control.Monad.Reader
 import             Control.Monad.State
+import             Control.Monad.Trans.Control
 import             Data.ByteString.Char8 (ByteString)
 import qualified   Data.Map as Map
 import             Data.Map (Map)
@@ -203,14 +204,12 @@ instance MonadTrans TemplateMonad where
 
 
 ------------------------------------------------------------------------------
--- | MonadCatchIO instance
-instance MonadCatchIO m => MonadCatchIO (TemplateMonad m) where
-    catch (TemplateMonad a) h = TemplateMonad $ \r s -> do
-       let handler e = runTemplateMonad (h e) r s
-       catch (a r s) handler
-    block (TemplateMonad m) = TemplateMonad $ \r s -> block (m r s)
-    unblock (TemplateMonad m) = TemplateMonad $ \r s -> unblock (m r s)
+-- | MonadControlIO instance
+instance MonadControlIO m => MonadControlIO (TemplateMonad m) where
+  liftControlIO = liftLiftControlBase liftControlIO
 
+instance MonadTransControl TemplateMonad where
+    liftControl f = undefined
 
 ------------------------------------------------------------------------------
 -- | MonadFix passthrough instance

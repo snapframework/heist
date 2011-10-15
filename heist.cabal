@@ -90,7 +90,7 @@ Library
     directory,
     directory-tree,
     filepath,
-    MonadCatchIO-transformers >= 0.2.1 && < 0.3,
+    monad-control >= 0.2,
     mtl >= 2.0 && < 2.1,
     process,
     random,

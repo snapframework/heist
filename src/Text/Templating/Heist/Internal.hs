@@ -8,9 +8,8 @@ module Text.Templating.Heist.Internal where
 import             Blaze.ByteString.Builder
 import             Control.Applicative
 import             Control.Arrow
-import             Control.Exception (SomeException)
 import             Control.Monad
-import             Control.Monad.CatchIO
+import             Control.Exception.Control
 import             Control.Monad.Trans
 import qualified   Data.Attoparsec.Text as AP
 import             Data.ByteString (ByteString)
