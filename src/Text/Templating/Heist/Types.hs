@@ -4,6 +4,8 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
 
 {-|
 
@@ -218,15 +220,20 @@ newtype TemplateMonad m a = TemplateMonad {
 
  - -}
 instance MonadTransControl TemplateMonad where
+    liftControl = liftControl'
+      where
+        liftControl' :: Monad m => (Run TemplateMonad -> m a) -> TemplateMonad m a
+        liftControl' f =
+          TemplateMonad $ \xn ts ->
+              let run :: forall n o b. (Monad n, Monad o, Monad (TemplateMonad o))
+                      => TemplateMonad n b -> n (TemplateMonad o b)
+                  run t = liftM (\(nd, ts') -> TemplateMonad
+                                     $ \_ _ -> return (nd, ts'))
+                                undefined -- (runTemplateMonad t xn ts)
+              in  liftM (\x -> (x, ts)) (f run)
 -- liftControl :: Monad m => (Run TemplateMonad -> m a) -> TemplateMonad m a
 -- type Run t = forall n o b. (Monad n, Monad o, Monad (TemplateMonad o))
 --            => TemplateMonad n b -> n (TemplateMonad o b)
-    liftControl f =
-        TemplateMonad $ \xn ts ->
-            let run t = liftM (\(nd, ts') -> TemplateMonad
-                                   $ \_ _ -> return (nd, ts'))
-                               (runTemplateMonad t xn ts)
-            in  undefined -- liftM (\x -> (x, ts)) (f run)
 
 ------------------------------------------------------------------------------
 -- | MonadFix passthrough instance
