@@ -206,10 +206,27 @@ instance MonadTrans TemplateMonad where
 ------------------------------------------------------------------------------
 -- | MonadControlIO instance
 instance MonadControlIO m => MonadControlIO (TemplateMonad m) where
-  liftControlIO = liftLiftControlBase liftControlIO
+    liftControlIO = liftLiftControlBase liftControlIO
 
+{-
+ -
+newtype TemplateMonad m a = TemplateMonad {
+    runTemplateMonad :: X.Node
+                     -> TemplateState m
+                     -> m (a, TemplateState m)
+}
+
+ - -}
 instance MonadTransControl TemplateMonad where
-    liftControl f = undefined
+-- liftControl :: Monad m => (Run TemplateMonad -> m a) -> TemplateMonad m a
+-- type Run t = forall n o b. (Monad n, Monad o, Monad (TemplateMonad o))
+--            => TemplateMonad n b -> n (TemplateMonad o b)
+    liftControl f =
+        TemplateMonad $ \xn ts ->
+            let run t = liftM (\(nd, ts') -> TemplateMonad
+                                   $ \_ _ -> return (nd, ts'))
+                               (runTemplateMonad t xn ts)
+            in  undefined -- liftM (\x -> (x, ts)) (f run)
 
 ------------------------------------------------------------------------------
 -- | MonadFix passthrough instance
