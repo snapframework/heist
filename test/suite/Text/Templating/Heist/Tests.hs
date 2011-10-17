@@ -309,7 +309,7 @@ lookupTemplateTest = do
     let k = do
             setContext ["foo"]
             getsTS $ lookupTemplate "/user/menu"
-    res <- runTemplateMonad k (X.TextNode "") ts
+    res <- runHeistT k (X.TextNode "") ts
     H.assertBool "lookup context test" $ isJust $ fst res
 
 

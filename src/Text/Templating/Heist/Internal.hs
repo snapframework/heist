@@ -34,7 +34,7 @@ import             Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
-addDoctype :: Monad m => [X.DocType] -> HeistT (TemplateState m) m ()
+addDoctype :: Monad m => [X.DocType] -> TemplateHeistT m ()
 addDoctype dt = do
     modifyTS (\s -> s { _doctypes = _doctypes s `mappend` dt })
 
@@ -312,19 +312,19 @@ addXMLTemplate n t mfp st =
 -- splice will result in a list of nodes @L@.  Normally @foo@ will recursively
 -- scan @L@ for splices and run them.  If @foo@ calls @stopRecursion@, @L@
 -- will be included in the output verbatim without running any splices.
-stopRecursion :: Monad m => HeistT (TemplateState m) m ()
+stopRecursion :: Monad m => TemplateHeistT m ()
 stopRecursion = modifyTS (\st -> st { _recurse = False })
 
 
 ------------------------------------------------------------------------------
 -- | Sets the current context
-setContext :: Monad m => TPath -> HeistT (TemplateState m) m ()
+setContext :: Monad m => TPath -> TemplateHeistT m ()
 setContext c = modifyTS (\st -> st { _curContext = c })
 
 
 ------------------------------------------------------------------------------
 -- | Gets the current context
-getContext :: Monad m => HeistT (TemplateState m) m TPath
+getContext :: Monad m => TemplateHeistT m TPath
 getContext = getsTS _curContext
 
 
@@ -332,7 +332,7 @@ getContext = getsTS _curContext
 -- | Gets the full path to the file holding the template currently being
 -- processed.  Returns Nothing if the template is not associated with a file
 -- on disk or if there is no template being processed.
-getTemplateFilePath :: Monad m => HeistT (TemplateState m) m (Maybe FilePath)
+getTemplateFilePath :: Monad m => TemplateHeistT m (Maybe FilePath)
 getTemplateFilePath = getsTS _curTemplateFile
 
 
@@ -354,7 +354,7 @@ runNode n                    = return [n]
 ------------------------------------------------------------------------------
 -- | Helper function for substituting a parsed attribute into an attribute
 -- tuple.
-attSubst :: (Monad m) => (t, Text) -> HeistT (TemplateState m) m (t, Text)
+attSubst :: (Monad m) => (t, Text) -> TemplateHeistT m (t, Text)
 attSubst (n,v) = do
     v' <- parseAtt v
     return (n,v')
@@ -363,7 +363,7 @@ attSubst (n,v) = do
 ------------------------------------------------------------------------------
 -- | Parses an attribute for any identifier expressions and performs
 -- appropriate substitution.
-parseAtt :: (Monad m) => Text -> HeistT (TemplateState m) m Text
+parseAtt :: (Monad m) => Text -> TemplateHeistT m Text
 parseAtt bs = do
     let ast = case AP.feed (AP.parse attParser bs) "" of
             (AP.Fail _ _ _) -> []
@@ -418,7 +418,7 @@ attParser = AP.many1 (identParser <|> litParser)
 -- it would be for the former user to accept that
 -- \"some \<b\>text\<\/b\> foobar\" is being rendered as \"some \" because
 -- it's \"more intuitive\".
-getAttributeSplice :: Monad m => Text -> HeistT (TemplateState m) m Text
+getAttributeSplice :: Monad m => Text -> TemplateHeistT m Text
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) getTS
     nodes <- maybe (return []) id s
@@ -450,7 +450,7 @@ recurseSplice node splice = do
                 return res
         else return result
   where
-    modRecursionDepth :: Monad m => (Int -> Int) -> HeistT (TemplateState m) m ()
+    modRecursionDepth :: Monad m => (Int -> Int) -> TemplateHeistT m ()
     modRecursionDepth f =
         modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
@@ -459,8 +459,8 @@ recurseSplice node splice = do
 -- | Looks up a template name runs a 'HeistT' computation on it.
 lookupAndRun :: Monad m
              => ByteString
-             -> ((DocumentFile, TPath) -> HeistT (TemplateState m) m (Maybe a))
-             -> HeistT (TemplateState m) m (Maybe a)
+             -> ((DocumentFile, TPath) -> TemplateHeistT m (Maybe a))
+             -> TemplateHeistT m (Maybe a)
 lookupAndRun name k = do
     ts <- getTS
     let mt = lookupTemplate name ts
@@ -473,7 +473,7 @@ lookupAndRun name k = do
 -- | Looks up a template name evaluates it by calling runNodeList.
 evalTemplate :: Monad m
             => ByteString
-            -> HeistT (TemplateState m) m (Maybe Template)
+            -> TemplateHeistT m (Maybe Template)
 evalTemplate name = lookupAndRun name
     (\(t,ctx) -> localTS (\ts -> ts {_curContext = ctx})
                          (liftM Just $ runNodeList $ X.docContent $ dfDoc t))
@@ -482,7 +482,7 @@ evalTemplate name = lookupAndRun name
 ------------------------------------------------------------------------------
 -- | Sets the document type of a 'X.Document' based on the 'HeistT'
 -- value.
-fixDocType :: Monad m => X.Document -> HeistT (TemplateState m) m X.Document
+fixDocType :: Monad m => X.Document -> TemplateHeistT m X.Document
 fixDocType d = do
     dts <- getsTS _doctypes
     return $ d { X.docType = listToMaybe dts }
@@ -494,7 +494,7 @@ fixDocType d = do
 -- top level.
 evalWithHooksInternal :: Monad m
                       => ByteString
-                      -> HeistT (TemplateState m) m (Maybe X.Document)
+                      -> TemplateHeistT m (Maybe X.Document)
 evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
     addDoctype $ maybeToList $ X.docType $ dfDoc t
     ts <- getTS
@@ -512,7 +512,7 @@ evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
 -- executes pre- and post-run hooks and adds the doctype.
 evalWithHooks :: Monad m
             => ByteString
-            -> HeistT (TemplateState m) m (Maybe Template)
+            -> TemplateHeistT m (Maybe Template)
 evalWithHooks name = liftM (liftM X.docContent) (evalWithHooksInternal name)
 
 
@@ -543,7 +543,7 @@ callTemplate :: Monad m
              => ByteString     -- ^ The name of the template
              -> [(Text, Text)] -- ^ Association list of
                                -- (name,value) parameter pairs
-             -> HeistT (TemplateState m) m (Maybe Template)
+             -> TemplateHeistT m (Maybe Template)
 callTemplate name params = do
     modifyTS $ bindStrings params
     evalTemplate name
