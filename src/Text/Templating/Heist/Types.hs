@@ -155,8 +155,8 @@ type TemplateHeistT m a = HeistT (TemplateState m) m a
 
 newtype HeistT ts m a = HeistT {
     runHeistT :: X.Node
-                     -> ts
-                     -> m (a, ts)
+              -> ts
+              -> m (a, ts)
 }
 
 
@@ -219,6 +219,7 @@ instance MonadTransControl (HeistT ts) where
             let run t = liftM (\(nd, ts') -> HeistT $ \_ _ -> return (nd, ts'))
                               (runHeistT t xn ts)
             in  liftM (\x -> (x, ts)) (f run)
+
 
 ------------------------------------------------------------------------------
 -- | MonadFix passthrough instance
