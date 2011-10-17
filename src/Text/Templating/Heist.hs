@@ -13,7 +13,7 @@
   of as functions that transform a node into a list of nodes.  Heist then
   substitutes the resulting list of nodes into your template in place of the
   input node.  'Splice' is implemented as a type synonym @type Splice m =
-  HeistT m [Node]@, and 'HeistT' has a function 'getParamNode'
+  NST m [Node]@, and 'NST' has a function 'getParamNode'
   that lets you get the input node.
 
   Suppose you have a place on your page where you want to display a link with
@@ -73,7 +73,7 @@ module Text.Templating.Heist
   , MIMEType
   , Splice
   , TemplateMonad
-  , HeistT
+  , NST
   , TemplateState
 
     -- * Functions and declarations on TemplateState values
@@ -94,7 +94,7 @@ module Text.Templating.Heist
   , addPreRunHook
   , addPostRunHook
 
-    -- * HeistT functions
+    -- * NST functions
   , stopRecursion
   , getParamNode
   , runNodeList

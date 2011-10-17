@@ -71,7 +71,7 @@ parseTTL s = value * multiplier
 -- clearCacheTagState.
 cacheImpl :: (MonadIO m)
            => CacheTagState
-           -> TemplateHeistT m Template
+           -> HeistT m Template
 cacheImpl (CTS mv) = do
     tree <- getParamNode
     let i = fromJust $ getAttribute "id" tree
