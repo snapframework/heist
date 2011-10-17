@@ -29,7 +29,7 @@ rawApply :: (Monad m)
          => [X.Node]
          -> TPath
          -> [X.Node]
-         -> HeistT m Template
+         -> HeistT (TemplateState m) m Template
 rawApply calledNodes newContext paramNodes = do
     st <- getTS  -- Can't use localTS here because the modifier is not pure
     processedParams <- runNodeList paramNodes

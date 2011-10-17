@@ -43,7 +43,7 @@ clearStaticTagCache (STS staticMVar) =
 -- referenced.
 staticImpl :: (MonadIO m)
            => StaticTagState
-           -> HeistT m Template
+           -> HeistT (TemplateState m) m Template
 staticImpl (STS mv) = do
     tree <- getParamNode
     let i = fromJust $ getAttribute "id" tree

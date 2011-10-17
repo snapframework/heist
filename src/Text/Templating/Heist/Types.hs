@@ -149,18 +149,25 @@ instance (Typeable1 m) => Typeable (TemplateState m) where
 -- | TemplateMonad is the monad used for 'Splice' processing.  TemplateMonad
 -- provides \"passthrough\" instances for many of the monads you might use in
 -- the inner monad.
-newtype TemplateMonad m a = TemplateMonad {
+{- newtype TemplateMonad m a = TemplateMonad { -}
+{-     runTemplateMonad :: X.Node-}
+{-                      -> TemplateState m-}
+{-                      -> m (a, TemplateState m)-}
+{- } -}
+type TemplateMonad m a = TemplateHeistT m a
+type TemplateHeistT m a = HeistT (TemplateState m) m a
+
+newtype HeistT ts m a = HeistT {
     runTemplateMonad :: X.Node
-                     -> TemplateState m
-                     -> m (a, TemplateState m)
+                     -> ts
+                     -> m (a, ts)
 }
-type HeistT = TemplateMonad
 
 
 ------------------------------------------------------------------------------
 -- | Evaluates a template monad as a computation in the underlying monad.
 evalTemplateMonad :: Monad m
-                  => TemplateMonad m a
+                  => HeistT (TemplateState m) m a
                   -> X.Node
                   -> TemplateState m
                   -> m a
@@ -171,107 +178,95 @@ evalTemplateMonad m r s = do
 
 ------------------------------------------------------------------------------
 -- | Functor instance
-instance Functor m => Functor (TemplateMonad m) where
-    fmap f (TemplateMonad m) = TemplateMonad $ \r s -> first f <$> m r s
+instance Functor m => Functor (HeistT ts m) where
+    fmap f (HeistT m) = HeistT $ \r s -> first f <$> m r s
 
 
 ------------------------------------------------------------------------------
 -- | Applicative instance
-instance (Monad m, Functor m) => Applicative (TemplateMonad m) where
+instance (Monad m, Functor m) => Applicative (HeistT ts m) where
     pure = return
     (<*>) = ap
 
 
 ------------------------------------------------------------------------------
 -- | Monad instance
-instance Monad m => Monad (TemplateMonad m) where
-    return a = TemplateMonad (\_ s -> return (a, s))
-    TemplateMonad m >>= k = TemplateMonad $ \r s -> do
+instance Monad m => Monad (HeistT ts m) where
+    return a = HeistT (\_ s -> return (a, s))
+    HeistT m >>= k = HeistT $ \r s -> do
         (a, s') <- m r s
         runTemplateMonad (k a) r s'
 
 
 ------------------------------------------------------------------------------
 -- | MonadIO instance
-instance MonadIO m => MonadIO (TemplateMonad m) where
+instance MonadIO m => MonadIO (HeistT ts m) where
     liftIO = lift . liftIO
 
 
 ------------------------------------------------------------------------------
 -- | MonadTrans instance
-instance MonadTrans TemplateMonad where
-    lift m = TemplateMonad $ \_ s -> do
+instance MonadTrans (HeistT ts) where
+    lift m = HeistT $ \_ s -> do
         a <- m
         return (a, s)
 
 
 ------------------------------------------------------------------------------
 -- | MonadControlIO instance
-instance MonadControlIO m => MonadControlIO (TemplateMonad m) where
+instance MonadControlIO m => MonadControlIO (HeistT ts m) where
     liftControlIO = liftLiftControlBase liftControlIO
 
-{-
- -
-newtype TemplateMonad m a = TemplateMonad {
-    runTemplateMonad :: X.Node
-                     -> TemplateState m
-                     -> m (a, TemplateState m)
-}
-
- - -}
-instance MonadTransControl TemplateMonad where
+instance MonadTransControl (HeistT ts) where
     liftControl = liftControl'
       where
-        liftControl' :: Monad m => (Run TemplateMonad -> m a) -> TemplateMonad m a
+        liftControl' :: Monad m => (Run (HeistT ts) -> m a) -> HeistT ts m a
         liftControl' f =
-          TemplateMonad $ \xn ts ->
-              let run :: forall n o b. (Monad n, Monad o, Monad (TemplateMonad o))
-                      => TemplateMonad n b -> n (TemplateMonad o b)
-                  run t = liftM (\(nd, ts') -> TemplateMonad
+          HeistT $ \xn ts ->
+              let run :: forall n o b. (Monad n, Monad o, Monad (HeistT ts o))
+                      => HeistT ts n b -> n (HeistT ts o b)
+                  run t = liftM (\(nd, ts') -> HeistT
                                      $ \_ _ -> return (nd, ts'))
-                                undefined -- (runTemplateMonad t xn ts)
+                                (runTemplateMonad t xn ts)
               in  liftM (\x -> (x, ts)) (f run)
--- liftControl :: Monad m => (Run TemplateMonad -> m a) -> TemplateMonad m a
--- type Run t = forall n o b. (Monad n, Monad o, Monad (TemplateMonad o))
---            => TemplateMonad n b -> n (TemplateMonad o b)
 
 ------------------------------------------------------------------------------
 -- | MonadFix passthrough instance
-instance MonadFix m => MonadFix (TemplateMonad m) where
-    mfix f = TemplateMonad $ \r s ->
+instance MonadFix m => MonadFix (HeistT ts m) where
+    mfix f = HeistT $ \r s ->
         mfix $ \ (a, _) -> runTemplateMonad (f a) r s
 
 
 ------------------------------------------------------------------------------
 -- | Alternative passthrough instance
-instance (Functor m, MonadPlus m) => Alternative (TemplateMonad m) where
+instance (Functor m, MonadPlus m) => Alternative (HeistT ts m) where
     empty = mzero
     (<|>) = mplus
 
 
 ------------------------------------------------------------------------------
 -- | MonadPlus passthrough instance
-instance MonadPlus m => MonadPlus (TemplateMonad m) where
+instance MonadPlus m => MonadPlus (HeistT ts m) where
     mzero = lift mzero
-    m `mplus` n = TemplateMonad $ \r s ->
+    m `mplus` n = HeistT $ \r s ->
         runTemplateMonad m r s `mplus` runTemplateMonad n r s
 
 
 ------------------------------------------------------------------------------
 -- | MonadState passthrough instance
-instance MonadState s m => MonadState s (TemplateMonad m) where
+instance MonadState s m => MonadState s (HeistT ts m) where
     get = lift get
     put = lift . put
 
 
 ------------------------------------------------------------------------------
 -- | MonadReader passthrough instance
-instance MonadReader r m => MonadReader r (TemplateMonad m) where
-    ask = TemplateMonad $ \_ s -> do
+instance MonadReader r m => MonadReader r (HeistT (TemplateState m) m) where
+    ask = HeistT $ \_ s -> do
             r <- ask
             return (r,s)
-    local f (TemplateMonad m) =
-        TemplateMonad $ \r s -> local f (m r s)
+    local f (HeistT m) =
+        HeistT $ \r s -> local f (m r s)
 
 
 ------------------------------------------------------------------------------
@@ -279,18 +274,18 @@ instance MonadReader r m => MonadReader r (TemplateMonad m) where
 liftCatch :: (m (a,TemplateState m)
               -> (e -> m (a,TemplateState m))
               -> m (a,TemplateState m))
-          -> TemplateMonad m a
-          -> (e -> TemplateMonad m a)
-          -> TemplateMonad m a
+          -> HeistT (TemplateState m) m a
+          -> (e -> HeistT (TemplateState m) m a)
+          -> HeistT (TemplateState m) m a
 liftCatch ce m h =
-    TemplateMonad $ \r s ->
+    HeistT $ \r s ->
         (runTemplateMonad m r s `ce`
         (\e -> runTemplateMonad (h e) r s))
 
 
 ------------------------------------------------------------------------------
 -- | MonadError passthrough instance
-instance (MonadError e m) => MonadError e (TemplateMonad m) where
+instance (MonadError e m) => MonadError e (HeistT (TemplateState m) m) where
     throwError = lift . throwError
     catchError = liftCatch catchError
 
@@ -300,16 +295,16 @@ instance (MonadError e m) => MonadError e (TemplateMonad m) where
 liftCallCC :: ((((a,TemplateState m) -> m (b, TemplateState m))
                   -> m (a, TemplateState m))
                 -> m (a, TemplateState m))
-           -> ((a -> TemplateMonad m b) -> TemplateMonad m a)
-           -> TemplateMonad m a
-liftCallCC ccc f = TemplateMonad $ \r s ->
+           -> ((a -> HeistT (TemplateState m) m b) -> HeistT (TemplateState m) m a)
+           -> HeistT (TemplateState m) m a
+liftCallCC ccc f = HeistT $ \r s ->
     ccc $ \c ->
-    runTemplateMonad (f (\a -> TemplateMonad $ \_ _ -> c (a, s))) r s
+    runTemplateMonad (f (\a -> HeistT $ \_ _ -> c (a, s))) r s
 
 
 ------------------------------------------------------------------------------
 -- | MonadCont passthrough instance
-instance (MonadCont m) => MonadCont (TemplateMonad m) where
+instance (MonadCont m) => MonadCont (HeistT (TemplateState m) m) where
     callCC = liftCallCC callCC
 
 
@@ -317,10 +312,10 @@ instance (MonadCont m) => MonadCont (TemplateMonad m) where
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateMonadTyCon :: TyCon
-templateMonadTyCon = mkTyCon "Text.Templating.Heist.TemplateMonad"
+templateMonadTyCon = mkTyCon "Text.Templating.Heist.HeistT"
 {-# NOINLINE templateMonadTyCon #-}
 
-instance (Typeable1 m) => Typeable1 (TemplateMonad m) where
+instance (Typeable1 m) => Typeable1 (HeistT ts m) where
     typeOf1 _ = mkTyConApp templateMonadTyCon [typeOf1 (undefined :: m ())]
 
 
@@ -341,43 +336,43 @@ instance (Typeable1 m) => Typeable1 (TemplateMonad m) where
 -- childNodes@ returns a list containing one 'TextNode' containing part of
 -- Hamlet's speech.  @liftM (getAttribute \"author\") getParamNode@ would
 -- return @Just "Shakespeare"@.
-getParamNode :: Monad m => TemplateMonad m X.Node
-getParamNode = TemplateMonad $ \r s -> return (r,s)
+getParamNode :: Monad m => HeistT ts m X.Node
+getParamNode = HeistT $ \r s -> return (r,s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's 'local'.
+-- | HeistT's 'local'.
 localParamNode :: Monad m
                => (X.Node -> X.Node)
-               -> TemplateMonad m a
-               -> TemplateMonad m a
-localParamNode f m = TemplateMonad $ \r s -> runTemplateMonad m (f r) s
+               -> HeistT ts m a
+               -> HeistT ts m a
+localParamNode f m = HeistT $ \r s -> runTemplateMonad m (f r) s
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's 'gets'.
-getsTS :: Monad m => (TemplateState m -> r) -> TemplateMonad m r
-getsTS f = TemplateMonad $ \_ s -> return (f s, s)
+-- | HeistT's 'gets'.
+getsTS :: Monad m => (TemplateState m -> r) -> HeistT (TemplateState m) m r
+getsTS f = HeistT $ \_ s -> return (f s, s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's 'get'.
-getTS :: Monad m => TemplateMonad m (TemplateState m)
-getTS = TemplateMonad $ \_ s -> return (s, s)
+-- | HeistT's 'get'.
+getTS :: Monad m => HeistT (TemplateState m) m (TemplateState m)
+getTS = HeistT $ \_ s -> return (s, s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's 'put'.
-putTS :: Monad m => TemplateState m -> TemplateMonad m ()
-putTS s = TemplateMonad $ \_ _ -> return ((), s)
+-- | HeistT's 'put'.
+putTS :: Monad m => TemplateState m -> HeistT (TemplateState m) m ()
+putTS s = HeistT $ \_ _ -> return ((), s)
 
 
 ------------------------------------------------------------------------------
--- | TemplateMonad's 'modify'.
+-- | HeistT's 'modify'.
 modifyTS :: Monad m
                     => (TemplateState m -> TemplateState m)
-                    -> TemplateMonad m ()
-modifyTS f = TemplateMonad $ \_ s -> return ((), f s)
+                    -> HeistT (TemplateState m) m ()
+modifyTS f = HeistT $ \_ s -> return ((), f s)
 
 
 ------------------------------------------------------------------------------
@@ -386,17 +381,17 @@ modifyTS f = TemplateMonad $ \_ s -> return ((), f s)
 -- @putTS@ to restore an old state.  This was needed because doctypes needs to
 -- be in a "global scope" as opposed to the template call "local scope" of
 -- state items such as recursionDepth, curContext, and spliceMap.
-restoreTS :: Monad m => TemplateState m -> TemplateMonad m ()
+restoreTS :: Monad m => TemplateState m -> HeistT (TemplateState m) m ()
 restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
 
 
 ------------------------------------------------------------------------------
--- | Abstracts the common pattern of running a TemplateMonad computation with
+-- | Abstracts the common pattern of running a HeistT computation with
 -- a modified template state.
 localTS :: Monad m
         => (TemplateState m -> TemplateState m)
-        -> TemplateMonad m a
-        -> TemplateMonad m a
+        -> HeistT (TemplateState m) m a
+        -> HeistT (TemplateState m) m a
 localTS f k = do
     ts <- getTS
     putTS $ f ts
