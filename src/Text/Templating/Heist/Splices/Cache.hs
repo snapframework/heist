@@ -11,7 +11,6 @@ import           Control.Monad.Trans
 import           Data.IORef
 import qualified Data.Map as Map
 import           Data.Map (Map)
-import           Data.Maybe
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -74,7 +73,10 @@ cacheImpl :: (MonadIO m)
            -> HeistT m Template
 cacheImpl (CTS mv) = do
     tree <- getParamNode
-    let i = fromJust $ getAttribute "id" tree
+    let err = error $ unwords ["cacheImpl is bound to a tag"
+                              ,"that didn't get an id attribute."
+                              ," This should never happen."]
+    let i = maybe err id $ getAttribute "id" tree
         ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
     mp <- liftIO $ readMVar mv
 
@@ -136,7 +138,8 @@ mkCacheTag = do
 
           g curs = do
               let node = current curs
-              curs' <- if tagName node == Just cacheTagName
+              curs' <- if tagName node == Just cacheTagName ||
+                          tagName node == Just "static"
                          then do
                              i <- getId
                              return $ modifyNode (setAttribute "id" i) curs
