@@ -129,7 +129,7 @@ module Text.Templating.Heist
     -- * Misc functions
   , getDoc
   , getXMLDoc
-  , bindStaticTag
+  , mkCacheTag
 
   ) where
 

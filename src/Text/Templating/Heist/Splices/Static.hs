@@ -1,4 +1,5 @@
 module Text.Templating.Heist.Splices.Static
+{-# DEPRECATED "This will go away in the future.  Use the cache splice instead." #-}
   ( StaticTagState
   , bindStaticTag
   , clearStaticTagCache
