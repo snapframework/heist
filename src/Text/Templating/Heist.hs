@@ -75,6 +75,8 @@ module Text.Templating.Heist
   , TemplateMonad
   , HeistT
   , TemplateState
+  , templateNames
+  , spliceNames
 
     -- * Functions and declarations on TemplateState values
   , addTemplate

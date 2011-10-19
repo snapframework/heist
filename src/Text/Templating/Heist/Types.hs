@@ -107,6 +107,18 @@ data TemplateState m = TemplateState {
 
 
 ------------------------------------------------------------------------------
+-- | Gets the names of all the templates defined in a TemplateState.
+templateNames :: TemplateState m -> [TPath]
+templateNames ts = Map.keys $ _templateMap ts
+
+
+------------------------------------------------------------------------------
+-- | Gets the names of all the splices defined in a TemplateState.
+spliceNames :: TemplateState m -> [Text]
+spliceNames ts = Map.keys $ _spliceMap ts
+
+
+------------------------------------------------------------------------------
 instance (Monad m) => Monoid (TemplateState m) where
     mempty = TemplateState Map.empty Map.empty True [] 0
                            return return return [] Nothing
