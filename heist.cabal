@@ -1,5 +1,5 @@
 name:           heist
-version:        0.6.0
+version:        0.6.0.1
 synopsis:       An xhtml templating system
 description:    An xhtml templating system
 license:        BSD3
@@ -105,7 +105,17 @@ Library
   else
     ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2
 
-  Extensions: OverloadedStrings
+  Extensions:
+    GeneralizedNewtypeDeriving,
+    PackageImports,
+    ScopedTypeVariables,
+    DeriveDataTypeable,
+    FlexibleInstances,
+    MultiParamTypeClasses,
+    UndecidableInstances,
+    OverloadedStrings,
+    TypeSynonymInstances,
+    NoMonomorphismRestriction
 
 
 source-repository head
