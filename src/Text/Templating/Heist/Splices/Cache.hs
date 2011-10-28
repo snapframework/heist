@@ -56,7 +56,7 @@ parseTTL s = value * multiplier
         'd' -> 86400
         'w' -> 604800
         _   -> 0
-        
+
 ------------------------------------------------------------------------------
 -- | The \"cache\" splice ensures that its contents are cached and only
 -- evaluated periodically.  The cached contents are returned every time the
@@ -81,16 +81,16 @@ cacheImpl (CTS mv) = do
     mp <- liftIO $ readMVar mv
 
     (mp',ns) <- do
-                   curTime <- liftIO getCurrentTime
+                   cur <- liftIO getCurrentTime
                    let mbn = Map.lookup i mp
                        reload = do
                            nodes' <- runNodeList $ childNodes tree
-                           return $! (Map.insert i (curTime,nodes') mp, nodes')
+                           return $! (Map.insert i (cur,nodes') mp, nodes')
                    case mbn of
                        Nothing -> reload
                        (Just (lastUpdate,n)) -> do
                            if ttl > 0 && tagName tree == Just cacheTagName &&
-                              diffUTCTime curTime lastUpdate > fromIntegral ttl
+                              diffUTCTime cur lastUpdate > fromIntegral ttl
                              then reload
                              else do
                                  stopRecursion

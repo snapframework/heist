@@ -127,8 +127,8 @@ runChildrenWith splices = localTS (bindSplices splices) runChildren
 
 
 ------------------------------------------------------------------------------
--- | Wrapper around runChildrenWith that applies a transformation function to the
--- second item in each of the tuples before calling runChildrenWith.
+-- | Wrapper around runChildrenWith that applies a transformation function to
+-- the second item in each of the tuples before calling runChildrenWith.
 runChildrenWithTrans :: (Monad m)
           => (b -> Splice m)
           -- ^ Splice generating function

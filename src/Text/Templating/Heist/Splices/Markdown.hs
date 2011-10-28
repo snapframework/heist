@@ -53,7 +53,8 @@ data NoMarkdownFileException = NoMarkdownFileException
 
 instance Show NoMarkdownFileException where
     show NoMarkdownFileException =
-        "Markdown error: no file or template in context during processing of markdown tag"
+        "Markdown error: no file or template in context" ++
+        " during processing of markdown tag"
 
 instance Exception NoMarkdownFileException where
 
