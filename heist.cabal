@@ -95,7 +95,7 @@ Library
     process,
     random,
     text >= 0.10 && < 0.12,
-    time >= 1.1 && < 1.4,
+    time >= 1.1 && < 1.5,
     transformers,
     xmlhtml == 0.1.*
 
