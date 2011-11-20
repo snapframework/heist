@@ -393,8 +393,8 @@ attParser = AP.many1 (identParser <|> litParser)
     escChar = (AP.char '\\' *> AP.anyChar) <|>
               AP.satisfy (AP.notInClass "\\$")
     litParser = Literal <$> (T.pack <$> AP.many1 escChar)
-    identParser = AP.string "$(" *>
-        (Ident <$> AP.takeWhile (/=')')) <* AP.string ")"
+    identParser = AP.string "${" *>
+        (Ident <$> AP.takeWhile (/='}')) <* AP.string "}"
 
 
 ------------------------------------------------------------------------------

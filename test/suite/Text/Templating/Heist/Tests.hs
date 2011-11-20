@@ -197,7 +197,7 @@ attrSubstTest = do
         H.assertBool ("attr subst " ++ (show str)) $ not $ B.null $
             snd $ B.breakSubstring str $ toByteString $ resDoc
         H.assertBool ("attr subst foo") $ not $ B.null $
-            snd $ B.breakSubstring "$(foo)" $ toByteString $ resDoc
+            snd $ B.breakSubstring "${foo}" $ toByteString $ resDoc
 
 
 ------------------------------------------------------------------------------
@@ -213,7 +213,7 @@ bindAttrTest = do
         H.assertBool ("attr subst " ++ (show str)) $ not $ B.null $
             snd $ B.breakSubstring str $ toByteString $ resDoc
         H.assertBool ("attr subst bar") $ B.null $
-            snd $ B.breakSubstring "$(bar)" $ toByteString $ resDoc
+            snd $ B.breakSubstring "${bar}" $ toByteString $ resDoc
 
 
 ------------------------------------------------------------------------------
