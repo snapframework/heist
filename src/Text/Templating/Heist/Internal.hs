@@ -551,6 +551,21 @@ callTemplate name params = do
 
 
 ------------------------------------------------------------------------------
+-- | Renders a template with the specified parameters.  This is the function
+-- to use when you want to "call" a template and pass in parameters from
+-- inside a splice.  If the template does not exist, this version simply
+-- returns an empty list.
+callTemplateWith :: Monad m
+                 => ByteString         -- ^ The name of the template
+                 -> [(Text, Splice m)] -- ^ Association list of
+                                       -- (name,value) parameter pairs
+                 -> HeistT m Template
+callTemplateWith name params = do
+    modifyTS $ bindSplices params
+    liftM (maybe [] id) $ evalTemplate name
+
+
+------------------------------------------------------------------------------
 -- Gives the MIME type for a 'X.Document'
 mimeType :: X.Document -> ByteString
 mimeType d = case d of
