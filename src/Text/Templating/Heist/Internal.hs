@@ -539,29 +539,28 @@ bindString n = bindSplice n . textSplice
 ------------------------------------------------------------------------------
 -- | Renders a template with the specified parameters.  This is the function
 -- to use when you want to "call" a template and pass in parameters from
--- inside a splice.
+-- inside a splice.  If the template does not exist, this version simply
+-- returns an empty list.
 callTemplate :: Monad m
-             => ByteString     -- ^ The name of the template
-             -> [(Text, Text)] -- ^ Association list of
-                               -- (name,value) parameter pairs
-             -> HeistT m (Maybe Template)
+             => ByteString         -- ^ The name of the template
+             -> [(Text, Splice m)] -- ^ Association list of
+                                   -- (name,value) parameter pairs
+             -> HeistT m Template
 callTemplate name params = do
-    modifyTS $ bindStrings params
-    evalTemplate name
+    modifyTS $ bindSplices params
+    liftM (maybe [] id) $ evalTemplate name
 
 
 ------------------------------------------------------------------------------
--- | Renders a template with the specified parameters.  This is the function
--- to use when you want to "call" a template and pass in parameters from
--- inside a splice.  If the template does not exist, this version simply
--- returns an empty list.
-callTemplateWith :: Monad m
-                 => ByteString         -- ^ The name of the template
-                 -> [(Text, Splice m)] -- ^ Association list of
+-- | Like callTemplate except the splices being bound are constant text
+-- splices.
+callTemplateWithText :: Monad m
+                     => ByteString     -- ^ The name of the template
+                     -> [(Text, Text)] -- ^ Association list of
                                        -- (name,value) parameter pairs
-                 -> HeistT m Template
-callTemplateWith name params = do
-    modifyTS $ bindSplices params
+                     -> HeistT m Template
+callTemplateWithText name params = do
+    modifyTS $ bindStrings params
     liftM (maybe [] id) $ evalTemplate name
 
 

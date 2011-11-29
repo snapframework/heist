@@ -114,7 +114,7 @@ module Text.Templating.Heist
     -- * Functions for running splices and templates
   , evalTemplate
   , callTemplate
-  , callTemplateWith
+  , callTemplateWithText
   , renderTemplate
   , renderWithArgs
   , bindStrings
