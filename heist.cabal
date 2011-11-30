@@ -1,7 +1,7 @@
 name:           heist
 version:        0.7.0
-synopsis:       An xhtml templating system
-description:    An xhtml templating system
+synopsis:       An (x)html templating system
+description:    An (x)html templating system
 license:        BSD3
 license-file:   LICENSE
 author:         Doug Beardsley, Gregory Collins
