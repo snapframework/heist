@@ -134,6 +134,8 @@ module Text.Templating.Heist
   , getXMLDoc
   , mkCacheTag
 
+    -- * Temporary functions
+  , useOldAttributeSyntax
   ) where
 
 import           Control.Monad.Trans
@@ -161,7 +163,7 @@ defaultSpliceMap = Map.fromList
 emptyTemplateState :: MonadIO m => TemplateState m
 emptyTemplateState =
     TemplateState (defaultSpliceMap) Map.empty True [] 0
-                  return return return [] Nothing
+                  return return return [] Nothing False
 
 
 -- $hookDoc

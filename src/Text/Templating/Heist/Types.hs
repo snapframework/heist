@@ -103,7 +103,22 @@ data TemplateState m = TemplateState {
     , _doctypes        :: [X.DocType]
     -- | The full path to the current template's file on disk.
     , _curTemplateFile :: Maybe FilePath
+    -- | Temporary flag for backwards compatibility with the old attribute
+    -- syntax for splices.
+    , _oldAttributeSyntax :: Bool
 }
+
+
+{-# DEPRECATED useOldAttributeSyntax "NOTICE: This function is only here temporarily to ease the transition in attribute syntax.  It will be removed in the next major release.  Update your templates!" #-}
+------------------------------------------------------------------------------
+-- | Sets compatibility mode that uses the old $() syntax for splices in
+-- attributes.  The old syntax conflicts with the ubiquitous jquery function.
+-- The new syntax is ${}.  This compatibility mode will be removed in the next
+-- major release.
+--
+-- See https://github.com/snapframework/heist/issues/12 for the discussion.
+useOldAttributeSyntax :: TemplateState m -> TemplateState m
+useOldAttributeSyntax ts = ts { _oldAttributeSyntax = True }
 
 
 ------------------------------------------------------------------------------
@@ -121,12 +136,12 @@ spliceNames ts = Map.keys $ _spliceMap ts
 ------------------------------------------------------------------------------
 instance (Monad m) => Monoid (TemplateState m) where
     mempty = TemplateState Map.empty Map.empty True [] 0
-                           return return return [] Nothing
+                           return return return [] Nothing False
 
-    (TemplateState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1) `mappend`
-        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2) =
+    (TemplateState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1 oas1) `mappend`
+        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2 oas2) =
         TemplateState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
-            (dt1 `mappend` dt2) ctf
+            (dt1 `mappend` dt2) ctf (oas1 || oas2)
       where
         s = s1 `mappend` s2
         t = t1 `mappend` t2
