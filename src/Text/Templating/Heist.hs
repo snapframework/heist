@@ -54,7 +54,7 @@
   >
   > main = do
   >     ets <- loadTemplates "templates" $
-  >            bindSplices mySplices (emptyTemplateState "templates")
+  >            bindSplices mySplices emptyTemplateState
   >     let ts = either error id ets
   >     t <- runMyAppMonad $ renderTemplate ts "index"
   >     print $ maybe "Page not found" (toByteString . fst) t
