@@ -47,22 +47,22 @@
   >
 
   Next, you need to bind that splice to a tag.  Heist stores information
-  about splices and templates in the 'TemplateState' data structure.  The
+  about splices and templates in the 'HeistState' data structure.  The
   following code demonstrates how this splice would be used.
 
   > mySplices = [ ("loginLogout", loginLogoutSplice) ]
   >
   > main = do
   >     ets <- loadTemplates "templates" $
-  >            bindSplices mySplices emptyTemplateState
+  >            bindSplices mySplices emptyHeistState
   >     let ts = either error id ets
   >     t <- runMyAppMonad $ renderTemplate ts "index"
   >     print $ maybe "Page not found" (toByteString . fst) t
 
-  Here we build up our 'TemplateState' by starting with emptyTemplateState and
+  Here we build up our 'HeistState' by starting with emptyHeistState and
   applying bindSplice for all the splices we want to add.  Then we pass this
-  to loadTemplates our final 'TemplateState' wrapped in an Either to handle
-  errors.  Then we use this 'TemplateState' to render our templates.
+  to loadTemplates our final 'HeistState' wrapped in an Either to handle
+  errors.  Then we use this 'HeistState' to render our templates.
 
 -}
 
@@ -74,14 +74,16 @@ module Text.Templating.Heist
   , Splice
   , TemplateMonad
   , HeistT
+  , HeistState
   , TemplateState
   , templateNames
   , spliceNames
 
-    -- * Functions and declarations on TemplateState values
+    -- * Functions and declarations on HeistState values
   , addTemplate
   , addXMLTemplate
   , emptyTemplateState
+  , defaultHeistState
   , bindSplice
   , bindSplices
   , lookupSplice
@@ -157,13 +159,22 @@ defaultSpliceMap = Map.fromList
 
 
 ------------------------------------------------------------------------------
+-- | An empty heist state, with Heist's default splices (@\<apply\>@,
+-- @\<bind\>@, @\<ignore\>@, and @\<markdown\>@) mapped.  The cache tag is
+-- not mapped here because it must be mapped manually in your application.
+defaultHeistState :: MonadIO m => HeistState m
+defaultHeistState =
+    HeistState (defaultSpliceMap) Map.empty True [] 0
+               return return return [] Nothing False
+
+
+{-# DEPRECATED emptyTemplateState "NOTICE: The name TemplateState is changing to HeistState.  Use defaultHeistState instead of emptyTemplateState." #-}
+------------------------------------------------------------------------------
 -- | An empty template state, with Heist's default splices (@\<apply\>@,
 -- @\<bind\>@, @\<ignore\>@, and @\<markdown\>@) mapped.  The static tag is
 -- not mapped here because it must be mapped manually in your application.
-emptyTemplateState :: MonadIO m => TemplateState m
-emptyTemplateState =
-    TemplateState (defaultSpliceMap) Map.empty True [] 0
-                  return return return [] Nothing False
+emptyTemplateState :: MonadIO m => HeistState m
+emptyTemplateState = defaultHeistState
 
 
 -- $hookDoc
@@ -171,7 +182,7 @@ emptyTemplateState =
 -- and after they are run.  Every time you call one of the addAbcHook
 -- functions the hook is added to onto the processing pipeline.  The hooks
 -- processes the template in the order that they were added to the
--- TemplateState.
+-- HeistState.
 --
 -- The pre-run and post-run hooks are run before and after every template is
 -- run/rendered.  You should be careful what code you put in these hooks

@@ -78,10 +78,10 @@ type SpliceMap m = Map Text (Splice m)
 
 ------------------------------------------------------------------------------
 -- | Holds all the state information needed for template processing.  You will
--- build a @TemplateState@ using any of Heist's @TemplateState m ->
--- TemplateState m@ \"filter\" functions.  Then you use the resulting
--- @TemplateState@ in calls to @renderTemplate@.
-data TemplateState m = TemplateState {
+-- build a @HeistState@ using any of Heist's @HeistState m -> HeistState m@
+-- \"filter\" functions.  Then you use the resulting @HeistState@ in calls to
+-- @renderTemplate@.
+data HeistState m = HeistState {
     -- | A mapping of splice names to splice actions
       _spliceMap       :: SpliceMap m
     -- | A mapping of template names to templates
@@ -109,6 +109,15 @@ data TemplateState m = TemplateState {
 }
 
 
+{-# DEPRECATED TemplateState "NOTICE: The name TemplateState is changing to HeistState.  Use HeistState instead of TemplateState." #-}
+------------------------------------------------------------------------------
+-- | Holds all the state information needed for template processing.  You will
+-- build a @HeistState@ using any of Heist's @HeistState m -> HeistState m@
+-- \"filter\" functions.  Then you use the resulting @HeistState@ in calls to
+-- @renderTemplate@.
+type TemplateState = HeistState
+
+
 {-# DEPRECATED useOldAttributeSyntax "NOTICE: This function is only here temporarily to ease the transition in attribute syntax.  It will be removed in the next major release.  Update your templates!" #-}
 ------------------------------------------------------------------------------
 -- | Sets compatibility mode that uses the old $() syntax for splices in
@@ -117,30 +126,30 @@ data TemplateState m = TemplateState {
 -- major release.
 --
 -- See https://github.com/snapframework/heist/issues/12 for the discussion.
-useOldAttributeSyntax :: TemplateState m -> TemplateState m
+useOldAttributeSyntax :: HeistState m -> HeistState m
 useOldAttributeSyntax ts = ts { _oldAttributeSyntax = True }
 
 
 ------------------------------------------------------------------------------
--- | Gets the names of all the templates defined in a TemplateState.
-templateNames :: TemplateState m -> [TPath]
+-- | Gets the names of all the templates defined in a HeistState.
+templateNames :: HeistState m -> [TPath]
 templateNames ts = Map.keys $ _templateMap ts
 
 
 ------------------------------------------------------------------------------
--- | Gets the names of all the splices defined in a TemplateState.
-spliceNames :: TemplateState m -> [Text]
+-- | Gets the names of all the splices defined in a HeistState.
+spliceNames :: HeistState m -> [Text]
 spliceNames ts = Map.keys $ _spliceMap ts
 
 
 ------------------------------------------------------------------------------
-instance (Monad m) => Monoid (TemplateState m) where
-    mempty = TemplateState Map.empty Map.empty True [] 0
+instance (Monad m) => Monoid (HeistState m) where
+    mempty = HeistState Map.empty Map.empty True [] 0
                            return return return [] Nothing False
 
-    (TemplateState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1 oas1) `mappend`
-        (TemplateState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2 oas2) =
-        TemplateState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
+    (HeistState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1 oas1) `mappend`
+        (HeistState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2 oas2) =
+        HeistState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
             (dt1 `mappend` dt2) ctf (oas1 || oas2)
       where
         s = s1 `mappend` s2
@@ -151,7 +160,7 @@ instance (Monad m) => Monoid (TemplateState m) where
 
 
 ------------------------------------------------------------------------------
-instance Eq (TemplateState m) where
+instance Eq (HeistState m) where
     a == b = (_recurse a == _recurse b) &&
              (_templateMap a == _templateMap b) &&
              (_curContext a == _curContext b)
@@ -161,10 +170,10 @@ instance Eq (TemplateState m) where
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateStateTyCon :: TyCon
-templateStateTyCon = mkTyCon "Text.Templating.Heist.TemplateState"
+templateStateTyCon = mkTyCon "Text.Templating.Heist.HeistState"
 {-# NOINLINE templateStateTyCon #-}
 
-instance (Typeable1 m) => Typeable (TemplateState m) where
+instance (Typeable1 m) => Typeable (HeistState m) where
     typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
 
 
@@ -175,8 +184,8 @@ instance (Typeable1 m) => Typeable (TemplateState m) where
 -- the inner monad.
 newtype TemplateMonad m a = TemplateMonad {
     runTemplateMonad :: X.Node
-                     -> TemplateState m
-                     -> m (a, TemplateState m)
+                     -> HeistState m
+                     -> m (a, HeistState m)
 }
 type HeistT = TemplateMonad
 
@@ -186,7 +195,7 @@ type HeistT = TemplateMonad
 evalTemplateMonad :: Monad m
                   => TemplateMonad m a
                   -> X.Node
-                  -> TemplateState m
+                  -> HeistState m
                   -> m a
 evalTemplateMonad m r s = do
     (a, _) <- runTemplateMonad m r s
@@ -280,9 +289,9 @@ instance MonadReader r m => MonadReader r (TemplateMonad m) where
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadError instance.
-liftCatch :: (m (a,TemplateState m)
-              -> (e -> m (a,TemplateState m))
-              -> m (a,TemplateState m))
+liftCatch :: (m (a,HeistState m)
+              -> (e -> m (a,HeistState m))
+              -> m (a,HeistState m))
           -> TemplateMonad m a
           -> (e -> TemplateMonad m a)
           -> TemplateMonad m a
@@ -301,9 +310,9 @@ instance (MonadError e m) => MonadError e (TemplateMonad m) where
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadCont instance.
-liftCallCC :: ((((a,TemplateState m) -> m (b, TemplateState m))
-                  -> m (a, TemplateState m))
-                -> m (a, TemplateState m))
+liftCallCC :: ((((a,HeistState m) -> m (b, HeistState m))
+                  -> m (a, HeistState m))
+                -> m (a, HeistState m))
            -> ((a -> TemplateMonad m b) -> TemplateMonad m a)
            -> TemplateMonad m a
 liftCallCC ccc f = TemplateMonad $ \r s ->
@@ -360,45 +369,45 @@ localParamNode f m = TemplateMonad $ \r s -> runTemplateMonad m (f r) s
 
 ------------------------------------------------------------------------------
 -- | TemplateMonad's 'gets'.
-getsTS :: Monad m => (TemplateState m -> r) -> TemplateMonad m r
+getsTS :: Monad m => (HeistState m -> r) -> TemplateMonad m r
 getsTS f = TemplateMonad $ \_ s -> return (f s, s)
 
 
 ------------------------------------------------------------------------------
 -- | TemplateMonad's 'get'.
-getTS :: Monad m => TemplateMonad m (TemplateState m)
+getTS :: Monad m => TemplateMonad m (HeistState m)
 getTS = TemplateMonad $ \_ s -> return (s, s)
 
 
 ------------------------------------------------------------------------------
 -- | TemplateMonad's 'put'.
-putTS :: Monad m => TemplateState m -> TemplateMonad m ()
+putTS :: Monad m => HeistState m -> TemplateMonad m ()
 putTS s = TemplateMonad $ \_ _ -> return ((), s)
 
 
 ------------------------------------------------------------------------------
 -- | TemplateMonad's 'modify'.
 modifyTS :: Monad m
-                    => (TemplateState m -> TemplateState m)
+                    => (HeistState m -> HeistState m)
                     -> TemplateMonad m ()
 modifyTS f = TemplateMonad $ \_ s -> return ((), f s)
 
 
 ------------------------------------------------------------------------------
--- | Restores the TemplateState.  This function is almost like putTS except it
+-- | Restores the HeistState.  This function is almost like putTS except it
 -- preserves the current doctypes.  You should use this function instead of
 -- @putTS@ to restore an old state.  This was needed because doctypes needs to
 -- be in a "global scope" as opposed to the template call "local scope" of
 -- state items such as recursionDepth, curContext, and spliceMap.
-restoreTS :: Monad m => TemplateState m -> TemplateMonad m ()
+restoreTS :: Monad m => HeistState m -> TemplateMonad m ()
 restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
 
 
 ------------------------------------------------------------------------------
 -- | Abstracts the common pattern of running a TemplateMonad computation with
--- a modified template state.
+-- a modified heist state.
 localTS :: Monad m
-        => (TemplateState m -> TemplateState m)
+        => (HeistState m -> HeistState m)
         -> TemplateMonad m a
         -> TemplateMonad m a
 localTS f k = do

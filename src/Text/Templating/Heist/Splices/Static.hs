@@ -67,13 +67,13 @@ staticImpl (STS mv) = do
 
 
 ------------------------------------------------------------------------------
--- | Modifies a TemplateState to include a \"static\" tag.  The static tag is
+-- | Modifies a HeistState to include a \"static\" tag.  The static tag is
 -- not bound automatically with the other default Heist tags.  This is because
 -- this function also returns StaticTagState, so the user will be able to
 -- clear it with the 'clearStaticTagCache' function.
 bindStaticTag :: MonadIO m
-              => TemplateState m
-              -> IO (TemplateState m, StaticTagState)
+              => HeistState m
+              -> IO (HeistState m, StaticTagState)
 bindStaticTag ts = do
     sr <- newIORef $ Set.empty
     mv <- liftM STS $ newMVar Map.empty

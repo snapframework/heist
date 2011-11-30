@@ -27,8 +27,8 @@ import           Text.Templating.Heist.Splices.Static
 data TemplateDirectory m
     = TemplateDirectory
         FilePath
-        (TemplateState m)
-        (MVar (TemplateState m))
+        (HeistState m)
+        (MVar (HeistState m))
         StaticTagState
 
 
@@ -37,7 +37,7 @@ data TemplateDirectory m
 -- error handling.
 newTemplateDirectory :: (MonadIO m, MonadIO n)
                      => FilePath
-                     -> TemplateState m
+                     -> HeistState m
                      -> n (Either String (TemplateDirectory m))
 newTemplateDirectory dir templateState = liftIO $ do
     (origTs,sts) <- bindStaticTag templateState
@@ -52,16 +52,16 @@ newTemplateDirectory dir templateState = liftIO $ do
 -- function on error.
 newTemplateDirectory' :: (MonadIO m, MonadIO n)
                       => FilePath
-                      -> TemplateState m
+                      -> HeistState m
                       -> n (TemplateDirectory m)
 newTemplateDirectory' = ((either fail return =<<) .) . newTemplateDirectory
 
 
 ------------------------------------------------------------------------------
--- | Gets the 'TemplateState' from a TemplateDirectory.
+-- | Gets the 'HeistState' from a TemplateDirectory.
 getDirectoryTS :: (Monad m, MonadIO n)
                => TemplateDirectory m
-               -> n (TemplateState m)
+               -> n (HeistState m)
 getDirectoryTS (TemplateDirectory _ _ tsMVar _) = liftIO $ readMVar $ tsMVar
 
 

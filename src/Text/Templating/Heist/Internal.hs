@@ -41,53 +41,53 @@ addDoctype dt = do
 
 
 ------------------------------------------------------------------------------
--- TemplateState functions
+-- HeistState functions
 ------------------------------------------------------------------------------
 
 
 ------------------------------------------------------------------------------
--- | Adds an on-load hook to a `TemplateState`.
+-- | Adds an on-load hook to a `HeistState`.
 addOnLoadHook :: (Monad m) =>
                  (Template -> IO Template)
-              -> TemplateState m
-              -> TemplateState m
+              -> HeistState m
+              -> HeistState m
 addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Adds a pre-run hook to a `TemplateState`.
+-- | Adds a pre-run hook to a `HeistState`.
 addPreRunHook :: (Monad m) =>
                  (Template -> m Template)
-              -> TemplateState m
-              -> TemplateState m
+              -> HeistState m
+              -> HeistState m
 addPreRunHook hook ts = ts { _preRunHook = _preRunHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Adds a post-run hook to a `TemplateState`.
+-- | Adds a post-run hook to a `HeistState`.
 addPostRunHook :: (Monad m) =>
                   (Template -> m Template)
-               -> TemplateState m
-               -> TemplateState m
+               -> HeistState m
+               -> HeistState m
 addPostRunHook hook ts = ts { _postRunHook = _postRunHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Binds a new splice declaration to a tag name within a 'TemplateState'.
+-- | Binds a new splice declaration to a tag name within a 'HeistState'.
 bindSplice :: Monad m =>
               Text              -- ^ tag name
            -> Splice m          -- ^ splice action
-           -> TemplateState m   -- ^ source state
-           -> TemplateState m
+           -> HeistState m      -- ^ source state
+           -> HeistState m
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 
 
 ------------------------------------------------------------------------------
--- | Binds a set of new splice declarations within a 'TemplateState'.
+-- | Binds a set of new splice declarations within a 'HeistState'.
 bindSplices :: Monad m =>
                [(Text, Splice m)] -- ^ splices to bind
-            -> TemplateState m    -- ^ start state
-            -> TemplateState m
+            -> HeistState m       -- ^ start state
+            -> HeistState m
 bindSplices ss ts = foldl' (flip id) ts acts
   where
     acts = map (uncurry bindSplice) ss
@@ -96,7 +96,7 @@ bindSplices ss ts = foldl' (flip id) ts acts
 ------------------------------------------------------------------------------
 -- | Sets the current template file.
 setCurTemplateFile :: Monad m
-                   => Maybe FilePath -> TemplateState m -> TemplateState m
+                   => Maybe FilePath -> HeistState m -> HeistState m
 setCurTemplateFile fp ts = ts { _curTemplateFile = fp }
 
 
@@ -168,7 +168,7 @@ mapSplices f vs = liftM concat $ mapM f vs
 -- | Convenience function for looking up a splice.
 lookupSplice :: Monad m =>
                 Text
-             -> TemplateState m
+             -> HeistState m
              -> Maybe (Splice m)
 lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 
@@ -220,10 +220,10 @@ traversePath tm path name =
 
 
 ------------------------------------------------------------------------------
--- | Returns 'True' if the given template can be found in the template state.
+-- | Returns 'True' if the given template can be found in the heist state.
 hasTemplate :: Monad m =>
                ByteString
-            -> TemplateState m
+            -> HeistState m
             -> Bool
 hasTemplate nameStr ts = isJust $ lookupTemplate nameStr ts
 
@@ -232,7 +232,7 @@ hasTemplate nameStr ts = isJust $ lookupTemplate nameStr ts
 -- | Convenience function for looking up a template.
 lookupTemplate :: Monad m =>
                   ByteString
-               -> TemplateState m
+               -> HeistState m
                -> Maybe (DocumentFile, TPath)
 lookupTemplate nameStr ts =
     f (_templateMap ts) path name
@@ -247,24 +247,24 @@ lookupTemplate nameStr ts =
 
 
 ------------------------------------------------------------------------------
--- | Sets the templateMap in a TemplateState.
-setTemplates :: Monad m => TemplateMap -> TemplateState m -> TemplateState m
+-- | Sets the templateMap in a HeistState.
+setTemplates :: Monad m => TemplateMap -> HeistState m -> HeistState m
 setTemplates m ts = ts { _templateMap = m }
 
 
 ------------------------------------------------------------------------------
--- | Adds a template to the template state.
+-- | Adds a template to the heist state.
 insertTemplate :: Monad m =>
                TPath
             -> DocumentFile
-            -> TemplateState m
-            -> TemplateState m
+            -> HeistState m
+            -> HeistState m
 insertTemplate p t st =
     setTemplates (Map.insert p t (_templateMap st)) st
 
 
 ------------------------------------------------------------------------------
--- | Adds an HTML format template to the template state.
+-- | Adds an HTML format template to the heist state.
 addTemplate :: Monad m
             => ByteString
             -- ^ Path that the template will be referenced by
@@ -273,8 +273,8 @@ addTemplate :: Monad m
             -> Maybe FilePath
             -- ^ An optional path to the actual file on disk where the
             -- template is stored
-            -> TemplateState m
-            -> TemplateState m
+            -> HeistState m
+            -> HeistState m
 addTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -282,7 +282,7 @@ addTemplate n t mfp st =
 
 
 ------------------------------------------------------------------------------
--- | Adds an XML format template to the template state.
+-- | Adds an XML format template to the heist state.
 addXMLTemplate :: Monad m
                => ByteString
                -- ^ Path that the template will be referenced by
@@ -291,8 +291,8 @@ addXMLTemplate :: Monad m
                -> Maybe FilePath
                -- ^ An optional path to the actual file on disk where the
                -- template is stored
-               -> TemplateState m
-               -> TemplateState m
+               -> HeistState m
+               -> HeistState m
 addXMLTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -525,8 +525,8 @@ evalWithHooks name = liftM (liftM X.docContent) (evalWithHooksInternal name)
 -- | Binds a list of constant string splices.
 bindStrings :: Monad m
             => [(Text, Text)]
-            -> TemplateState m
-            -> TemplateState m
+            -> HeistState m
+            -> HeistState m
 bindStrings pairs ts = foldr (uncurry bindString) ts pairs
 
 
@@ -535,8 +535,8 @@ bindStrings pairs ts = foldr (uncurry bindString) ts pairs
 bindString :: Monad m
             => Text
             -> Text
-            -> TemplateState m
-            -> TemplateState m
+            -> HeistState m
+            -> HeistState m
 bindString n = bindSplice n . textSplice
 
 
@@ -583,13 +583,13 @@ mimeType d = case d of
 
 
 ------------------------------------------------------------------------------
--- | Renders a template from the specified TemplateState to a 'Builder'.  The
+-- | Renders a template from the specified HeistState to a 'Builder'.  The
 -- MIME type returned is based on the detected character encoding, and whether
 -- the root template was an HTML or XML format template.  It will always be
 -- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
 -- particular XML application, it must be provided by the application.
 renderTemplate :: Monad m
-               => TemplateState m
+               => HeistState m
                -> ByteString
                -> m (Maybe (Builder, MIMEType))
 renderTemplate ts name = evalTemplateMonad tpl (X.TextNode "") ts
@@ -606,7 +606,7 @@ renderTemplate ts name = evalTemplateMonad tpl (X.TextNode "") ts
 -- template.
 renderWithArgs :: Monad m
                    => [(Text, Text)]
-                   -> TemplateState m
+                   -> HeistState m
                    -> ByteString
                    -> m (Maybe (Builder, MIMEType))
 renderWithArgs args ts = renderTemplate (bindStrings args ts)
@@ -671,10 +671,10 @@ loadTemplate templateRoot fname
 
 
 ------------------------------------------------------------------------------
--- | Traverses the specified directory structure and builds a
--- TemplateState by loading all the files with a ".tpl" or ".xtpl" extension.
-loadTemplates :: Monad m => FilePath -> TemplateState m
-              -> IO (Either String (TemplateState m))
+-- | Traverses the specified directory structure and builds a HeistState by
+-- loading all the files with a ".tpl" or ".xtpl" extension.
+loadTemplates :: Monad m => FilePath -> HeistState m
+              -> IO (Either String (HeistState m))
 loadTemplates dir ts = do
     d <- readDirectoryWith (loadTemplate dir) dir
     let tlist = F.fold (free d)
@@ -695,21 +695,21 @@ runHook f t = do
 
 
 ------------------------------------------------------------------------------
--- | Runs the onLoad hook on the template and returns the 'TemplateState'
+-- | Runs the onLoad hook on the template and returns the 'HeistState'
 -- with the result inserted.
-loadHook :: Monad m => TemplateState m -> (TPath, DocumentFile)
-         -> IO (TemplateState m)
+loadHook :: Monad m => HeistState m -> (TPath, DocumentFile)
+         -> IO (HeistState m)
 loadHook ts (tp, t) = do
     t' <- runHook (_onLoadHook ts) t
     return $ insertTemplate tp t' ts
 
 
 ------------------------------------------------------------------------------
--- | Adds a path prefix to all the templates in the 'TemplateState'.  If you
+-- | Adds a path prefix to all the templates in the 'HeistState'.  If you
 -- want to add multiple levels of directories, separate them with slashes as
 -- in "foo/bar".  Using an empty string as a path prefix will leave the
--- 'TemplateState' unchanged.
-addTemplatePathPrefix :: ByteString -> TemplateState m -> TemplateState m
+-- 'HeistState' unchanged.
+addTemplatePathPrefix :: ByteString -> HeistState m -> HeistState m
 addTemplatePathPrefix dir ts
   | B.null dir = ts
   | otherwise  = ts { _templateMap = Map.mapKeys f $ _templateMap ts }

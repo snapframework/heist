@@ -102,12 +102,12 @@ cacheImpl (CTS mv) = do
 
 
 ------------------------------------------------------------------------------
--- | Returns a function that modifies a TemplateState to include a \"cache\"
+-- | Returns a function that modifies a HeistState to include a \"cache\"
 -- tag.  The cache tag is not bound automatically with the other default Heist
 -- tags.  This is because this function also returns CacheTagState, so the
 -- user will be able to clear it with the 'clearCacheTagState' function.
 mkCacheTag :: MonadIO m
-           => IO (TemplateState m -> TemplateState m, CacheTagState)
+           => IO (HeistState m -> HeistState m, CacheTagState)
 mkCacheTag = do
     sr <- newIORef $ Set.empty
     mv <- liftM CTS $ newMVar Map.empty
