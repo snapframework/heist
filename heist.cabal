@@ -1,5 +1,5 @@
 name:           heist
-version:        0.7.0
+version:        0.8.0
 synopsis:       An (x)html templating system
 description:    An (x)html templating system
 license:        BSD3
@@ -73,7 +73,6 @@ Library
     Text.Templating.Heist.Splices.Html,
     Text.Templating.Heist.Splices.Ignore,
     Text.Templating.Heist.Splices.Markdown,
-    Text.Templating.Heist.Splices.Static,
     Text.Templating.Heist.TemplateDirectory
 
   other-modules:

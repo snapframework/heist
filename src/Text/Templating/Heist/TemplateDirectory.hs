@@ -19,7 +19,7 @@ import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
 import           Text.Templating.Heist
-import           Text.Templating.Heist.Splices.Static
+import           Text.Templating.Heist.Splices.Cache
 
 
 ------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ data TemplateDirectory m
         FilePath
         (HeistState m)
         (MVar (HeistState m))
-        StaticTagState
+        CacheTagState
 
 
 ------------------------------------------------------------------------------
@@ -40,11 +40,12 @@ newTemplateDirectory :: (MonadIO m, MonadIO n)
                      -> HeistState m
                      -> n (Either String (TemplateDirectory m))
 newTemplateDirectory dir templateState = liftIO $ do
-    (origTs,sts) <- bindStaticTag templateState
+    (modTs,cts) <- mkCacheTag
+    let origTs = modTs templateState
     ets <- loadTemplates dir origTs
     leftPass ets $ \ts -> do
         tsMVar <- newMVar $ ts
-        return $ TemplateDirectory dir origTs tsMVar sts
+        return $ TemplateDirectory dir origTs tsMVar cts
 
 
 ------------------------------------------------------------------------------
@@ -70,8 +71,8 @@ getDirectoryTS (TemplateDirectory _ _ tsMVar _) = liftIO $ readMVar $ tsMVar
 reloadTemplateDirectory :: (MonadIO m, MonadIO n)
                         => TemplateDirectory m
                         -> n (Either String ())
-reloadTemplateDirectory (TemplateDirectory p origTs tsMVar sts) = liftIO $ do
-    clearStaticTagCache sts
+reloadTemplateDirectory (TemplateDirectory p origTs tsMVar cts) = liftIO $ do
+    clearCacheTagState cts
     ets <- loadTemplates p origTs
     leftPass ets $ \ts -> modifyMVar_ tsMVar (const $ return ts)
 

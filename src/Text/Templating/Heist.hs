@@ -72,17 +72,14 @@ module Text.Templating.Heist
     Template
   , MIMEType
   , Splice
-  , TemplateMonad
   , HeistT
   , HeistState
-  , TemplateState
   , templateNames
   , spliceNames
 
     -- * Functions and declarations on HeistState values
   , addTemplate
   , addXMLTemplate
-  , emptyTemplateState
   , defaultHeistState
   , bindSplice
   , bindSplices
@@ -135,9 +132,6 @@ module Text.Templating.Heist
   , getDoc
   , getXMLDoc
   , mkCacheTag
-
-    -- * Temporary functions
-  , useOldAttributeSyntax
   ) where
 
 import           Control.Monad.Trans
@@ -166,15 +160,6 @@ defaultHeistState :: MonadIO m => HeistState m
 defaultHeistState =
     HeistState (defaultSpliceMap) Map.empty True [] 0
                return return return [] Nothing False
-
-
-{-# DEPRECATED emptyTemplateState "NOTICE: The name TemplateState is changing to HeistState.  Use defaultHeistState instead of emptyTemplateState." #-}
-------------------------------------------------------------------------------
--- | An empty template state, with Heist's default splices (@\<apply\>@,
--- @\<bind\>@, @\<ignore\>@, and @\<markdown\>@) mapped.  The static tag is
--- not mapped here because it must be mapped manually in your application.
-emptyTemplateState :: MonadIO m => HeistState m
-emptyTemplateState = defaultHeistState
 
 
 -- $hookDoc

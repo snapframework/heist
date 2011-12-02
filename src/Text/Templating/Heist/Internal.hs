@@ -592,7 +592,7 @@ renderTemplate :: Monad m
                => HeistState m
                -> ByteString
                -> m (Maybe (Builder, MIMEType))
-renderTemplate ts name = evalTemplateMonad tpl (X.TextNode "") ts
+renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
   where tpl = do mt <- evalWithHooksInternal name
                  case mt of
                     Nothing  -> return Nothing
