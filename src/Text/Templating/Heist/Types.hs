@@ -103,9 +103,6 @@ data HeistState m = HeistState {
     , _doctypes        :: [X.DocType]
     -- | The full path to the current template's file on disk.
     , _curTemplateFile :: Maybe FilePath
-    -- | Temporary flag for backwards compatibility with the old attribute
-    -- syntax for splices.
-    , _oldAttributeSyntax :: Bool
 }
 
 
@@ -124,12 +121,12 @@ spliceNames ts = Map.keys $ _spliceMap ts
 ------------------------------------------------------------------------------
 instance (Monad m) => Monoid (HeistState m) where
     mempty = HeistState Map.empty Map.empty True [] 0
-                           return return return [] Nothing False
+                           return return return [] Nothing
 
-    (HeistState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1 oas1) `mappend`
-        (HeistState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2 oas2) =
+    (HeistState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1) `mappend`
+        (HeistState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2) =
         HeistState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
-            (dt1 `mappend` dt2) ctf (oas1 || oas2)
+            (dt1 `mappend` dt2) ctf
       where
         s = s1 `mappend` s2
         t = t1 `mappend` t2

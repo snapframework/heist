@@ -159,7 +159,7 @@ defaultSpliceMap = Map.fromList
 defaultHeistState :: MonadIO m => HeistState m
 defaultHeistState =
     HeistState (defaultSpliceMap) Map.empty True [] 0
-               return return return [] Nothing False
+               return return return [] Nothing
 
 
 -- $hookDoc

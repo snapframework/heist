@@ -366,8 +366,7 @@ attSubst (n,v) = do
 -- appropriate substitution.
 parseAtt :: (Monad m) => Text -> HeistT m Text
 parseAtt bs = do
-    oldSyntax <- getsTS _oldAttributeSyntax
-    let ast = case AP.feed (AP.parse (attParser oldSyntax) bs) "" of
+    let ast = case AP.feed (AP.parse attParser bs) "" of
             (AP.Fail _ _ _) -> []
             (AP.Done _ res) -> res
             (AP.Partial _)  -> []
@@ -388,16 +387,13 @@ data AttAST = Literal Text |
 
 ------------------------------------------------------------------------------
 -- | Parser for attribute variable substitution.
-attParser :: Bool -> AP.Parser [AttAST]
-attParser oldSyntax = AP.many1 (identParser <|> litParser)
+attParser :: AP.Parser [AttAST]
+attParser = AP.many1 (identParser <|> litParser)
   where
     escChar = (AP.char '\\' *> AP.anyChar) <|>
               AP.satisfy (AP.notInClass "\\$")
     litParser = Literal <$> (T.pack <$> AP.many1 escChar)
-    identParser = if oldSyntax then oldParser else newParser
-    oldParser = AP.string "$(" *>
-        (Ident <$> AP.takeWhile (/=')')) <* AP.string ")"
-    newParser = AP.string "${" *>
+    identParser = AP.string "${" *>
         (Ident <$> AP.takeWhile (/='}')) <* AP.string "}"
 
 
