@@ -1,5 +1,5 @@
 name:           heist
-version:        0.7.0
+version:        0.7.0.1
 synopsis:       An (x)html templating system
 description:    An (x)html templating system
 license:        BSD3
