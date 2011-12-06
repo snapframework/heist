@@ -375,7 +375,8 @@ parseAtt bs = do
     return $ T.concat chunks
   where
     cvt (Literal x) = return x
-    cvt (Ident x)   = getAttributeSplice x
+    cvt (Ident x)   =
+        localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
 
 
 ------------------------------------------------------------------------------

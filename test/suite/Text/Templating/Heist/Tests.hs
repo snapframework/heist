@@ -64,6 +64,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/apply"                 applyTest
         , testCase     "heist/ignore"                ignoreTest
         , testCase     "heist/lookupTemplateContext" lookupTemplateTest
+        , testCase     "heist/attrSpliceContext"     attrSpliceContext
         ]
 
 
@@ -137,7 +138,7 @@ loadTest = do
     ets <- loadT "templates"
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertBool "loadTest size" $ Map.size tm == 21
+                      H.assertBool "loadTest size" $ Map.size tm == 23
            ) ets
 
 
@@ -266,6 +267,12 @@ divExpansion = renderTest "div_expansion" "<div>foo</div>"
 -- | Handling of <content> and bound parameters in a bonud tag.
 bindParam :: H.Assertion
 bindParam = renderTest "bind_param" "<li>Hi there world</li>"
+
+
+------------------------------------------------------------------------------
+-- | Handling of <content> and bound parameters in a bonud tag.
+attrSpliceContext :: H.Assertion
+attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a>"
 
 
 ------------------------------------------------------------------------------
