@@ -9,9 +9,9 @@ import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.IORef
-import qualified Data.Map as Map
-import           Data.Map (Map)
-import qualified Data.Set as Set
+import qualified Data.HashMap.Strict as H
+import           Data.HashMap.Strict (HashMap)
+import qualified Data.HashSet as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Read
@@ -33,14 +33,14 @@ cacheTagName = "cache"
 
 ------------------------------------------------------------------------------
 -- | State for storing cache tag information
-newtype CacheTagState = CTS (MVar (Map Text (UTCTime, Template)))
+newtype CacheTagState = CTS (MVar (HashMap Text (UTCTime, Template)))
 
 
 ------------------------------------------------------------------------------
 -- | Clears the cache tag state.
 clearCacheTagState :: CacheTagState -> IO ()
 clearCacheTagState (CTS cacheMVar) =
-    modifyMVar_ cacheMVar (const $ return Map.empty)
+    modifyMVar_ cacheMVar (const $ return H.empty)
 
 
 ------------------------------------------------------------------------------
@@ -82,10 +82,10 @@ cacheImpl (CTS mv) = do
 
     (mp',ns) <- do
                    cur <- liftIO getCurrentTime
-                   let mbn = Map.lookup i mp
+                   let mbn = H.lookup i mp
                        reload = do
                            nodes' <- runNodeList $ childNodes tree
-                           return $! (Map.insert i (cur,nodes') mp, nodes')
+                           return $! (H.insert i (cur,nodes') mp, nodes')
                    case mbn of
                        Nothing -> reload
                        (Just (lastUpdate,n)) -> do
@@ -110,7 +110,7 @@ mkCacheTag :: MonadIO m
            => IO (HeistState m -> HeistState m, CacheTagState)
 mkCacheTag = do
     sr <- newIORef $ Set.empty
-    mv <- liftM CTS $ newMVar Map.empty
+    mv <- liftM CTS $ newMVar H.empty
 
     return $ ( addOnLoadHook (assignIds sr) .
                -- The cache tag allows the ttl attribute.

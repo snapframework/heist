@@ -135,7 +135,7 @@ module Text.Templating.Heist
   ) where
 
 import           Control.Monad.Trans
-import qualified Data.Map as Map
+import qualified Data.HashMap.Strict as Map
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Splices
 import           Text.Templating.Heist.Types

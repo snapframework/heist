@@ -29,8 +29,8 @@ import             Control.Monad.Error
 import             Control.Monad.Reader
 import             Control.Monad.State
 import             Data.ByteString.Char8 (ByteString)
-import qualified   Data.Map as Map
-import             Data.Map (Map)
+import qualified   Data.HashMap.Strict as H
+import             Data.HashMap.Strict (HashMap)
 import             Data.Monoid
 import             Data.Text (Text)
 import             Data.Typeable
@@ -63,7 +63,7 @@ data DocumentFile = DocumentFile
 
 ------------------------------------------------------------------------------
 -- | All documents representing templates are stored in a map.
-type TemplateMap = Map TPath DocumentFile
+type TemplateMap = HashMap TPath DocumentFile
 
 
 ------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ type Splice m = HeistT m Template
 
 ------------------------------------------------------------------------------
 -- | SpliceMap associates a name and a Splice.
-type SpliceMap m = Map Text (Splice m)
+type SpliceMap m = HashMap Text (Splice m)
 
 
 ------------------------------------------------------------------------------
@@ -109,18 +109,18 @@ data HeistState m = HeistState {
 ------------------------------------------------------------------------------
 -- | Gets the names of all the templates defined in a HeistState.
 templateNames :: HeistState m -> [TPath]
-templateNames ts = Map.keys $ _templateMap ts
+templateNames ts = H.keys $ _templateMap ts
 
 
 ------------------------------------------------------------------------------
 -- | Gets the names of all the splices defined in a HeistState.
 spliceNames :: HeistState m -> [Text]
-spliceNames ts = Map.keys $ _spliceMap ts
+spliceNames ts = H.keys $ _spliceMap ts
 
 
 ------------------------------------------------------------------------------
 instance (Monad m) => Monoid (HeistState m) where
-    mempty = HeistState Map.empty Map.empty True [] 0
+    mempty = HeistState H.empty H.empty True [] 0
                            return return return [] Nothing
 
     (HeistState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1) `mappend`

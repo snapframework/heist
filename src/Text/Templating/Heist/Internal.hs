@@ -19,7 +19,7 @@ import qualified   Data.ByteString.Char8 as BC
 import             Data.Either
 import qualified   Data.Foldable as F
 import             Data.List
-import qualified   Data.Map as Map
+import qualified   Data.HashMap.Strict as Map
 import             Data.Maybe
 import             Data.Monoid
 import qualified   Data.Text as T
@@ -709,7 +709,11 @@ loadHook ts (tp, t) = do
 addTemplatePathPrefix :: ByteString -> HeistState m -> HeistState m
 addTemplatePathPrefix dir ts
   | B.null dir = ts
-  | otherwise  = ts { _templateMap = Map.mapKeys f $ _templateMap ts }
+  | otherwise  = ts { _templateMap = Map.fromList $
+                                     map (\(x,y) -> (f x, y)) $
+                                     Map.toList $
+                                     _templateMap ts
+                    }
   where
     f ps = ps++splitTemplatePath dir
 

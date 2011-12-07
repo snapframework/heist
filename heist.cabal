@@ -80,22 +80,24 @@ Library
     Text.Templating.Heist.Types
 
   build-depends:
-    attoparsec >= 0.10 && < 0.11,
-    base >= 4 && < 5,
-    blaze-builder >= 0.2 && <0.4,
+    attoparsec                >= 0.10  && < 0.11,
+    base                      >= 4     && < 5,
+    blaze-builder             >= 0.2   && < 0.4,
     bytestring,
-    containers >= 0.2 && < 0.5,
+    containers                >= 0.2   && < 0.5,
     directory,
     directory-tree,
     filepath,
     MonadCatchIO-transformers >= 0.2.1 && < 0.3,
-    mtl >= 2.0 && < 2.1,
+    mtl                       >= 2.0   && < 2.1,
     process,
     random,
-    text >= 0.10 && < 0.12,
-    time >= 1.1 && < 1.5,
+    text                      >= 0.10  && < 0.12,
+    time                      >= 1.1   && < 1.5,
     transformers,
-    xmlhtml == 0.1.*
+    xmlhtml                   >= 0.1.6 && < 0.2,
+    unordered-containers      >= 0.1.4 && < 0.2
+
 
   if impl(ghc >= 6.12.0)
     ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2

@@ -15,7 +15,7 @@ import           Control.Monad.State
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
-import qualified Data.Map as Map
+import qualified Data.HashMap.Strict as Map
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
