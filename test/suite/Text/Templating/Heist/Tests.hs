@@ -142,7 +142,7 @@ loadTest = do
     ets <- loadT "templates"
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertBool "loadTest size" $ Map.size tm == 23
+                      H.assertBool "loadTest size" $ Map.size tm == 26
            ) ets
 
 
