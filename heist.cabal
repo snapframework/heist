@@ -48,6 +48,9 @@ extra-source-files:
   test/templates/foo/b.tpl,
   test/templates/index.tpl,
   test/templates/ioc.tpl,
+  test/templates/json.tpl,
+  test/templates/json_object.tpl,
+  test/templates/json_snippet.tpl,
   test/templates/markdown.tpl,
   test/templates/noroot.tpl,
   test/templates/page.tpl,
@@ -72,6 +75,7 @@ Library
     Text.Templating.Heist.Splices.Cache,
     Text.Templating.Heist.Splices.Html,
     Text.Templating.Heist.Splices.Ignore,
+    Text.Templating.Heist.Splices.Json,
     Text.Templating.Heist.Splices.Markdown,
     Text.Templating.Heist.TemplateDirectory
 
@@ -80,9 +84,11 @@ Library
     Text.Templating.Heist.Types
 
   build-depends:
+    aeson                     >= 0.4   && < 0.5,
     attoparsec                >= 0.10  && < 0.11,
     base                      >= 4     && < 5,
     blaze-builder             >= 0.2   && < 0.4,
+    blaze-html                >= 0.4   && < 0.5,
     bytestring,
     containers                >= 0.2   && < 0.5,
     directory,
@@ -96,7 +102,8 @@ Library
     time                      >= 1.1   && < 1.5,
     transformers,
     xmlhtml                   >= 0.1.6 && < 0.2,
-    unordered-containers      >= 0.1.4 && < 0.2
+    unordered-containers      >= 0.1.4 && < 0.2,
+    vector                    >= 0.9   && < 0.10
 
 
   if impl(ghc >= 6.12.0)

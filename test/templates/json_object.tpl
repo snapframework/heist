@@ -1,0 +1,1 @@
+<jsonObject><i><value:foo/></i><i><snippet:bar/></i><with:baz><value:baz1/><value:baz2/></with:baz><with:quux><value/></with:quux><with var="quux"><value/></with><value var="baz.baz1"/><snippet var="bar"/></jsonObject>

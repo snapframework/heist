@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoMonomorphismRestriction  #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
-{-# LANGUAGE NoMonomorphismRestriction  #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 module Text.Templating.Heist.Tests
@@ -12,6 +12,7 @@ module Text.Templating.Heist.Tests
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Monad.State
+import           Data.Aeson
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -36,6 +37,7 @@ import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Types
 import           Text.Templating.Heist.Splices.Apply
 import           Text.Templating.Heist.Splices.Ignore
+import           Text.Templating.Heist.Splices.Json
 import           Text.Templating.Heist.Splices.Markdown
 import qualified Text.XmlHtml        as X
 import qualified Text.XmlHtml.Cursor as X
@@ -65,6 +67,8 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/ignore"                ignoreTest
         , testCase     "heist/lookupTemplateContext" lookupTemplateTest
         , testCase     "heist/attrSpliceContext"     attrSpliceContext
+        , testCase     "heist/json/values"           jsonValueTest
+        , testCase     "heist/json/object"           jsonObjectTest
         ]
 
 
@@ -228,6 +232,27 @@ markdownTest :: H.Assertion
 markdownTest = renderTest "markdown" htmlExpected
 
 
+------------------------------------------------------------------------------
+jsonValueTest :: H.Assertion
+jsonValueTest = do
+    renderTest "json" jsonExpected1
+    renderTest "json_snippet" jsonExpected2
+
+  where
+    jsonExpected1 = B.concat [ "<i>&lt;b&gt;ok&lt;/b&gt;</i><i>1</i>"
+                             , "<i></i><i>false</i><i>foo</i>" ]
+    jsonExpected2 = "<i><b>ok</b></i><i>1</i><i></i><i>false</i><i>foo</i>"
+
+
+------------------------------------------------------------------------------
+jsonObjectTest :: H.Assertion
+jsonObjectTest = do
+    renderTest "json_object" jsonExpected
+  where
+    jsonExpected = B.concat [ "<i>1</i><i><b>ok</b></i>12quuxquux1<b>ok</b>" ]
+
+
+------------------------------------------------------------------------------
 -- | Render a template and assert that it matches an expected result
 renderTest  :: ByteString   -- ^ template name
             -> ByteString   -- ^ expected result
@@ -239,7 +264,21 @@ renderTest templateName expectedResult = do
     check ts expectedResult
 
   where
-    check ts str = do
+    bind txt = bindJson v
+      where
+        v :: Value
+        v = fromJust $ decode txt
+
+    check ts0 str = do
+        let ts = bindSplices [
+                      ("json", bind "[\"<b>ok</b>\", 1, null, false, \"foo\"]")
+                    , ("jsonObject",
+                       bind $ mconcat [
+                                 "{\"foo\": 1, \"bar\": \"<b>ok</b>\", "
+                                , "\"baz\": { \"baz1\": 1, \"baz2\": 2 }, "
+                                , "\"quux\": \"quux\" }"
+                                ])
+                    ] ts0
         Just (doc, _) <- renderTemplate ts templateName
         let result = B.filter (/= '\n') (toByteString doc)
         H.assertEqual ("Should match " ++ (show str)) str result
@@ -264,13 +303,13 @@ divExpansion = renderTest "div_expansion" "<div>foo</div>"
 
 
 ------------------------------------------------------------------------------
--- | Handling of <content> and bound parameters in a bonud tag.
+-- | Handling of <content> and bound parameters in a bound tag.
 bindParam :: H.Assertion
 bindParam = renderTest "bind_param" "<li>Hi there world</li>"
 
 
 ------------------------------------------------------------------------------
--- | Handling of <content> and bound parameters in a bonud tag.
+-- | Handling of <content> and bound parameters in a bound tag.
 attrSpliceContext :: H.Assertion
 attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a>"
 
