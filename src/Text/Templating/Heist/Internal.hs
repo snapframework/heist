@@ -1,13 +1,14 @@
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PackageImports #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PackageImports             #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Text.Templating.Heist.Internal where
 
 ------------------------------------------------------------------------------
 import             Blaze.ByteString.Builder
 import             Control.Applicative
-import             Control.Arrow
+import             Control.Arrow hiding (loop)
 import             Control.Exception (SomeException)
 import             Control.Monad
 import             Control.Monad.CatchIO
@@ -381,19 +382,38 @@ parseAtt bs = do
 ------------------------------------------------------------------------------
 -- | AST to hold attribute parsing structure.  This is necessary because
 -- attoparsec doesn't support parsers running in another monad.
-data AttAST = Literal Text |
-              Ident   Text
-    deriving (Show)
+data AttAST = Literal Text
+            | Ident   Text
+  deriving (Show)
 
 
 ------------------------------------------------------------------------------
 -- | Parser for attribute variable substitution.
 attParser :: AP.Parser [AttAST]
-attParser = AP.many1 (identParser <|> litParser)
+attParser = liftM ($! []) (loop id)
   where
-    escChar = (AP.char '\\' *> AP.anyChar) <|>
-              AP.satisfy (AP.notInClass "\\$")
-    litParser = Literal <$> (T.pack <$> AP.many1 escChar)
+    append !dl !x = dl . (x:)
+
+    loop !dl = go id
+      where
+        finish subDL = let !txt = T.concat $! subDL []
+                           lit  = Literal $! T.concat $! subDL []
+                       in return $! if T.null txt
+                                      then dl
+                                      else append dl lit
+
+        go !subDL = (gobbleText >>= go . append subDL)
+                    <|> (AP.endOfInput *> finish subDL)
+                    <|> (escChar >>= go . append subDL)
+                    <|> (do
+                            idp <- identParser
+                            dl' <- finish subDL
+                            loop $! append dl' idp)
+
+    gobbleText = AP.takeWhile1 (AP.notInClass "\\$")
+
+    escChar = AP.char '\\' *> (T.singleton <$> AP.anyChar)
+
     identParser = AP.string "${" *>
         (Ident <$> AP.takeWhile (/='}')) <* AP.string "}"
 
