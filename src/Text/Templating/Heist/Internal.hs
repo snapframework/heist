@@ -368,9 +368,9 @@ attSubst (n,v) = do
 parseAtt :: (Monad m) => Text -> HeistT m Text
 parseAtt bs = do
     let ast = case AP.feed (AP.parse attParser bs) "" of
-            (AP.Fail _ _ _) -> []
-            (AP.Done _ res) -> res
-            (AP.Partial _)  -> []
+                (AP.Done _ res) -> res
+                (AP.Fail _ _ _) -> []
+                (AP.Partial _)  -> []
     chunks <- mapM cvt ast
     return $ T.concat chunks
   where
