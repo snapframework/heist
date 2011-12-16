@@ -163,6 +163,7 @@ mapSplices :: (Monad m)
         -> Splice m
         -- ^ The result of all splices concatenated together.
 mapSplices f vs = liftM concat $ mapM f vs
+{-# INLINE mapSplices #-}
 
 
 ------------------------------------------------------------------------------
@@ -172,6 +173,7 @@ lookupSplice :: Monad m =>
              -> HeistState m
              -> Maybe (Splice m)
 lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
+{-# INLINE lookupSplice #-}
 
 
 ------------------------------------------------------------------------------
@@ -450,6 +452,7 @@ getAttributeSplice name = do
 -- | Performs splice processing on a list of nodes.
 runNodeList :: Monad m => [X.Node] -> Splice m
 runNodeList = mapSplices runNode
+{-# INLINE runNodeList #-}
 
 
 ------------------------------------------------------------------------------

@@ -174,6 +174,7 @@ evalHeistT :: Monad m
 evalHeistT m r s = do
     (a, _) <- runHeistT m r s
     return a
+{-# INLINE evalHeistT #-}
 
 
 ------------------------------------------------------------------------------
@@ -193,9 +194,11 @@ instance (Monad m, Functor m) => Applicative (HeistT m) where
 -- | Monad instance
 instance Monad m => Monad (HeistT m) where
     return a = HeistT (\_ s -> return (a, s))
+    {-# INLINE return #-}
     HeistT m >>= k = HeistT $ \r s -> do
         (a, s') <- m r s
         runHeistT (k a) r s'
+    {-# INLINE (>>=) #-}
 
 
 ------------------------------------------------------------------------------
@@ -248,7 +251,9 @@ instance MonadPlus m => MonadPlus (HeistT m) where
 -- | MonadState passthrough instance
 instance MonadState s m => MonadState s (HeistT m) where
     get = lift get
+    {-# INLINE get #-}
     put = lift . put
+    {-# INLINE put #-}
 
 
 ------------------------------------------------------------------------------
@@ -330,6 +335,7 @@ instance (Typeable1 m) => Typeable1 (HeistT m) where
 -- return @Just "Shakespeare"@.
 getParamNode :: Monad m => HeistT m X.Node
 getParamNode = HeistT $ \r s -> return (r,s)
+{-# INLINE getParamNode #-}
 
 
 ------------------------------------------------------------------------------
@@ -339,24 +345,28 @@ localParamNode :: Monad m
                -> HeistT m a
                -> HeistT m a
 localParamNode f m = HeistT $ \r s -> runHeistT m (f r) s
+{-# INLINE localParamNode #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'gets'.
 getsTS :: Monad m => (HeistState m -> r) -> HeistT m r
 getsTS f = HeistT $ \_ s -> return (f s, s)
+{-# INLINE getsTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'get'.
 getTS :: Monad m => HeistT m (HeistState m)
 getTS = HeistT $ \_ s -> return (s, s)
+{-# INLINE getTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'put'.
 putTS :: Monad m => HeistState m -> HeistT m ()
 putTS s = HeistT $ \_ _ -> return ((), s)
+{-# INLINE putTS #-}
 
 
 ------------------------------------------------------------------------------
@@ -365,6 +375,7 @@ modifyTS :: Monad m
                     => (HeistState m -> HeistState m)
                     -> HeistT m ()
 modifyTS f = HeistT $ \_ s -> return ((), f s)
+{-# INLINE modifyTS #-}
 
 
 ------------------------------------------------------------------------------
@@ -375,6 +386,7 @@ modifyTS f = HeistT $ \_ s -> return ((), f s)
 -- state items such as recursionDepth, curContext, and spliceMap.
 restoreTS :: Monad m => HeistState m -> HeistT m ()
 restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
+{-# INLINE restoreTS #-}
 
 
 ------------------------------------------------------------------------------
@@ -390,4 +402,5 @@ localTS f k = do
     res <- k
     restoreTS ts
     return res
+{-# INLINE localTS #-}
 
