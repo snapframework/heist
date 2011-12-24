@@ -1,3 +1,13 @@
+-- | The \"cache\" splice ensures that its contents are cached and only
+-- evaluated periodically.  The cached contents are returned every time the
+-- splice is referenced.
+--
+-- Use the ttl attribute to set the amount of time between reloads.  The ttl
+-- value should be a positive integer followed by a single character
+-- specifying the units.  Valid units are seconds, minutes, hours, days, and
+-- weeks.  If the ttl string is invalid or the ttl attribute is not specified,
+-- the cache is never refreshed unless explicitly cleared with
+-- clearCacheTagState.
 module Text.Templating.Heist.Splices.Cache
   ( CacheTagState
   , mkCacheTag
@@ -58,16 +68,6 @@ parseTTL s = value * multiplier
         _   -> 0
 
 ------------------------------------------------------------------------------
--- | The \"cache\" splice ensures that its contents are cached and only
--- evaluated periodically.  The cached contents are returned every time the
--- splice is referenced.
---
--- Use the ttl attribute to set the amount of time between reloads.  The ttl
--- value should be a positive integer followed by a single character
--- specifying the units.  Valid units are seconds, minutes, hours, days, and
--- weeks.  If the ttl string is invalid or the ttl attribute is not specified,
--- the cache is never refreshed unless explicitly cleared with
--- clearCacheTagState.
 cacheImpl :: (MonadIO m)
            => CacheTagState
            -> HeistT m Template
