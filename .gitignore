@@ -1,5 +1,6 @@
 *~
 dist/
+cabal-dev/
 *.tix
 .hpc
 *.prof
