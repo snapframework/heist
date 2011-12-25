@@ -1,5 +1,15 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-| The \"markdown\" splice formats markdown content as HTML and inserts
+it into the document.
 
+If the file attribute is present the contents of the tag is ignored and
+the file specified is converted to HTML.
+
+Otherwise the non-markup children of the tag are processed as markdown
+and converted to HTML.
+
+This splice requires that the \"pandoc\" executable is in your path.
+-}
 module Text.Templating.Heist.Splices.Markdown where
 
 ------------------------------------------------------------------------------
