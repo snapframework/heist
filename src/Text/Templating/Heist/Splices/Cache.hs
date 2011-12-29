@@ -73,28 +73,31 @@ cacheImpl :: (MonadIO m)
            -> HeistT m Template
 cacheImpl (CTS mv) = do
     tree <- getParamNode
-    let err = error $ unwords ["cacheImpl is bound to a tag"
-                              ,"that didn't get an id attribute."
-                              ," This should never happen."]
-    let i = maybe err id $ getAttribute "id" tree
-        ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
+    let err = error $ unwords [ "cacheImpl is bound to a tag"
+                              , "that didn't get an id attribute."
+                              , " This should never happen."
+                              ]
+    let i   = maybe err id $ getAttribute "id" tree
+    let ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
+
     mp <- liftIO $ readMVar mv
 
     (mp',ns) <- do
-                   cur <- liftIO getCurrentTime
-                   let mbn = H.lookup i mp
-                       reload = do
-                           nodes' <- runNodeList $ childNodes tree
-                           return $! (H.insert i (cur,nodes') mp, nodes')
-                   case mbn of
-                       Nothing -> reload
-                       (Just (lastUpdate,n)) -> do
-                           if ttl > 0 && tagName tree == Just cacheTagName &&
-                              diffUTCTime cur lastUpdate > fromIntegral ttl
-                             then reload
-                             else do
-                                 stopRecursion
-                                 return $! (mp,n)
+        cur <- liftIO getCurrentTime
+        let mbn    = H.lookup i mp
+        let reload = do
+                nodes' <- runNodeList $ childNodes tree
+                return $! (H.insert i (cur,nodes') mp, nodes')
+
+        case mbn of
+            Nothing -> reload
+            (Just (lastUpdate,n)) -> do
+                if ttl > 0 && tagName tree == Just cacheTagName &&
+                   diffUTCTime cur lastUpdate > fromIntegral ttl
+                  then reload
+                  else do
+                      stopRecursion
+                      return $! (mp,n)
 
     liftIO $ modifyMVar_ mv (const $ return mp')
 

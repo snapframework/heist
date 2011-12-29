@@ -38,3 +38,36 @@ Executable testsuite
   ghc-options: -O2 -Wall -fhpc -fwarn-tabs -funbox-strict-fields -threaded
   Extensions: OverloadedStrings
 
+
+Executable benchmark
+  hs-source-dirs: benchmark ../src
+  main-is: Benchmark.hs
+
+  ghc-options: -O2 -Wall -fwarn-tabs -funbox-strict-fields -threaded
+               -fno-warn-unused-do-bind -rtsopts
+
+  ghc-prof-options: -prof -auto-all
+
+  build-depends:
+    MonadCatchIO-transformers  >= 0.2.1 && < 0.3,
+    aeson                      >= 0.4   && < 0.5,
+    attoparsec                 >= 0.10  && < 0.11,
+    base                       >= 4     && < 5,
+    blaze-builder              >= 0.2   && < 0.4,
+    blaze-html                 >= 0.4   && < 0.5,
+    bytestring,
+    containers,
+    criterion                  >= 0.6   && < 0.7,
+    directory,
+    directory-tree,
+    filepath,
+    mtl                        >= 2,
+    parallel-io                >= 0.3.2 && < 0.4,
+    process,
+    random,
+    text                       >= 0.10  && < 0.12,
+    time,
+    transformers,
+    unordered-containers       >= 0.1.4 && < 0.2,
+    vector                     >= 0.9   && < 0.10,
+    xmlhtml                    == 0.1.*
