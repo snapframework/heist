@@ -17,7 +17,6 @@ module Text.Templating.Heist.Splices.Cache
   ) where
 
 ------------------------------------------------------------------------------
-import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.IORef
@@ -45,14 +44,22 @@ cacheTagName = "cache"
 
 ------------------------------------------------------------------------------
 -- | State for storing cache tag information
-newtype CacheTagState = CTS (MVar (HashMap Text (UTCTime, Template)))
+newtype CacheTagState = CTS (IORef (HashMap Text (UTCTime, Template)))
+
+
+------------------------------------------------------------------------------
+modRef :: IORef a -> (a -> a) -> IO a
+modRef ref f = atomicModifyIORef ref g
+  where
+    g x = let !y = f x in (y, y)
 
 
 ------------------------------------------------------------------------------
 -- | Clears the cache tag state.
 clearCacheTagState :: CacheTagState -> IO ()
-clearCacheTagState (CTS cacheMVar) =
-    modifyMVar_ cacheMVar (const $ return H.empty)
+clearCacheTagState (CTS cacheRef) =
+    void $ modRef cacheRef (const H.empty)
+
 
 
 ------------------------------------------------------------------------------
@@ -73,7 +80,7 @@ parseTTL s = value * multiplier
 cacheImpl :: (MonadIO m)
            => CacheTagState
            -> HeistT m Template
-cacheImpl (CTS mv) = do
+cacheImpl (CTS ref) = do
     tree <- getParamNode
     let err = error $ unwords [ "cacheImpl is bound to a tag"
                               , "that didn't get an id attribute."
@@ -82,14 +89,14 @@ cacheImpl (CTS mv) = do
     let i   = maybe err id $ getAttribute "id" tree
     let ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
 
-    mp <- liftIO $ readMVar mv
+    mp <- liftIO $ readIORef ref
 
-    (mp',ns) <- do
+    (modF,ns) <- do
         cur <- liftIO getCurrentTime
         let mbn    = H.lookup i mp
         let reload = do
                 nodes' <- runNodeList $ childNodes tree
-                return $! (H.insert i (cur,nodes') mp, nodes')
+                return $! (Just (H.insert i (cur,nodes')), nodes')
 
         case mbn of
             Nothing -> reload
@@ -99,10 +106,9 @@ cacheImpl (CTS mv) = do
                   then reload
                   else do
                       stopRecursion
-                      return $! (mp,n)
+                      return $! (Nothing,n)
 
-    liftIO $ modifyMVar_ mv (const $ return mp')
-
+    liftIO $ maybe (return ()) (void . modRef ref) modF
     return ns
 
 
@@ -115,7 +121,7 @@ mkCacheTag :: MonadIO m
            => IO (HeistState m -> HeistState m, CacheTagState)
 mkCacheTag = do
     sr <- newIORef $ Set.empty
-    mv <- liftM CTS $ newMVar H.empty
+    mv <- liftM CTS $ newIORef H.empty
 
     return $ ( addOnLoadHook (assignIds sr) .
                -- The cache tag allows the ttl attribute.
@@ -151,7 +157,3 @@ mkCacheTag = do
                          else return curs
               let mbc = nextDF curs'
               maybe (return $ topNode curs') g mbc
-
-
-
-

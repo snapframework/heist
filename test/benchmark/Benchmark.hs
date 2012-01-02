@@ -30,9 +30,9 @@ main = do
        ]
 
   where
-    contentionThreads = 30
-    contentionTasks   = 60
-    contentionTrials  = 4
+    contentionThreads = 10
+    contentionTasks   = 20
+    contentionTrials  = 1
 
     contentionBenchmarkName = concat [ "cacheContention/"
                                      , show contentionThreads

@@ -163,7 +163,9 @@ mapSplices :: (Monad m)
         -- ^ List of items to generate splices for
         -> Splice m
         -- ^ The result of all splices concatenated together.
-mapSplices f vs = liftM concat $ mapM f vs
+mapSplices f vs = do
+    !out <- liftM concat $ mapM f vs
+    return $! out
 {-# INLINE mapSplices #-}
 
 
@@ -350,9 +352,9 @@ runNode (X.Element nm at ch) = do
     s <- liftM (lookupSplice nm) getTS
     maybe (runKids newAtts) (recurseSplice n) s
   where
-    runKids newAtts = do
-        newKids <- runNodeList ch
-        return [X.Element nm newAtts newKids]
+    runKids !newAtts = do
+        !newKids <- runNodeList ch
+        return $! [X.Element nm newAtts newKids]
 runNode n                    = return [n]
 
 
@@ -459,7 +461,7 @@ runNodeList = mapSplices runNode
 ------------------------------------------------------------------------------
 -- | The maximum recursion depth.  (Used to prevent infinite loops.)
 mAX_RECURSION_DEPTH :: Int
-mAX_RECURSION_DEPTH = 50
+mAX_RECURSION_DEPTH = 4
 
 
 ------------------------------------------------------------------------------
@@ -524,13 +526,13 @@ evalWithHooksInternal :: Monad m
 evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
     addDoctype $ maybeToList $ X.docType $ dfDoc t
     ts <- getTS
-    nodes <- lift $ _preRunHook ts $ X.docContent $ dfDoc t
+    !nodes <- lift $ _preRunHook ts $ X.docContent $ dfDoc t
     putTS (ts {_curContext = ctx})
-    res <- runNodeList nodes
+    !res <- runNodeList nodes
     restoreTS ts
-    newNodes <- lift (_postRunHook ts res)
-    newDoc   <- fixDocType $ (dfDoc t) { X.docContent = newNodes }
-    return (Just newDoc)
+    !newNodes <- lift (_postRunHook ts res)
+    !newDoc   <- fixDocType $ (dfDoc t) { X.docContent = newNodes }
+    return $! (Just newDoc)
 
 
 ------------------------------------------------------------------------------
