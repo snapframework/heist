@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings  #-}
+
 -- | The \"cache\" splice ensures that its contents are cached and only
 -- evaluated periodically.  The cached contents are returned every time the
 -- splice is referenced.

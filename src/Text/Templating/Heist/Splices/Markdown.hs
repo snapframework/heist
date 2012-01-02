@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings  #-}
+
 {-| The \"markdown\" splice formats markdown content as HTML and inserts
 it into the document.
 

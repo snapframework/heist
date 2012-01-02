@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings  #-}
+
 module Text.Templating.Heist.Splices.Ignore where
 
 ------------------------------------------------------------------------------

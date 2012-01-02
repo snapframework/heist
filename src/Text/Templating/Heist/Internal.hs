@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PackageImports             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
