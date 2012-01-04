@@ -22,7 +22,8 @@ main = do
     ts   <- getDirectoryTS tdir
 
     defaultMain [
-         bench contentionBenchmarkName $
+         bench "faq-speed" (renderTemplate ts "snap-website/faq")
+       , bench contentionBenchmarkName $
                cacheContentionBenchmark contentionThreads
                                         contentionTasks
                                         contentionTrials
