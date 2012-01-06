@@ -8,7 +8,7 @@ import           Criterion
 import           Criterion.Main
 import           Criterion.Measurement
 ------------------------------------------------------------------------------
-import           Control.Concurrent.ParallelIO.Local
+import           Control.Concurrent
 import           Control.Exception (evaluate)
 import           Control.Monad
 import           Blaze.ByteString.Builder
@@ -24,21 +24,17 @@ main = do
     defaultMain [
          bench "faq-speed" (renderTemplate ts "snap-website/faq")
        , bench contentionBenchmarkName $
-               cacheContentionBenchmark contentionThreads
-                                        contentionTasks
-                                        contentionTrials
+               cacheContentionBenchmark contentionTrials
+                                        contentionThreads
                                         ts
        ]
 
   where
     contentionThreads = 10
-    contentionTasks   = 20
-    contentionTrials  = 1
+    contentionTrials  = 3
 
     contentionBenchmarkName = concat [ "cacheContention/"
                                      , show contentionThreads
-                                     , "/"
-                                     , show contentionTasks
                                      , "/"
                                      , show contentionTrials ]
 
@@ -60,18 +56,26 @@ makeTemplateDirectory = newTemplateDirectory' "templates" defaultHeistState
 
 
 ------------------------------------------------------------------------------
-cacheContentionBenchmark :: Int    -- ^ number of tasks
-                         -> Int    -- ^ number of trials per task
+cacheContentionBenchmark :: Int    -- ^ number of trials per thread
                          -> Int    -- ^ number of pool threads
                          -> HeistState IO
                          -> IO ()
-cacheContentionBenchmark nTasks nTrialsPerTask nThreads heistState =
-    withPool nThreads $ \pool -> do
-        parallel_ pool $ replicate nTasks
-                       $ replicateM_ nTrialsPerTask (renderOne >>= evaluate)
-        return $! ()
+cacheContentionBenchmark nTrialsPerThread nThreads heistState = do
+    mvars <- mkMVars
+    _     <- mkThreads mvars
+
+    -- wait for all threads to finish
+    mapM_ takeMVar mvars
 
   where
+    mkMVars = replicateM nThreads newEmptyMVar
+
+    mkThreads = mapM_ (forkIO . oneThread)
+
+    oneThread mvar = do
+        replicateM_ nTrialsPerThread (renderOne >>= evaluate)
+        putMVar mvar ()
+
     renderOne =
         renderTemplate heistState "cached_haddock" >>=
         return . maybe (error "render went wrong??") (toByteString . fst)
