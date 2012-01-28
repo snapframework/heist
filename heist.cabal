@@ -84,7 +84,7 @@ Library
     Text.Templating.Heist.Types
 
   build-depends:
-    aeson                     >= 0.4   && < 0.5,
+    aeson                     >= 0.6   && < 0.7,
     attoparsec                >= 0.10  && < 0.11,
     base                      >= 4     && < 5,
     blaze-builder             >= 0.2   && < 0.4,
