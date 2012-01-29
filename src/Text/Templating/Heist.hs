@@ -54,12 +54,12 @@
   >
   > main = do
   >     ets <- loadTemplates "templates" $
-  >            bindSplices mySplices emptyHeistState
+  >            bindSplices mySplices defaultHeistState
   >     let ts = either error id ets
   >     t <- runMyAppMonad $ renderTemplate ts "index"
   >     print $ maybe "Page not found" (toByteString . fst) t
 
-  Here we build up our 'HeistState' by starting with emptyHeistState and
+  Here we build up our 'HeistState' by starting with defaultHeistState and
   applying bindSplice for all the splices we want to add.  Then we pass this
   to loadTemplates our final 'HeistState' wrapped in an Either to handle
   errors.  Then we use this 'HeistState' to render our templates.
