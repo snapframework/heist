@@ -311,7 +311,7 @@ bindParam = renderTest "bind_param" "<li>Hi there world</li>"
 ------------------------------------------------------------------------------
 -- | Handling of <content> and bound parameters in a bound tag.
 attrSpliceContext :: H.Assertion
-attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a>"
+attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a><a href='before$after'>foo</a>"
 
 
 ------------------------------------------------------------------------------
