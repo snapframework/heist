@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PackageImports             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
@@ -416,8 +417,8 @@ attParser = liftM ($! []) (loop id)
 
     escChar = AP.char '\\' *> (T.singleton <$> AP.anyChar)
 
-    identParser = AP.string "${" *>
-        (Ident <$> AP.takeWhile (/='}')) <* AP.string "}"
+    identParser = AP.char '$' *> (ident <|> return (Literal "$"))
+    ident = (AP.char '{' *> (Ident <$> AP.takeWhile (/='}')) <* AP.string "}")
 
 
 ------------------------------------------------------------------------------

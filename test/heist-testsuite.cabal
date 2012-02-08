@@ -20,7 +20,7 @@ Executable testsuite
     directory-tree,
     process,
     filepath,
-    xmlhtml                    == 0.1.*,
+    xmlhtml                    >= 0.1.6 && < 0.2,
     HUnit                      >= 1.2   && < 2,
     mtl                        >= 2,
     random,
