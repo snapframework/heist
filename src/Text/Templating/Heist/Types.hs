@@ -1,8 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-|
@@ -61,19 +65,10 @@ data DocumentFile = DocumentFile
     , dfFile :: Maybe FilePath
     } deriving (Eq)
 
+
 ------------------------------------------------------------------------------
 -- | All documents representing templates are stored in a map.
 type TemplateMap = HashMap TPath DocumentFile
-
-
-------------------------------------------------------------------------------
--- | A Splice is a HeistT computation that returns a 'Template'.
-type Splice m = HeistT m Template
-
-
-------------------------------------------------------------------------------
--- | SpliceMap associates a name and a Splice.
-type SpliceMap m = HashMap Text (Splice m)
 
 
 ------------------------------------------------------------------------------
@@ -83,7 +78,7 @@ type SpliceMap m = HashMap Text (Splice m)
 -- @renderTemplate@.
 data HeistState m = HeistState {
     -- | A mapping of splice names to splice actions
-      _spliceMap       :: SpliceMap m
+      _spliceMap       :: HashMap Text (HeistT m Template)
     -- | A mapping of template names to templates
     , _templateMap     :: TemplateMap
     -- | A flag to control splice recursion
@@ -154,7 +149,7 @@ instance (Typeable1 m) => Typeable (HeistState m) where
 
 
 ------------------------------------------------------------------------------
--- | HeistT is the monad used for 'Splice' processing.  HeistT provides
+-- | HeistT is the monad used for splice processing.  HeistT provides
 -- \"passthrough\" instances for many of the monads you might use in the inner
 -- monad.
 newtype HeistT m a = HeistT {
@@ -317,6 +312,21 @@ instance (Typeable1 m) => Typeable1 (HeistT m) where
 
 
 ------------------------------------------------------------------------------
+-- Type class enabling easy Heist support in other monads.
+------------------------------------------------------------------------------
+
+
+class (Monad m, Monad (Under m)) => MonadHeist m where
+    type Under m :: * -> *
+    liftHeist :: HeistT (Under m) a -> m a
+
+
+instance (Monad m) => MonadHeist (HeistT m) where
+    type Under (HeistT m) = m
+    liftHeist = id
+
+
+------------------------------------------------------------------------------
 -- Functions for our monad.
 ------------------------------------------------------------------------------
 
@@ -333,48 +343,50 @@ instance (Typeable1 m) => Typeable1 (HeistT m) where
 -- childNodes@ returns a list containing one 'TextNode' containing part of
 -- Hamlet's speech.  @liftM (getAttribute \"author\") getParamNode@ would
 -- return @Just "Shakespeare"@.
-getParamNode :: Monad m => HeistT m X.Node
-getParamNode = HeistT $ \r s -> return (r,s)
+getParamNode :: (MonadHeist m) => m X.Node
+getParamNode = liftHeist $ HeistT $ \r s -> return (r,s)
 {-# INLINE getParamNode #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'local'.
-localParamNode :: Monad m
-               => (X.Node -> X.Node)
-               -> HeistT m a
-               -> HeistT m a
-localParamNode f m = HeistT $ \r s -> runHeistT m (f r) s
+--localParamNode :: MonadHeist m
+--               => (X.Node -> X.Node)
+--               -> m a
+--               -> m a
+localParamNode :: MonadHeist m
+               => (X.Node -> X.Node) -> HeistT (Under m) a -> m a
+localParamNode f m = liftHeist $ HeistT $ \r s -> runHeistT m (f r) s
 {-# INLINE localParamNode #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'gets'.
-getsTS :: Monad m => (HeistState m -> r) -> HeistT m r
-getsTS f = HeistT $ \_ s -> return (f s, s)
+getsTS :: MonadHeist m => (HeistState (Under m) -> r) -> m r
+getsTS f = liftHeist $ HeistT $ \_ s -> return (f s, s)
 {-# INLINE getsTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'get'.
-getTS :: Monad m => HeistT m (HeistState m)
-getTS = HeistT $ \_ s -> return (s, s)
+getTS :: MonadHeist m => m (HeistState (Under m))
+getTS = liftHeist $ HeistT $ \_ s -> return (s, s)
 {-# INLINE getTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'put'.
-putTS :: Monad m => HeistState m -> HeistT m ()
-putTS s = HeistT $ \_ _ -> return ((), s)
+putTS :: MonadHeist m => HeistState (Under m) -> m ()
+putTS s = liftHeist $ HeistT $ \_ _ -> return ((), s)
 {-# INLINE putTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'modify'.
-modifyTS :: Monad m
-                    => (HeistState m -> HeistState m)
-                    -> HeistT m ()
-modifyTS f = HeistT $ \_ s -> return ((), f s)
+modifyTS :: MonadHeist m
+         => (HeistState (Under m) -> HeistState (Under m))
+         -> m ()
+modifyTS f = liftHeist $ HeistT $ \_ s -> return ((), f s)
 {-# INLINE modifyTS #-}
 
 
@@ -384,18 +396,17 @@ modifyTS f = HeistT $ \_ s -> return ((), f s)
 -- @putTS@ to restore an old state.  This was needed because doctypes needs to
 -- be in a "global scope" as opposed to the template call "local scope" of
 -- state items such as recursionDepth, curContext, and spliceMap.
-restoreTS :: Monad m => HeistState m -> HeistT m ()
-restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
+restoreTS :: (Under (HeistT (Under m)) ~ Under m, MonadHeist m)
+          => HeistState (Under m) -> m ()
+restoreTS old = liftHeist $ modifyTS (\cur -> old { _doctypes = _doctypes cur })
 {-# INLINE restoreTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | Abstracts the common pattern of running a HeistT computation with
 -- a modified heist state.
-localTS :: Monad m
-        => (HeistState m -> HeistState m)
-        -> HeistT m a
-        -> HeistT m a
+localTS :: (Under (HeistT (Under m)) ~ Under m, MonadHeist m)
+        => (HeistState (Under m) -> HeistState (Under m)) -> m b -> m b
 localTS f k = do
     ts <- getTS
     putTS $ f ts

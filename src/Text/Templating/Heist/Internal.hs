@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PackageImports             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module Text.Templating.Heist.Internal where
 
@@ -37,10 +38,10 @@ import             Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
-addDoctype :: Monad m => [X.DocType] -> HeistT m ()
-addDoctype dt = do
+addDoctype :: (Under (HeistT (Under m)) ~ Under m, MonadHeist m)
+           => [X.DocType] -> m ()
+addDoctype dt = liftHeist $ do
     modifyTS (\s -> s { _doctypes = _doctypes s `mappend` dt })
-
 
 ------------------------------------------------------------------------------
 -- HeistState functions
@@ -78,7 +79,7 @@ addPostRunHook hook ts = ts { _postRunHook = _postRunHook ts >=> hook }
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
 bindSplice :: Monad m =>
               Text              -- ^ tag name
-           -> Splice m          -- ^ splice action
+           -> HeistT m Template -- ^ splice action
            -> HeistState m      -- ^ source state
            -> HeistState m
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
@@ -87,7 +88,7 @@ bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
 bindSplices :: Monad m =>
-               [(Text, Splice m)] -- ^ splices to bind
+               [(Text, HeistT m Template)] -- ^ splices to bind
             -> HeistState m       -- ^ start state
             -> HeistState m
 bindSplices ss ts = foldl' (flip id) ts acts
@@ -104,26 +105,192 @@ setCurTemplateFile fp ts = ts { _curTemplateFile = fp }
 
 ------------------------------------------------------------------------------
 -- | Converts 'Text' to a splice returning a single 'TextNode'.
-textSplice :: (Monad m) => Text -> Splice m
-textSplice t = return [X.TextNode t]
+textSplice :: (MonadHeist m) => Text -> m Template
+textSplice t = liftHeist $ return [X.TextNode t]
 
 
+------------------------------------------------------------------------------
+-- | Maps a splice generating function over a list and concatenates the
+-- results.
+mapSplices :: (MonadHeist m)
+        => (a -> m Template)
+        -- ^ Splice generating function
+        -> [a]
+        -- ^ List of items to generate splices for
+        -> m Template
+        -- ^ The result of all splices concatenated together.
+mapSplices f vs = liftM concat $ mapM f vs
+{-# INLINE mapSplices #-}
+
+
+------------------------------------------------------------------------------
+-- | Convenience function for looking up a splice.
+lookupSplice :: MonadHeist m
+             => Text
+             -> HeistState (Under m)
+             -> Maybe (m Template)
+lookupSplice nm ts = fmap liftHeist $ Map.lookup nm $ _spliceMap ts
+{-# INLINE lookupSplice #-}
+
+
+------------------------------------------------------------------------------
+-- | Performs splice processing on a single node.
+--runNode :: MonadHeist m => X.Node -> m Template
+runNode (X.Element nm at ch) = do
+    newAtts <- mapM attSubst at
+    let n = X.Element nm newAtts ch
+    s <- liftM (lookupSplice nm) getTS
+    maybe (runKids newAtts) (recurseSplice n) s
+  where
+    runKids newAtts = do
+        newKids <- runNodeList ch
+        return [X.Element nm newAtts newKids]
+runNode n                    = return [n]
+
+
+------------------------------------------------------------------------------
+-- | Performs splice processing on a list of nodes.
+--runNodeList :: MonadHeist m => [X.Node] -> m Template
+runNodeList = mapSplices runNode
+{-# INLINE runNodeList #-}
+
+
+------------------------------------------------------------------------------
+-- | Helper function for substituting a parsed attribute into an attribute
+-- tuple.
+--attSubst :: (MonadHeist m) => (t, Text) -> m (t, Text)
+attSubst (n,v) = do
+    v' <- parseAtt v
+    return (n,v')
+
+
+------------------------------------------------------------------------------
+-- | Parses an attribute for any identifier expressions and performs
+-- appropriate substitution.
+--parseAtt :: (MonadHeist m, Under (HeistT (Under m)) ~ Under m) => Text -> m Text
+parseAtt bs = do
+    let ast = case AP.feed (AP.parse attParser bs) "" of
+                (AP.Done _ res) -> res
+                (AP.Fail _ _ _) -> []
+                (AP.Partial _)  -> []
+    chunks <- mapM cvt ast
+    return $ T.concat chunks
+  where
+    cvt (Literal x) = return x
+    cvt (Ident x)   =
+        localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
+
+
+------------------------------------------------------------------------------
+-- | AST to hold attribute parsing structure.  This is necessary because
+-- attoparsec doesn't support parsers running in another monad.
+data AttAST = Literal Text
+            | Ident   Text
+  deriving (Show)
+
+
+------------------------------------------------------------------------------
+-- | Parser for attribute variable substitution.
+attParser :: AP.Parser [AttAST]
+attParser = liftM ($! []) (loop id)
+  where
+    append !dl !x = dl . (x:)
+
+    loop !dl = go id
+      where
+        finish subDL = let !txt = T.concat $! subDL []
+                           lit  = Literal $! T.concat $! subDL []
+                       in return $! if T.null txt
+                                      then dl
+                                      else append dl lit
+
+        go !subDL = (gobbleText >>= go . append subDL)
+                    <|> (AP.endOfInput *> finish subDL)
+                    <|> (escChar >>= go . append subDL)
+                    <|> (do
+                            idp <- identParser
+                            dl' <- finish subDL
+                            loop $! append dl' idp)
+
+    gobbleText = AP.takeWhile1 (AP.notInClass "\\$")
+
+    escChar = AP.char '\\' *> (T.singleton <$> AP.anyChar)
+
+    identParser = AP.char '$' *> (ident <|> return (Literal "$"))
+    ident = (AP.char '{' *> (Ident <$> AP.takeWhile (/='}')) <* AP.string "}")
+
+
+------------------------------------------------------------------------------
+-- | Gets the attribute value.  If the splice's result list contains non-text
+-- nodes, this will translate them into text nodes with nodeText and
+-- concatenate them together.
+--
+-- Originally, this only took the first node from the splices's result list,
+-- and only if it was a text node. This caused problems when the splice's
+-- result contained HTML entities, as they would split a text node. This was
+-- then fixed to take the first consecutive bunch of text nodes, and return
+-- their concatenation. This was seen as more useful than throwing an error,
+-- and more intuitive than trying to render all the nodes as text.
+--
+-- However, it was decided in the end to render all the nodes as text, and
+-- then concatenate them. If a splice returned
+-- \"some \<b\>text\<\/b\> foobar\", the user would almost certainly want
+-- \"some text foobar\" to be rendered, and Heist would probably seem
+-- annoyingly limited for not being able to do this. If the user really did
+-- want it to render \"some \", it would probably be easier for them to
+-- accept that they were silly to pass more than that to be substituted than
+-- it would be for the former user to accept that
+-- \"some \<b\>text\<\/b\> foobar\" is being rendered as \"some \" because
+-- it's \"more intuitive\".
+--getAttributeSplice :: MonadHeist m => Text -> m Text
+getAttributeSplice name = do
+    s <- liftM (lookupSplice name) getTS
+    nodes <- maybe (return []) id s
+    return $ T.concat $ map X.nodeText nodes
+
+
+------------------------------------------------------------------------------
+-- | The maximum recursion depth.  (Used to prevent infinite loops.)
+mAX_RECURSION_DEPTH :: Int
+mAX_RECURSION_DEPTH = 50
+
+
+------------------------------------------------------------------------------
+-- | Checks the recursion flag and recurses accordingly.  Does not recurse
+-- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
+--recurseSplice :: MonadHeist m => X.Node -> m Template -> m Template
+recurseSplice node splice = do
+    result <- localParamNode (const node) splice
+    ts' <- getTS
+    if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
+        then do modRecursionDepth (+1)
+                res <- runNodeList result
+                restoreTS ts'
+                return res
+        else return result
+  where
+    modRecursionDepth :: Monad m => (Int -> Int) -> HeistT m ()
+    modRecursionDepth f =
+        modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
+
+
+{-
 ------------------------------------------------------------------------------
 -- | Runs the parameter node's children and returns the resulting node list.
 -- By itself this function is a simple passthrough splice that makes the
 -- spliced node disappear.  In combination with locally bound splices, this
 -- function makes it easier to pass the desired view into your splices.
-runChildren :: Monad m => Splice m
+runChildren :: MonadHeist m => m Template
 runChildren = runNodeList . X.childNodes =<< getParamNode
 
 
 ------------------------------------------------------------------------------
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
-runChildrenWith :: (Monad m)
-                => [(Text, Splice m)]
+runChildrenWith :: (MonadHeist m)
+                => [(Text, HeistT m Template)]
                 -- ^ List of splices to bind before running the param nodes.
-                -> Splice m
+                -> HeistT m Template
                 -- ^ Returns the passed in view.
 runChildrenWith splices = localTS (bindSplices splices) runChildren
 
@@ -132,49 +299,27 @@ runChildrenWith splices = localTS (bindSplices splices) runChildren
 -- | Wrapper around runChildrenWith that applies a transformation function to
 -- the second item in each of the tuples before calling runChildrenWith.
 runChildrenWithTrans :: (Monad m)
-          => (b -> Splice m)
+          => (b -> HeistT m Template)
           -- ^ Splice generating function
           -> [(Text, b)]
           -- ^ List of tuples to be bound
-          -> Splice m
+          -> HeistT m Template
 runChildrenWithTrans f = runChildrenWith . map (second f)
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using constant templates rather than dynamic
 -- splices.
-runChildrenWithTemplates :: (Monad m) => [(Text, Template)] -> Splice m
+runChildrenWithTemplates :: (Monad m)
+                         => [(Text, Template)]
+                         -> HeistT m Template
 runChildrenWithTemplates = runChildrenWithTrans return
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using literal text rather than dynamic splices.
-runChildrenWithText :: (Monad m) => [(Text, Text)] -> Splice m
+runChildrenWithText :: (Monad m) => [(Text, Text)] -> HeistT m Template
 runChildrenWithText = runChildrenWithTrans textSplice
-
-
-------------------------------------------------------------------------------
--- | Maps a splice generating function over a list and concatenates the
--- results.
-mapSplices :: (Monad m)
-        => (a -> Splice m)
-        -- ^ Splice generating function
-        -> [a]
-        -- ^ List of items to generate splices for
-        -> Splice m
-        -- ^ The result of all splices concatenated together.
-mapSplices f vs = liftM concat $ mapM f vs
-{-# INLINE mapSplices #-}
-
-
-------------------------------------------------------------------------------
--- | Convenience function for looking up a splice.
-lookupSplice :: Monad m =>
-                Text
-             -> HeistState m
-             -> Maybe (Splice m)
-lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
-{-# INLINE lookupSplice #-}
 
 
 ------------------------------------------------------------------------------
@@ -342,146 +487,6 @@ getTemplateFilePath = getsTS _curTemplateFile
 
 
 ------------------------------------------------------------------------------
--- | Performs splice processing on a single node.
-runNode :: Monad m => X.Node -> Splice m
-runNode (X.Element nm at ch) = do
-    newAtts <- mapM attSubst at
-    let n = X.Element nm newAtts ch
-    s <- liftM (lookupSplice nm) getTS
-    maybe (runKids newAtts) (recurseSplice n) s
-  where
-    runKids newAtts = do
-        newKids <- runNodeList ch
-        return [X.Element nm newAtts newKids]
-runNode n                    = return [n]
-
-
-------------------------------------------------------------------------------
--- | Helper function for substituting a parsed attribute into an attribute
--- tuple.
-attSubst :: (Monad m) => (t, Text) -> HeistT m (t, Text)
-attSubst (n,v) = do
-    v' <- parseAtt v
-    return (n,v')
-
-
-------------------------------------------------------------------------------
--- | Parses an attribute for any identifier expressions and performs
--- appropriate substitution.
-parseAtt :: (Monad m) => Text -> HeistT m Text
-parseAtt bs = do
-    let ast = case AP.feed (AP.parse attParser bs) "" of
-                (AP.Done _ res) -> res
-                (AP.Fail _ _ _) -> []
-                (AP.Partial _)  -> []
-    chunks <- mapM cvt ast
-    return $ T.concat chunks
-  where
-    cvt (Literal x) = return x
-    cvt (Ident x)   =
-        localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
-
-
-------------------------------------------------------------------------------
--- | AST to hold attribute parsing structure.  This is necessary because
--- attoparsec doesn't support parsers running in another monad.
-data AttAST = Literal Text
-            | Ident   Text
-  deriving (Show)
-
-
-------------------------------------------------------------------------------
--- | Parser for attribute variable substitution.
-attParser :: AP.Parser [AttAST]
-attParser = liftM ($! []) (loop id)
-  where
-    append !dl !x = dl . (x:)
-
-    loop !dl = go id
-      where
-        finish subDL = let !txt = T.concat $! subDL []
-                           lit  = Literal $! T.concat $! subDL []
-                       in return $! if T.null txt
-                                      then dl
-                                      else append dl lit
-
-        go !subDL = (gobbleText >>= go . append subDL)
-                    <|> (AP.endOfInput *> finish subDL)
-                    <|> (escChar >>= go . append subDL)
-                    <|> (do
-                            idp <- identParser
-                            dl' <- finish subDL
-                            loop $! append dl' idp)
-
-    gobbleText = AP.takeWhile1 (AP.notInClass "\\$")
-
-    escChar = AP.char '\\' *> (T.singleton <$> AP.anyChar)
-
-    identParser = AP.char '$' *> (ident <|> return (Literal "$"))
-    ident = (AP.char '{' *> (Ident <$> AP.takeWhile (/='}')) <* AP.string "}")
-
-
-------------------------------------------------------------------------------
--- | Gets the attribute value.  If the splice's result list contains non-text
--- nodes, this will translate them into text nodes with nodeText and
--- concatenate them together.
---
--- Originally, this only took the first node from the splices's result list,
--- and only if it was a text node. This caused problems when the splice's
--- result contained HTML entities, as they would split a text node. This was
--- then fixed to take the first consecutive bunch of text nodes, and return
--- their concatenation. This was seen as more useful than throwing an error,
--- and more intuitive than trying to render all the nodes as text.
---
--- However, it was decided in the end to render all the nodes as text, and
--- then concatenate them. If a splice returned
--- \"some \<b\>text\<\/b\> foobar\", the user would almost certainly want
--- \"some text foobar\" to be rendered, and Heist would probably seem
--- annoyingly limited for not being able to do this. If the user really did
--- want it to render \"some \", it would probably be easier for them to
--- accept that they were silly to pass more than that to be substituted than
--- it would be for the former user to accept that
--- \"some \<b\>text\<\/b\> foobar\" is being rendered as \"some \" because
--- it's \"more intuitive\".
-getAttributeSplice :: Monad m => Text -> HeistT m Text
-getAttributeSplice name = do
-    s <- liftM (lookupSplice name) getTS
-    nodes <- maybe (return []) id s
-    return $ T.concat $ map X.nodeText nodes
-
-------------------------------------------------------------------------------
--- | Performs splice processing on a list of nodes.
-runNodeList :: Monad m => [X.Node] -> Splice m
-runNodeList = mapSplices runNode
-{-# INLINE runNodeList #-}
-
-
-------------------------------------------------------------------------------
--- | The maximum recursion depth.  (Used to prevent infinite loops.)
-mAX_RECURSION_DEPTH :: Int
-mAX_RECURSION_DEPTH = 50
-
-
-------------------------------------------------------------------------------
--- | Checks the recursion flag and recurses accordingly.  Does not recurse
--- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
-recurseSplice :: Monad m => X.Node -> Splice m -> Splice m
-recurseSplice node splice = do
-    result <- localParamNode (const node) splice
-    ts' <- getTS
-    if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
-        then do modRecursionDepth (+1)
-                res <- runNodeList result
-                restoreTS ts'
-                return res
-        else return result
-  where
-    modRecursionDepth :: Monad m => (Int -> Int) -> HeistT m ()
-    modRecursionDepth f =
-        modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
-
-
-------------------------------------------------------------------------------
 -- | Looks up a template name runs a 'HeistT' computation on it.
 lookupAndRun :: Monad m
              => ByteString
@@ -568,7 +573,7 @@ bindString n = bindSplice n . textSplice
 -- returns an empty list.
 callTemplate :: Monad m
              => ByteString         -- ^ The name of the template
-             -> [(Text, Splice m)] -- ^ Association list of
+             -> [(Text, HeistT m Template)] -- ^ Association list of
                                    -- (name,value) parameter pairs
              -> HeistT m Template
 callTemplate name params = do
@@ -740,4 +745,4 @@ addTemplatePathPrefix dir ts
                     }
   where
     f ps = ps++splitTemplatePath dir
-
+-}

@@ -143,7 +143,7 @@ import           Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | The default set of built-in splices.
-defaultSpliceMap :: MonadIO m => SpliceMap m
+defaultSpliceMap :: MonadIO m => HashMap Text (HeistT m Template)
 defaultSpliceMap = Map.fromList
     [(applyTag, applyImpl)
     ,(bindTag, bindImpl)
