@@ -114,6 +114,7 @@ module Text.Templating.Heist
   , localTS
 
     -- * Functions for running splices and templates
+  , evalTemplateMonad
   , evalTemplate
   , callTemplate
   , callTemplateWithText
