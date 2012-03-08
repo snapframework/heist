@@ -426,8 +426,9 @@ attParser oldSyntax = AP.many1 (identParser <|> litParser)
 getAttributeSplice :: Monad m => Text -> HeistT m Text
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) getTS
-    nodes <- maybe (return []) id s
+    nodes <- maybe (return []) withAttrParamNode s
     return $ T.concat $ map X.nodeText nodes
+  where withAttrParamNode = localParamNode (const (X.Element name [] []))
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
