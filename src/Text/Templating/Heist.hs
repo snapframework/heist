@@ -74,6 +74,7 @@ module Text.Templating.Heist
   , Splice
   , HeistT
   , HeistState
+  , evalHeistT
   , templateNames
   , spliceNames
 
