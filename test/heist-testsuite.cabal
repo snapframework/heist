@@ -9,7 +9,7 @@ Executable testsuite
 
   build-depends:
     QuickCheck                 >= 2,
-    aeson                      >= 0.4   && < 0.5,
+    aeson                      >= 0.4   && < 0.7,
     attoparsec                 >= 0.10  && < 0.11,
     base                       >= 4     && < 5,
     blaze-builder              >= 0.2   && < 0.4,
@@ -25,13 +25,13 @@ Executable testsuite
     mtl                        >= 2,
     random,
     MonadCatchIO-transformers  >= 0.2.1 && < 0.3,
-    test-framework             >= 0.3.1 && < 0.4,
+    test-framework             >= 0.3.1 && < 0.6,
     test-framework-hunit       >= 0.2.5 && < 0.3,
     test-framework-quickcheck2 >= 0.2.6 && < 0.3,
     text                       >= 0.10  && < 0.12,
     time,
     transformers,
-    unordered-containers       >= 0.1.4 && < 0.2,
+    unordered-containers       >= 0.1.4 && < 0.3,
     vector                     >= 0.9   && < 0.10
 
 
