@@ -1,5 +1,5 @@
 name:           heist
-version:        0.8.0
+version:        0.8.1
 synopsis:       An (x)html templating system
 description:    An (x)html templating system
 license:        BSD3
@@ -101,7 +101,7 @@ Library
     text                      >= 0.10  && < 0.12,
     time                      >= 1.1   && < 1.5,
     transformers,
-    xmlhtml                   >= 0.1.6 && < 0.2,
+    xmlhtml                   >= 0.1.6 && < 0.3,
     unordered-containers      >= 0.1.4 && < 0.3,
     vector                    >= 0.9   && < 0.10
 
