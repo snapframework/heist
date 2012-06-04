@@ -664,7 +664,7 @@ getDoc = getDocWith X.parseHTML
 ------------------------------------------------------------------------------
 -- | Reads an XML template from disk.
 getXMLDoc :: String -> IO (Either String DocumentFile)
-getXMLDoc = getDocWith X.parseHTML
+getXMLDoc = getDocWith X.parseXML
 
 
 ------------------------------------------------------------------------------
