@@ -1,5 +1,5 @@
 name:           heist
-version:        0.8.1
+version:        0.8.1.1
 synopsis:       An (x)html templating system
 description:    An (x)html templating system
 license:        BSD3
@@ -90,7 +90,7 @@ Library
     blaze-builder             >= 0.2   && < 0.4,
     blaze-html                >= 0.4   && < 0.6,
     bytestring,
-    containers                >= 0.2   && < 0.5,
+    containers                >= 0.2   && < 0.6,
     directory,
     directory-tree,
     filepath,
