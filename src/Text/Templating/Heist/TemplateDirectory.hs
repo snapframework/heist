@@ -24,21 +24,21 @@ import           Text.Templating.Heist.Splices.Cache
 
 ------------------------------------------------------------------------------
 -- | Structure representing a template directory.
-data TemplateDirectory m
+data TemplateDirectory n m
     = TemplateDirectory
         FilePath
-        (HeistState m)
-        (MVar (HeistState m))
+        (HeistState n m)
+        (MVar (HeistState n m))
         CacheTagState
 
 
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory' wrapped in an Either for
 -- error handling.
-newTemplateDirectory :: (MonadIO m, MonadIO n)
+newTemplateDirectory :: (MonadIO n)
                      => FilePath
-                     -> HeistState m
-                     -> n (Either String (TemplateDirectory m))
+                     -> HeistState n n
+                     -> n (Either String (TemplateDirectory n n))
 newTemplateDirectory dir templateState = liftIO $ do
     (modTs,cts) <- mkCacheTag
     let origTs = modTs templateState
@@ -51,25 +51,25 @@ newTemplateDirectory dir templateState = liftIO $ do
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory', using the monad's fail
 -- function on error.
-newTemplateDirectory' :: (MonadIO m, MonadIO n)
+newTemplateDirectory' :: (MonadIO n)
                       => FilePath
-                      -> HeistState m
-                      -> n (TemplateDirectory m)
+                      -> HeistState n n
+                      -> n (TemplateDirectory n n)
 newTemplateDirectory' = ((either fail return =<<) .) . newTemplateDirectory
 
 
 ------------------------------------------------------------------------------
 -- | Gets the 'HeistState' from a TemplateDirectory.
 getDirectoryTS :: (Monad m, MonadIO n)
-               => TemplateDirectory m
-               -> n (HeistState m)
+               => TemplateDirectory n m
+               -> n (HeistState n m)
 getDirectoryTS (TemplateDirectory _ _ tsMVar _) = liftIO $ readMVar $ tsMVar
 
 
 ------------------------------------------------------------------------------
 -- | Clears cached content and reloads templates from disk.
 reloadTemplateDirectory :: (MonadIO m, MonadIO n)
-                        => TemplateDirectory m
+                        => TemplateDirectory n m
                         -> n (Either String ())
 reloadTemplateDirectory (TemplateDirectory p origTs tsMVar cts) = liftIO $ do
     clearCacheTagState cts

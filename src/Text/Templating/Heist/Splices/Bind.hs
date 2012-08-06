@@ -22,7 +22,7 @@ bindAttr = "tag"
 
 ------------------------------------------------------------------------------
 -- | Implementation of the bind splice.
-bindImpl :: Monad m => Splice m
+bindImpl :: Monad n => Splice n n
 bindImpl = do
     node <- getParamNode
     maybe (return ())

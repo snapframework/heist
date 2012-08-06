@@ -93,8 +93,6 @@ module Text.Templating.Heist
     -- * Hook functions
     -- $hookDoc
   , addOnLoadHook
-  , addPreRunHook
-  , addPostRunHook
 
     -- * HeistT functions
   , stopRecursion
@@ -135,8 +133,11 @@ module Text.Templating.Heist
   , mkCacheTag
   ) where
 
+import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.HashMap.Strict as Map
+import qualified Data.HeterogeneousEnvironment   as HE
+import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Splices
 import           Text.Templating.Heist.Types
@@ -144,7 +145,7 @@ import           Text.Templating.Heist.Types
 
 ------------------------------------------------------------------------------
 -- | The default set of built-in splices.
-defaultSpliceMap :: MonadIO m => SpliceMap m
+defaultSpliceMap :: MonadIO n => SpliceMap n n
 defaultSpliceMap = Map.fromList
     [(applyTag, applyImpl)
     ,(bindTag, bindImpl)
@@ -157,10 +158,11 @@ defaultSpliceMap = Map.fromList
 -- | An empty heist state, with Heist's default splices (@\<apply\>@,
 -- @\<bind\>@, @\<ignore\>@, and @\<markdown\>@) mapped.  The cache tag is
 -- not mapped here because it must be mapped manually in your application.
-defaultHeistState :: MonadIO m => HeistState m
+defaultHeistState :: MonadIO n => IO (HeistState n n)
 defaultHeistState =
-    HeistState (defaultSpliceMap) Map.empty True [] 0
-               return return return [] Nothing
+    liftM (HeistState (defaultSpliceMap) Map.empty
+                      Map.empty Map.empty True [] 0 return [] Nothing)
+          HE.newKeyGen
 
 
 -- $hookDoc
@@ -173,4 +175,5 @@ defaultHeistState =
 -- The pre-run and post-run hooks are run before and after every template is
 -- run/rendered.  You should be careful what code you put in these hooks
 -- because it can significantly affect the performance of your site.
+
 

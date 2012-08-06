@@ -75,7 +75,7 @@ markdownTag = "markdown"
 
 ------------------------------------------------------------------------------
 -- | Implementation of the markdown splice.
-markdownSplice :: MonadIO m => Splice m
+markdownSplice :: MonadIO m => Splice n m
 markdownSplice = do
     templateDir <- liftM (fmap takeDirectory) getTemplateFilePath
     pdMD <- liftIO $ findExecutable "pandoc"

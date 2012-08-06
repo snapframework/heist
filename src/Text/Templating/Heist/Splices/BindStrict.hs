@@ -17,7 +17,7 @@ bindStrictTag = "bindStrict"
 
 ------------------------------------------------------------------------------
 -- | Implementation of the bind splice.
-bindStrictImpl :: Monad m => Splice m
+bindStrictImpl :: Monad n => Splice n n
 bindStrictImpl = do
     node <- getParamNode
     cs <- runChildren

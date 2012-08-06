@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -21,21 +22,26 @@ liberating us from the unused writer portion of RWST.
 module Text.Templating.Heist.Types where
 
 ------------------------------------------------------------------------------
-import             Control.Applicative
-import             Control.Arrow
-import             Control.Monad.CatchIO
-import             Control.Monad.Cont
-import             Control.Monad.Error
-import             Control.Monad.Reader
-import             Control.Monad.State
-import             Data.ByteString.Char8 (ByteString)
-import qualified   Data.HashMap.Strict as H
-import             Data.HashMap.Strict (HashMap)
-import             Data.Monoid
-import             Data.Text (Text)
-import             Data.Typeable
-import             Prelude hiding (catch)
-import qualified   Text.XmlHtml as X
+import           Blaze.ByteString.Builder
+import           Control.Applicative
+import           Control.Arrow
+import           Control.Monad.CatchIO
+import           Control.Monad.Cont
+import           Control.Monad.Error
+import           Control.Monad.Reader
+import           Control.Monad.State.Strict
+import           Data.ByteString.Char8 (ByteString)
+import           Data.DList                      (DList)
+import qualified Data.HashMap.Strict as H
+import           Data.HashMap.Strict (HashMap)
+import           Data.HeterogeneousEnvironment   (HeterogeneousEnvironment)
+import qualified Data.HeterogeneousEnvironment as HE
+import           Data.Monoid
+import           Data.Text (Text)
+import qualified Data.Text                       as T
+import           Data.Typeable
+import           Prelude hiding (catch)
+import qualified Text.XmlHtml as X
 
 
 ------------------------------------------------------------------------------
@@ -61,6 +67,69 @@ data DocumentFile = DocumentFile
     , dfFile :: Maybe FilePath
     } deriving (Eq)
 
+
+------------------------------------------------------------------------------
+-- Caper types
+------------------------------------------------------------------------------
+
+type CaperOutput m = DList (Chunk m)
+
+
+------------------------------------------------------------------------------
+newtype RuntimeSplice m a = RuntimeSplice {
+      unRT :: StateT HeterogeneousEnvironment m a
+    } deriving ( Applicative
+               , Functor
+               , Monad
+               , MonadIO
+               , MonadState HeterogeneousEnvironment
+               , MonadTrans )
+
+
+------------------------------------------------------------------------------
+instance (Monad m, Monoid a) => Monoid (RuntimeSplice m a) where
+    mempty = return mempty
+
+    a `mappend` b = do
+        !x <- a
+        !y <- b
+        return $! x `mappend` y
+
+
+------------------------------------------------------------------------------
+data Chunk m = Pure !Text
+               -- ^ output known at load time
+             | RuntimeHtml !(RuntimeSplice m Text)
+               -- ^ output computed at run time
+             | RuntimeAction !(RuntimeSplice m ())
+               -- ^ runtime action used only for its side-effect
+
+
+------------------------------------------------------------------------------
+instance Show (Chunk m) where
+    show (Pure a)          = T.unpack $ T.concat ["Pure \"", a, "\""]
+    show (RuntimeHtml _)   = "RuntimeHtml <m>"
+    show (RuntimeAction _) = "RuntimeAction <m>"
+
+
+data CaperDocumentFile m = CaperDocumentFile
+    { cdfDoc  :: CaperOutput m
+    , cdfFile :: Maybe FilePath
+    }
+
+
+newtype CompiledTemplateMap m =
+    CompiledTemplateMap (HashMap ByteString (m Builder))
+
+
+------------------------------------------------------------------------------
+newtype Promise a = Promise (HE.Key a)
+
+
+------------------------------------------------------------------------------
+-- 
+------------------------------------------------------------------------------
+
 ------------------------------------------------------------------------------
 -- | All documents representing templates are stored in a map.
 type TemplateMap = HashMap TPath DocumentFile
@@ -68,78 +137,81 @@ type TemplateMap = HashMap TPath DocumentFile
 
 ------------------------------------------------------------------------------
 -- | A Splice is a HeistT computation that returns a 'Template'.
-type Splice m = HeistT m Template
+type Splice n m = HeistT n m Template
+
+
+------------------------------------------------------------------------------
+-- | A Splice is a HeistT computation that returns a 'Template'.
+type CaperSplice n m = HeistT n m (DList (Chunk n))
 
 
 ------------------------------------------------------------------------------
 -- | SpliceMap associates a name and a Splice.
-type SpliceMap m = HashMap Text (Splice m)
+type SpliceMap n m = HashMap Text (Splice n m)
 
 
 ------------------------------------------------------------------------------
 -- | Holds all the state information needed for template processing.  You will
--- build a @HeistState@ using any of Heist's @HeistState m -> HeistState m@
+-- build a @HeistState@ using any of Heist's @HeistState -> HeistState@
 -- \"filter\" functions.  Then you use the resulting @HeistState@ in calls to
 -- @renderTemplate@.
-data HeistState m = HeistState {
+--
+-- n is the runtime monad
+-- m is the load time monad
+data HeistState n m = HeistState {
     -- | A mapping of splice names to splice actions
-      _spliceMap       :: SpliceMap m
+      _spliceMap        :: SpliceMap n n
     -- | A mapping of template names to templates
-    , _templateMap     :: TemplateMap
+    , _templateMap      :: TemplateMap
+
+    -- | A mapping of splice names to splice actions
+    , _caperSpliceMap   :: HashMap Text (CaperSplice n m)
+    -- | A mapping of template names to templates
+    , _caperTemplateMap :: HashMap TPath (CaperDocumentFile m)
+
     -- | A flag to control splice recursion
-    , _recurse         :: Bool
+    , _recurse          :: Bool
     -- | The path to the template currently being processed.
-    , _curContext      :: TPath
+    , _curContext       :: TPath
     -- | A counter keeping track of the current recursion depth to prevent
     -- infinite loops.
-    , _recursionDepth  :: Int
+    , _recursionDepth   :: Int
     -- | A hook run on all templates at load time.
-    , _onLoadHook      :: Template -> IO Template
-    -- | A hook run on all templates just before they are rendered.
-    , _preRunHook      :: Template -> m Template
-    -- | A hook run on all templates just after they are rendered.
-    , _postRunHook     :: Template -> m Template
+    , _onLoadHook       :: Template -> IO Template
     -- | The doctypes encountered during template processing.
-    , _doctypes        :: [X.DocType]
+    , _doctypes         :: [X.DocType]
     -- | The full path to the current template's file on disk.
-    , _curTemplateFile :: Maybe FilePath
+    , _curTemplateFile  :: Maybe FilePath
+      -- | A key generator used to produce new unique Promises.
+    , _keygen           :: HE.KeyGen
+}
+
+
+instance (Typeable1 m) => Typeable (HeistState n m) where
+    typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
+
+
+------------------------------------------------------------------------------
+-- | HeistT is the monad used for 'Splice' processing.  HeistT provides
+-- \"passthrough\" instances for many of the monads you might use in the inner
+-- monad.
+newtype HeistT n m a = HeistT {
+    runHeistT :: X.Node
+              -> HeistState n m
+              -> m (a, HeistState n m)
 }
 
 
 ------------------------------------------------------------------------------
 -- | Gets the names of all the templates defined in a HeistState.
-templateNames :: HeistState m -> [TPath]
+templateNames :: HeistState n m -> [TPath]
 templateNames ts = H.keys $ _templateMap ts
 
 
 ------------------------------------------------------------------------------
 -- | Gets the names of all the splices defined in a HeistState.
-spliceNames :: HeistState m -> [Text]
+spliceNames :: HeistState n m -> [Text]
 spliceNames ts = H.keys $ _spliceMap ts
-
-
-------------------------------------------------------------------------------
-instance (Monad m) => Monoid (HeistState m) where
-    mempty = HeistState H.empty H.empty True [] 0
-                           return return return [] Nothing
-
-    (HeistState s1 t1 r1 _ d1 o1 b1 a1 dt1 ctf1) `mappend`
-        (HeistState s2 t2 r2 c2 d2 o2 b2 a2 dt2 ctf2) =
-        HeistState s t r c2 d (o1 >=> o2) (b1 >=> b2) (a1 >=> a2)
-            (dt1 `mappend` dt2) ctf
-      where
-        s = s1 `mappend` s2
-        t = t1 `mappend` t2
-        r = r1 && r2
-        d = max d1 d2
-        ctf = getLast $ Last ctf1 `mappend` Last ctf2
-
-
-------------------------------------------------------------------------------
-instance Eq (HeistState m) where
-    a == b = (_recurse a == _recurse b) &&
-             (_templateMap a == _templateMap b) &&
-             (_curContext a == _curContext b)
 
 
 ------------------------------------------------------------------------------
@@ -149,27 +221,12 @@ templateStateTyCon :: TyCon
 templateStateTyCon = mkTyCon "Text.Templating.Heist.HeistState"
 {-# NOINLINE templateStateTyCon #-}
 
-instance (Typeable1 m) => Typeable (HeistState m) where
-    typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
-
-
-------------------------------------------------------------------------------
--- | HeistT is the monad used for 'Splice' processing.  HeistT provides
--- \"passthrough\" instances for many of the monads you might use in the inner
--- monad.
-newtype HeistT m a = HeistT {
-    runHeistT :: X.Node
-              -> HeistState m
-              -> m (a, HeistState m)
-}
-
-
 ------------------------------------------------------------------------------
 -- | Evaluates a template monad as a computation in the underlying monad.
-evalHeistT :: Monad m
-           => HeistT m a
+evalHeistT :: (Monad m)
+           => HeistT n m a
            -> X.Node
-           -> HeistState m
+           -> HeistState n m
            -> m a
 evalHeistT m r s = do
     (a, _) <- runHeistT m r s
@@ -179,20 +236,20 @@ evalHeistT m r s = do
 
 ------------------------------------------------------------------------------
 -- | Functor instance
-instance Functor m => Functor (HeistT m) where
+instance Functor m => Functor (HeistT n m) where
     fmap f (HeistT m) = HeistT $ \r s -> first f <$> m r s
 
 
 ------------------------------------------------------------------------------
 -- | Applicative instance
-instance (Monad m, Functor m) => Applicative (HeistT m) where
+instance (Monad m, Functor m) => Applicative (HeistT n m) where
     pure = return
     (<*>) = ap
 
 
 ------------------------------------------------------------------------------
 -- | Monad instance
-instance Monad m => Monad (HeistT m) where
+instance Monad m => Monad (HeistT n m) where
     return a = HeistT (\_ s -> return (a, s))
     {-# INLINE return #-}
     HeistT m >>= k = HeistT $ \r s -> do
@@ -203,13 +260,13 @@ instance Monad m => Monad (HeistT m) where
 
 ------------------------------------------------------------------------------
 -- | MonadIO instance
-instance MonadIO m => MonadIO (HeistT m) where
+instance MonadIO m => MonadIO (HeistT n m) where
     liftIO = lift . liftIO
 
 
 ------------------------------------------------------------------------------
 -- | MonadTrans instance
-instance MonadTrans HeistT where
+instance MonadTrans (HeistT n) where
     lift m = HeistT $ \_ s -> do
         a <- m
         return (a, s)
@@ -217,7 +274,7 @@ instance MonadTrans HeistT where
 
 ------------------------------------------------------------------------------
 -- | MonadCatchIO instance
-instance MonadCatchIO m => MonadCatchIO (HeistT m) where
+instance MonadCatchIO m => MonadCatchIO (HeistT n m) where
     catch (HeistT a) h = HeistT $ \r s -> do
        let handler e = runHeistT (h e) r s
        catch (a r s) handler
@@ -227,21 +284,21 @@ instance MonadCatchIO m => MonadCatchIO (HeistT m) where
 
 ------------------------------------------------------------------------------
 -- | MonadFix passthrough instance
-instance MonadFix m => MonadFix (HeistT m) where
+instance MonadFix m => MonadFix (HeistT n m) where
     mfix f = HeistT $ \r s ->
         mfix $ \ (a, _) -> runHeistT (f a) r s
 
 
 ------------------------------------------------------------------------------
 -- | Alternative passthrough instance
-instance (Functor m, MonadPlus m) => Alternative (HeistT m) where
+instance (Functor m, MonadPlus m) => Alternative (HeistT n m) where
     empty = mzero
     (<|>) = mplus
 
 
 ------------------------------------------------------------------------------
 -- | MonadPlus passthrough instance
-instance MonadPlus m => MonadPlus (HeistT m) where
+instance MonadPlus m => MonadPlus (HeistT n m) where
     mzero = lift mzero
     m `mplus` n = HeistT $ \r s ->
         runHeistT m r s `mplus` runHeistT n r s
@@ -249,7 +306,7 @@ instance MonadPlus m => MonadPlus (HeistT m) where
 
 ------------------------------------------------------------------------------
 -- | MonadState passthrough instance
-instance MonadState s m => MonadState s (HeistT m) where
+instance MonadState s m => MonadState s (HeistT n m) where
     get = lift get
     {-# INLINE get #-}
     put = lift . put
@@ -258,7 +315,7 @@ instance MonadState s m => MonadState s (HeistT m) where
 
 ------------------------------------------------------------------------------
 -- | MonadReader passthrough instance
-instance MonadReader r m => MonadReader r (HeistT m) where
+instance MonadReader r m => MonadReader r (HeistT n m) where
     ask = HeistT $ \_ s -> do
             r <- ask
             return (r,s)
@@ -268,12 +325,12 @@ instance MonadReader r m => MonadReader r (HeistT m) where
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadError instance.
-liftCatch :: (m (a,HeistState m)
-              -> (e -> m (a,HeistState m))
-              -> m (a,HeistState m))
-          -> HeistT m a
-          -> (e -> HeistT m a)
-          -> HeistT m a
+liftCatch :: (m (a,HeistState n m)
+              -> (e -> m (a,HeistState n m))
+              -> m (a,HeistState n m))
+          -> HeistT n m a
+          -> (e -> HeistT n m a)
+          -> HeistT n m a
 liftCatch ce m h =
     HeistT $ \r s ->
         (runHeistT m r s `ce`
@@ -282,18 +339,18 @@ liftCatch ce m h =
 
 ------------------------------------------------------------------------------
 -- | MonadError passthrough instance
-instance (MonadError e m) => MonadError e (HeistT m) where
+instance (MonadError e m) => MonadError e (HeistT n m) where
     throwError = lift . throwError
     catchError = liftCatch catchError
 
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadCont instance.
-liftCallCC :: ((((a,HeistState m) -> m (b, HeistState m))
-                  -> m (a, HeistState m))
-                -> m (a, HeistState m))
-           -> ((a -> HeistT m b) -> HeistT m a)
-           -> HeistT m a
+liftCallCC :: ((((a,HeistState n m) -> m (b, HeistState n m))
+                  -> m (a, HeistState n m))
+                -> m (a, HeistState n m))
+           -> ((a -> HeistT n m b) -> HeistT n m a)
+           -> HeistT n m a
 liftCallCC ccc f = HeistT $ \r s ->
     ccc $ \c ->
     runHeistT (f (\a -> HeistT $ \_ _ -> c (a, s))) r s
@@ -301,7 +358,7 @@ liftCallCC ccc f = HeistT $ \r s ->
 
 ------------------------------------------------------------------------------
 -- | MonadCont passthrough instance
-instance (MonadCont m) => MonadCont (HeistT m) where
+instance (MonadCont m) => MonadCont (HeistT n m) where
     callCC = liftCallCC callCC
 
 
@@ -312,7 +369,7 @@ templateMonadTyCon :: TyCon
 templateMonadTyCon = mkTyCon "Text.Templating.Heist.HeistT"
 {-# NOINLINE templateMonadTyCon #-}
 
-instance (Typeable1 m) => Typeable1 (HeistT m) where
+instance (Typeable1 m) => Typeable1 (HeistT n m) where
     typeOf1 _ = mkTyConApp templateMonadTyCon [typeOf1 (undefined :: m ())]
 
 
@@ -333,7 +390,7 @@ instance (Typeable1 m) => Typeable1 (HeistT m) where
 -- childNodes@ returns a list containing one 'TextNode' containing part of
 -- Hamlet's speech.  @liftM (getAttribute \"author\") getParamNode@ would
 -- return @Just "Shakespeare"@.
-getParamNode :: Monad m => HeistT m X.Node
+getParamNode :: Monad m => HeistT n m X.Node
 getParamNode = HeistT $ \r s -> return (r,s)
 {-# INLINE getParamNode #-}
 
@@ -342,29 +399,29 @@ getParamNode = HeistT $ \r s -> return (r,s)
 -- | HeistT's 'local'.
 localParamNode :: Monad m
                => (X.Node -> X.Node)
-               -> HeistT m a
-               -> HeistT m a
+               -> HeistT n m a
+               -> HeistT n m a
 localParamNode f m = HeistT $ \r s -> runHeistT m (f r) s
 {-# INLINE localParamNode #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'gets'.
-getsTS :: Monad m => (HeistState m -> r) -> HeistT m r
+getsTS :: Monad m => (HeistState n m -> r) -> HeistT n m r
 getsTS f = HeistT $ \_ s -> return (f s, s)
 {-# INLINE getsTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'get'.
-getTS :: Monad m => HeistT m (HeistState m)
+getTS :: Monad m => HeistT n m (HeistState n m)
 getTS = HeistT $ \_ s -> return (s, s)
 {-# INLINE getTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'put'.
-putTS :: Monad m => HeistState m -> HeistT m ()
+putTS :: Monad m => HeistState n m -> HeistT n m ()
 putTS s = HeistT $ \_ _ -> return ((), s)
 {-# INLINE putTS #-}
 
@@ -372,8 +429,8 @@ putTS s = HeistT $ \_ _ -> return ((), s)
 ------------------------------------------------------------------------------
 -- | HeistT's 'modify'.
 modifyTS :: Monad m
-                    => (HeistState m -> HeistState m)
-                    -> HeistT m ()
+         => (HeistState n m -> HeistState n m)
+         -> HeistT n m ()
 modifyTS f = HeistT $ \_ s -> return ((), f s)
 {-# INLINE modifyTS #-}
 
@@ -384,7 +441,7 @@ modifyTS f = HeistT $ \_ s -> return ((), f s)
 -- @putTS@ to restore an old state.  This was needed because doctypes needs to
 -- be in a "global scope" as opposed to the template call "local scope" of
 -- state items such as recursionDepth, curContext, and spliceMap.
-restoreTS :: Monad m => HeistState m -> HeistT m ()
+restoreTS :: Monad m => HeistState n m -> HeistT n m ()
 restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
 {-# INLINE restoreTS #-}
 
@@ -393,9 +450,9 @@ restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
 -- | Abstracts the common pattern of running a HeistT computation with
 -- a modified heist state.
 localTS :: Monad m
-        => (HeistState m -> HeistState m)
-        -> HeistT m a
-        -> HeistT m a
+        => (HeistState n m -> HeistState n m)
+        -> HeistT n m a
+        -> HeistT n m a
 localTS f k = do
     ts <- getTS
     putTS $ f ts
@@ -403,4 +460,19 @@ localTS f k = do
     restoreTS ts
     return res
 {-# INLINE localTS #-}
+
+
+------------------------------------------------------------------------------
+-- | AST to hold attribute parsing structure.  This is necessary because
+-- attoparsec doesn't support parsers running in another monad.
+data AttAST = Literal Text
+            | Ident   Text
+  deriving (Show)
+
+
+------------------------------------------------------------------------------
+isLiteral :: AttAST -> Bool
+isLiteral (Literal _) = True
+isLiteral _           = False
+
 

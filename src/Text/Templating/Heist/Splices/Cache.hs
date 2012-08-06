@@ -68,9 +68,9 @@ parseTTL s = value * multiplier
         _   -> 0
 
 ------------------------------------------------------------------------------
-cacheImpl :: (MonadIO m)
+cacheImpl :: (MonadIO n)
            => CacheTagState
-           -> HeistT m Template
+           -> Splice n n
 cacheImpl (CTS mv) = do
     tree <- getParamNode
     let err = error $ unwords ["cacheImpl is bound to a tag"
@@ -106,8 +106,8 @@ cacheImpl (CTS mv) = do
 -- tag.  The cache tag is not bound automatically with the other default Heist
 -- tags.  This is because this function also returns CacheTagState, so the
 -- user will be able to clear it with the 'clearCacheTagState' function.
-mkCacheTag :: MonadIO m
-           => IO (HeistState m -> HeistState m, CacheTagState)
+mkCacheTag :: MonadIO n
+           => IO (HeistState n n -> HeistState n n, CacheTagState)
 mkCacheTag = do
     sr <- newIORef $ Set.empty
     mv <- liftM CTS $ newMVar H.empty

@@ -8,12 +8,10 @@ module Text.Templating.Heist.Internal where
 
 ------------------------------------------------------------------------------
 import             Blaze.ByteString.Builder
-import             Control.Applicative
 import             Control.Arrow hiding (loop)
 import             Control.Exception (SomeException)
 import             Control.Monad
 import             Control.Monad.CatchIO
-import             Control.Monad.Trans
 import qualified   Data.Attoparsec.Text as AP
 import             Data.ByteString (ByteString)
 import qualified   Data.ByteString as B
@@ -28,16 +26,16 @@ import qualified   Data.Text as T
 import             Data.Text (Text)
 import             Prelude hiding (catch)
 import             System.Directory.Tree hiding (name)
-import             System.FilePath
 import qualified   Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
+import             Text.Templating.Heist.Common
 import             Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
-addDoctype :: Monad m => [X.DocType] -> HeistT m ()
+addDoctype :: Monad m => [X.DocType] -> HeistT n m ()
 addDoctype dt = do
     modifyTS (\s -> s { _doctypes = _doctypes s `mappend` dt })
 
@@ -51,60 +49,34 @@ addDoctype dt = do
 -- | Adds an on-load hook to a `HeistState`.
 addOnLoadHook :: (Monad m) =>
                  (Template -> IO Template)
-              -> HeistState m
-              -> HeistState m
+              -> HeistState n m
+              -> HeistState n m
 addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 
 
 ------------------------------------------------------------------------------
--- | Adds a pre-run hook to a `HeistState`.
-addPreRunHook :: (Monad m) =>
-                 (Template -> m Template)
-              -> HeistState m
-              -> HeistState m
-addPreRunHook hook ts = ts { _preRunHook = _preRunHook ts >=> hook }
-
-
-------------------------------------------------------------------------------
--- | Adds a post-run hook to a `HeistState`.
-addPostRunHook :: (Monad m) =>
-                  (Template -> m Template)
-               -> HeistState m
-               -> HeistState m
-addPostRunHook hook ts = ts { _postRunHook = _postRunHook ts >=> hook }
-
-
-------------------------------------------------------------------------------
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
-bindSplice :: Monad m =>
-              Text              -- ^ tag name
-           -> Splice m          -- ^ splice action
-           -> HeistState m      -- ^ source state
-           -> HeistState m
+bindSplice :: Text              -- ^ tag name
+           -> Splice n n          -- ^ splice action
+           -> HeistState n m      -- ^ source state
+           -> HeistState n m
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 
 
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
 bindSplices :: Monad m =>
-               [(Text, Splice m)] -- ^ splices to bind
-            -> HeistState m       -- ^ start state
-            -> HeistState m
+               [(Text, Splice n n)] -- ^ splices to bind
+            -> HeistState n m       -- ^ start state
+            -> HeistState n m
 bindSplices ss ts = foldl' (flip id) ts acts
   where
     acts = map (uncurry bindSplice) ss
 
 
 ------------------------------------------------------------------------------
--- | Sets the current template file.
-setCurTemplateFile :: Monad m
-                   => Maybe FilePath -> HeistState m -> HeistState m
-setCurTemplateFile fp ts = ts { _curTemplateFile = fp }
-
-
-------------------------------------------------------------------------------
 -- | Converts 'Text' to a splice returning a single 'TextNode'.
-textSplice :: (Monad m) => Text -> Splice m
+textSplice :: Monad n => Text -> Splice n n
 textSplice t = return [X.TextNode t]
 
 
@@ -113,17 +85,17 @@ textSplice t = return [X.TextNode t]
 -- By itself this function is a simple passthrough splice that makes the
 -- spliced node disappear.  In combination with locally bound splices, this
 -- function makes it easier to pass the desired view into your splices.
-runChildren :: Monad m => Splice m
+runChildren :: Monad n => Splice n n
 runChildren = runNodeList . X.childNodes =<< getParamNode
 
 
 ------------------------------------------------------------------------------
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
-runChildrenWith :: (Monad m)
-                => [(Text, Splice m)]
+runChildrenWith :: (Monad n)
+                => [(Text, Splice n n)]
                 -- ^ List of splices to bind before running the param nodes.
-                -> Splice m
+                -> Splice n n
                 -- ^ Returns the passed in view.
 runChildrenWith splices = localTS (bindSplices splices) runChildren
 
@@ -131,128 +103,41 @@ runChildrenWith splices = localTS (bindSplices splices) runChildren
 ------------------------------------------------------------------------------
 -- | Wrapper around runChildrenWith that applies a transformation function to
 -- the second item in each of the tuples before calling runChildrenWith.
-runChildrenWithTrans :: (Monad m)
-          => (b -> Splice m)
+runChildrenWithTrans :: (Monad n)
+          => (b -> Splice n n)
           -- ^ Splice generating function
           -> [(Text, b)]
           -- ^ List of tuples to be bound
-          -> Splice m
+          -> Splice n n
 runChildrenWithTrans f = runChildrenWith . map (second f)
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using constant templates rather than dynamic
 -- splices.
-runChildrenWithTemplates :: (Monad m) => [(Text, Template)] -> Splice m
+runChildrenWithTemplates :: (Monad n) => [(Text, Template)] -> Splice n n
 runChildrenWithTemplates = runChildrenWithTrans return
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using literal text rather than dynamic splices.
-runChildrenWithText :: (Monad m) => [(Text, Text)] -> Splice m
+runChildrenWithText :: (Monad n) => [(Text, Text)] -> Splice n n
 runChildrenWithText = runChildrenWithTrans textSplice
-
-
-------------------------------------------------------------------------------
--- | Maps a splice generating function over a list and concatenates the
--- results.
-mapSplices :: (Monad m)
-        => (a -> Splice m)
-        -- ^ Splice generating function
-        -> [a]
-        -- ^ List of items to generate splices for
-        -> Splice m
-        -- ^ The result of all splices concatenated together.
-mapSplices f vs = liftM concat $ mapM f vs
-{-# INLINE mapSplices #-}
 
 
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a splice.
 lookupSplice :: Monad m =>
                 Text
-             -> HeistState m
-             -> Maybe (Splice m)
+             -> HeistState n m
+             -> Maybe (Splice n n)
 lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 {-# INLINE lookupSplice #-}
 
 
 ------------------------------------------------------------------------------
--- | Converts a path into an array of the elements in reverse order.  If the
--- path is absolute, we need to remove the leading slash so the split doesn't
--- leave @\"\"@ as the last element of the TPath.
---
--- FIXME @\"..\"@ currently doesn't work in paths, the solution is non-trivial
-splitPathWith :: Char -> ByteString -> TPath
-splitPathWith s p = if BC.null p then [] else (reverse $ BC.split s path)
-  where
-    path = if BC.head p == s then BC.tail p else p
-
--- | Converts a path into an array of the elements in reverse order using the
--- path separator of the local operating system. See 'splitPathWith' for more
--- details.
-splitLocalPath :: ByteString -> TPath
-splitLocalPath = splitPathWith pathSeparator
-
--- | Converts a path into an array of the elements in reverse order using a
--- forward slash (/) as the path separator. See 'splitPathWith' for more
--- details.
-splitTemplatePath :: ByteString -> TPath
-splitTemplatePath = splitPathWith '/'
-
-
-------------------------------------------------------------------------------
--- | Does a single template lookup without cascading up.
-singleLookup :: TemplateMap
-             -> TPath
-             -> ByteString
-             -> Maybe (DocumentFile, TPath)
-singleLookup tm path name = fmap (\a -> (a,path)) $ Map.lookup (name:path) tm
-
-
-------------------------------------------------------------------------------
--- | Searches for a template by looking in the full path then backing up into
--- each of the parent directories until the template is found.
-traversePath :: TemplateMap
-             -> TPath
-             -> ByteString
-             -> Maybe (DocumentFile, TPath)
-traversePath tm [] name = fmap (\a -> (a,[])) (Map.lookup [name] tm)
-traversePath tm path name =
-    singleLookup tm path name `mplus`
-    traversePath tm (tail path) name
-
-
-------------------------------------------------------------------------------
--- | Returns 'True' if the given template can be found in the heist state.
-hasTemplate :: Monad m =>
-               ByteString
-            -> HeistState m
-            -> Bool
-hasTemplate nameStr ts = isJust $ lookupTemplate nameStr ts
-
-
-------------------------------------------------------------------------------
--- | Convenience function for looking up a template.
-lookupTemplate :: Monad m =>
-                  ByteString
-               -> HeistState m
-               -> Maybe (DocumentFile, TPath)
-lookupTemplate nameStr ts =
-    f (_templateMap ts) path name
-  where (name:p) = case splitTemplatePath nameStr of
-                       [] -> [""]
-                       ps -> ps
-        ctx = if B.isPrefixOf "/" nameStr then [] else _curContext ts
-        path = p ++ ctx
-        f = if '/' `BC.elem` nameStr
-                then singleLookup
-                else traversePath
-
-
-------------------------------------------------------------------------------
 -- | Sets the templateMap in a HeistState.
-setTemplates :: Monad m => TemplateMap -> HeistState m -> HeistState m
+setTemplates :: Monad m => TemplateMap -> HeistState n m -> HeistState n m
 setTemplates m ts = ts { _templateMap = m }
 
 
@@ -261,8 +146,8 @@ setTemplates m ts = ts { _templateMap = m }
 insertTemplate :: Monad m =>
                TPath
             -> DocumentFile
-            -> HeistState m
-            -> HeistState m
+            -> HeistState n m
+            -> HeistState n m
 insertTemplate p t st =
     setTemplates (Map.insert p t (_templateMap st)) st
 
@@ -277,8 +162,8 @@ addTemplate :: Monad m
             -> Maybe FilePath
             -- ^ An optional path to the actual file on disk where the
             -- template is stored
-            -> HeistState m
-            -> HeistState m
+            -> HeistState n m
+            -> HeistState n m
 addTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -295,8 +180,8 @@ addXMLTemplate :: Monad m
                -> Maybe FilePath
                -- ^ An optional path to the actual file on disk where the
                -- template is stored
-               -> HeistState m
-               -> HeistState m
+               -> HeistState n m
+               -> HeistState n m
 addXMLTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -317,19 +202,13 @@ addXMLTemplate n t mfp st =
 -- splice will result in a list of nodes @L@.  Normally @foo@ will recursively
 -- scan @L@ for splices and run them.  If @foo@ calls @stopRecursion@, @L@
 -- will be included in the output verbatim without running any splices.
-stopRecursion :: Monad m => HeistT m ()
+stopRecursion :: Monad m => HeistT n m ()
 stopRecursion = modifyTS (\st -> st { _recurse = False })
 
 
 ------------------------------------------------------------------------------
--- | Sets the current context
-setContext :: Monad m => TPath -> HeistT m ()
-setContext c = modifyTS (\st -> st { _curContext = c })
-
-
-------------------------------------------------------------------------------
 -- | Gets the current context
-getContext :: Monad m => HeistT m TPath
+getContext :: Monad m => HeistT n m TPath
 getContext = getsTS _curContext
 
 
@@ -337,13 +216,13 @@ getContext = getsTS _curContext
 -- | Gets the full path to the file holding the template currently being
 -- processed.  Returns Nothing if the template is not associated with a file
 -- on disk or if there is no template being processed.
-getTemplateFilePath :: Monad m => HeistT m (Maybe FilePath)
+getTemplateFilePath :: Monad m => HeistT n m (Maybe FilePath)
 getTemplateFilePath = getsTS _curTemplateFile
 
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a single node.
-runNode :: Monad m => X.Node -> Splice m
+runNode :: Monad n => X.Node -> Splice n n
 runNode (X.Element nm at ch) = do
     newAtts <- mapM attSubst at
     let n = X.Element nm newAtts ch
@@ -359,7 +238,7 @@ runNode n                    = return [n]
 ------------------------------------------------------------------------------
 -- | Helper function for substituting a parsed attribute into an attribute
 -- tuple.
-attSubst :: (Monad m) => (t, Text) -> HeistT m (t, Text)
+attSubst :: (Monad n) => (t, Text) -> HeistT n n (t, Text)
 attSubst (n,v) = do
     v' <- parseAtt v
     return (n,v')
@@ -368,7 +247,7 @@ attSubst (n,v) = do
 ------------------------------------------------------------------------------
 -- | Parses an attribute for any identifier expressions and performs
 -- appropriate substitution.
-parseAtt :: (Monad m) => Text -> HeistT m Text
+parseAtt :: (Monad n) => Text -> HeistT n n Text
 parseAtt bs = do
     let ast = case AP.feed (AP.parse attParser bs) "" of
                 (AP.Done _ res) -> res
@@ -380,45 +259,6 @@ parseAtt bs = do
     cvt (Literal x) = return x
     cvt (Ident x)   =
         localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
-
-
-------------------------------------------------------------------------------
--- | AST to hold attribute parsing structure.  This is necessary because
--- attoparsec doesn't support parsers running in another monad.
-data AttAST = Literal Text
-            | Ident   Text
-  deriving (Show)
-
-
-------------------------------------------------------------------------------
--- | Parser for attribute variable substitution.
-attParser :: AP.Parser [AttAST]
-attParser = liftM ($! []) (loop id)
-  where
-    append !dl !x = dl . (x:)
-
-    loop !dl = go id
-      where
-        finish subDL = let !txt = T.concat $! subDL []
-                           lit  = Literal $! T.concat $! subDL []
-                       in return $! if T.null txt
-                                      then dl
-                                      else append dl lit
-
-        go !subDL = (gobbleText >>= go . append subDL)
-                    <|> (AP.endOfInput *> finish subDL)
-                    <|> (escChar >>= go . append subDL)
-                    <|> (do
-                            idp <- identParser
-                            dl' <- finish subDL
-                            loop $! append dl' idp)
-
-    gobbleText = AP.takeWhile1 (AP.notInClass "\\$")
-
-    escChar = AP.char '\\' *> (T.singleton <$> AP.anyChar)
-
-    identParser = AP.char '$' *> (ident <|> return (Literal "$"))
-    ident = (AP.char '{' *> (Ident <$> AP.takeWhile (/='}')) <* AP.string "}")
 
 
 ------------------------------------------------------------------------------
@@ -443,7 +283,7 @@ attParser = liftM ($! []) (loop id)
 -- it would be for the former user to accept that
 -- \"some \<b\>text\<\/b\> foobar\" is being rendered as \"some \" because
 -- it's \"more intuitive\".
-getAttributeSplice :: Monad m => Text -> HeistT m Text
+getAttributeSplice :: Monad n => Text -> HeistT n n Text
 getAttributeSplice name = do
     s <- liftM (lookupSplice name) getTS
     nodes <- maybe (return []) id s
@@ -451,7 +291,7 @@ getAttributeSplice name = do
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
-runNodeList :: Monad m => [X.Node] -> Splice m
+runNodeList :: Monad n => [X.Node] -> Splice n n
 runNodeList = mapSplices runNode
 {-# INLINE runNodeList #-}
 
@@ -465,7 +305,7 @@ mAX_RECURSION_DEPTH = 50
 ------------------------------------------------------------------------------
 -- | Checks the recursion flag and recurses accordingly.  Does not recurse
 -- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
-recurseSplice :: Monad m => X.Node -> Splice m -> Splice m
+recurseSplice :: Monad n => X.Node -> Splice n n -> Splice n n
 recurseSplice node splice = do
     result <- localParamNode (const node) splice
     ts' <- getTS
@@ -476,7 +316,7 @@ recurseSplice node splice = do
                 return res
         else return result
   where
-    modRecursionDepth :: Monad m => (Int -> Int) -> HeistT m ()
+    modRecursionDepth :: Monad m => (Int -> Int) -> HeistT n m ()
     modRecursionDepth f =
         modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
@@ -485,11 +325,11 @@ recurseSplice node splice = do
 -- | Looks up a template name runs a 'HeistT' computation on it.
 lookupAndRun :: Monad m
              => ByteString
-             -> ((DocumentFile, TPath) -> HeistT m (Maybe a))
-             -> HeistT m (Maybe a)
+             -> ((DocumentFile, TPath) -> HeistT n m (Maybe a))
+             -> HeistT n m (Maybe a)
 lookupAndRun name k = do
     ts <- getTS
-    let mt = lookupTemplate name ts
+    let mt = lookupTemplate name ts _templateMap
     let curPath = join $ fmap (dfFile . fst) mt
     modifyTS (setCurTemplateFile curPath)
     maybe (return Nothing) k mt
@@ -497,9 +337,9 @@ lookupAndRun name k = do
 
 ------------------------------------------------------------------------------
 -- | Looks up a template name evaluates it by calling runNodeList.
-evalTemplate :: Monad m
-            => ByteString
-            -> HeistT m (Maybe Template)
+evalTemplate :: Monad n
+             => ByteString
+             -> HeistT n n (Maybe Template)
 evalTemplate name = lookupAndRun name
     (\(t,ctx) -> localTS (\ts -> ts {_curContext = ctx})
                          (liftM Just $ runNodeList $ X.docContent $ dfDoc t))
@@ -508,7 +348,7 @@ evalTemplate name = lookupAndRun name
 ------------------------------------------------------------------------------
 -- | Sets the document type of a 'X.Document' based on the 'HeistT'
 -- value.
-fixDocType :: Monad m => X.Document -> HeistT m X.Document
+fixDocType :: Monad m => X.Document -> HeistT n m X.Document
 fixDocType d = do
     dts <- getsTS _doctypes
     return $ d { X.docType = listToMaybe dts }
@@ -518,17 +358,16 @@ fixDocType d = do
 -- | Same as evalWithHooks, but returns the entire 'X.Document' rather than
 -- just the nodes.  This is the right thing to do if we are starting at the
 -- top level.
-evalWithHooksInternal :: Monad m
+evalWithHooksInternal :: Monad n
                       => ByteString
-                      -> HeistT m (Maybe X.Document)
+                      -> HeistT n n (Maybe X.Document)
 evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
     addDoctype $ maybeToList $ X.docType $ dfDoc t
     ts <- getTS
-    nodes <- lift $ _preRunHook ts $ X.docContent $ dfDoc t
+    let nodes = X.docContent $ dfDoc t
     putTS (ts {_curContext = ctx})
-    res <- runNodeList nodes
+    newNodes <- runNodeList nodes
     restoreTS ts
-    newNodes <- lift (_postRunHook ts res)
     newDoc   <- fixDocType $ (dfDoc t) { X.docContent = newNodes }
     return (Just newDoc)
 
@@ -536,28 +375,28 @@ evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
 ------------------------------------------------------------------------------
 -- | Looks up a template name evaluates it by calling runNodeList.  This also
 -- executes pre- and post-run hooks and adds the doctype.
-evalWithHooks :: Monad m
-            => ByteString
-            -> HeistT m (Maybe Template)
+evalWithHooks :: Monad n
+              => ByteString
+              -> HeistT n n (Maybe Template)
 evalWithHooks name = liftM (liftM X.docContent) (evalWithHooksInternal name)
 
 
 ------------------------------------------------------------------------------
 -- | Binds a list of constant string splices.
-bindStrings :: Monad m
+bindStrings :: Monad n
             => [(Text, Text)]
-            -> HeistState m
-            -> HeistState m
+            -> HeistState n n
+            -> HeistState n n
 bindStrings pairs ts = foldr (uncurry bindString) ts pairs
 
 
 ------------------------------------------------------------------------------
 -- | Binds a single constant string splice.
-bindString :: Monad m
-            => Text
-            -> Text
-            -> HeistState m
-            -> HeistState m
+bindString :: Monad n
+           => Text
+           -> Text
+           -> HeistState n n
+           -> HeistState n n
 bindString n = bindSplice n . textSplice
 
 
@@ -566,11 +405,11 @@ bindString n = bindSplice n . textSplice
 -- to use when you want to "call" a template and pass in parameters from
 -- inside a splice.  If the template does not exist, this version simply
 -- returns an empty list.
-callTemplate :: Monad m
+callTemplate :: Monad n
              => ByteString         -- ^ The name of the template
-             -> [(Text, Splice m)] -- ^ Association list of
+             -> [(Text, Splice n n)] -- ^ Association list of
                                    -- (name,value) parameter pairs
-             -> HeistT m Template
+             -> HeistT n n Template
 callTemplate name params = do
     modifyTS $ bindSplices params
     liftM (maybe [] id) $ evalTemplate name
@@ -579,11 +418,11 @@ callTemplate name params = do
 ------------------------------------------------------------------------------
 -- | Like callTemplate except the splices being bound are constant text
 -- splices.
-callTemplateWithText :: Monad m
+callTemplateWithText :: Monad n
                      => ByteString     -- ^ The name of the template
                      -> [(Text, Text)] -- ^ Association list of
                                        -- (name,value) parameter pairs
-                     -> HeistT m Template
+                     -> HeistT n n Template
 callTemplateWithText name params = do
     modifyTS $ bindStrings params
     liftM (maybe [] id) $ evalTemplate name
@@ -609,10 +448,10 @@ mimeType d = case d of
 -- the root template was an HTML or XML format template.  It will always be
 -- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
 -- particular XML application, it must be provided by the application.
-renderTemplate :: Monad m
-               => HeistState m
+renderTemplate :: Monad n
+               => HeistState n n
                -> ByteString
-               -> m (Maybe (Builder, MIMEType))
+               -> n (Maybe (Builder, MIMEType))
 renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
   where tpl = do mt <- evalWithHooksInternal name
                  case mt of
@@ -625,11 +464,11 @@ renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
 -- convenience function for the common pattern of calling renderTemplate after
 -- using bindString, bindStrings, or bindSplice to set up the arguments to the
 -- template.
-renderWithArgs :: Monad m
-                   => [(Text, Text)]
-                   -> HeistState m
-                   -> ByteString
-                   -> m (Maybe (Builder, MIMEType))
+renderWithArgs :: Monad n
+               => [(Text, Text)]
+               -> HeistState n n
+               -> ByteString
+               -> n (Maybe (Builder, MIMEType))
 renderWithArgs args ts = renderTemplate (bindStrings args ts)
 
 
@@ -694,8 +533,8 @@ loadTemplate templateRoot fname
 ------------------------------------------------------------------------------
 -- | Traverses the specified directory structure and builds a HeistState by
 -- loading all the files with a ".tpl" or ".xtpl" extension.
-loadTemplates :: Monad m => FilePath -> HeistState m
-              -> IO (Either String (HeistState m))
+loadTemplates :: Monad m => FilePath -> HeistState n m
+              -> IO (Either String (HeistState n m))
 loadTemplates dir ts = do
     d <- readDirectoryWith (loadTemplate dir) dir
     let tlist = F.fold (free d)
@@ -718,8 +557,8 @@ runHook f t = do
 ------------------------------------------------------------------------------
 -- | Runs the onLoad hook on the template and returns the 'HeistState'
 -- with the result inserted.
-loadHook :: Monad m => HeistState m -> (TPath, DocumentFile)
-         -> IO (HeistState m)
+loadHook :: Monad m => HeistState n m -> (TPath, DocumentFile)
+         -> IO (HeistState n m)
 loadHook ts (tp, t) = do
     t' <- runHook (_onLoadHook ts) t
     return $ insertTemplate tp t' ts
@@ -730,7 +569,7 @@ loadHook ts (tp, t) = do
 -- want to add multiple levels of directories, separate them with slashes as
 -- in "foo/bar".  Using an empty string as a path prefix will leave the
 -- 'HeistState' unchanged.
-addTemplatePathPrefix :: ByteString -> HeistState m -> HeistState m
+addTemplatePathPrefix :: ByteString -> HeistState n m -> HeistState n m
 addTemplatePathPrefix dir ts
   | B.null dir = ts
   | otherwise  = ts { _templateMap = Map.fromList $

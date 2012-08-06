@@ -16,7 +16,7 @@ ignoreTag = "ignore"
 ------------------------------------------------------------------------------
 -- | The ignore tag and everything it surrounds disappears in the
 -- rendered output.
-ignoreImpl :: Monad m => Splice m
+ignoreImpl :: Monad m => Splice n m
 ignoreImpl = return []
 
 

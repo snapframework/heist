@@ -53,7 +53,7 @@ import           Text.XmlHtml
 -- @\<value\/\>@    --  the given JSON value, as a string
 -- @\<snippet\/\>@  --  the given JSON value, parsed and spliced in as HTML
 --
-bindJson :: (ToJSON a, Monad m) => a -> Splice m
+bindJson :: (ToJSON a, Monad n) => a -> Splice n n
 bindJson = runReaderT explodeTag . toJSON
 
 
@@ -69,11 +69,11 @@ errorMessage s = renderHtmlNodes $
 
 
 ------------------------------------------------------------------------------
-type JsonMonad m a = ReaderT Value (HeistT m) a
+type JsonMonad n m a = ReaderT Value (HeistT n m) a
 
 
 ------------------------------------------------------------------------------
-withValue :: (Monad m) => Value -> JsonMonad m a -> HeistT m a
+withValue :: (Monad m) => Value -> JsonMonad n m a -> HeistT n m a
 withValue = flip runReaderT
 
 
@@ -108,7 +108,7 @@ asHtml t =
 
 
 ------------------------------------------------------------------------------
-snippetTag :: Monad m => JsonMonad m [Node]
+snippetTag :: Monad m => JsonMonad n m [Node]
 snippetTag = ask >>= snip
   where
     txt t = lift $ asHtml t
@@ -127,7 +127,7 @@ snippetTag = ask >>= snip
 
 
 ------------------------------------------------------------------------------
-valueTag :: Monad m => JsonMonad m [Node]
+valueTag :: Monad m => JsonMonad n m [Node]
 valueTag = ask >>= go
   where
     go Null       = txt ""
@@ -147,7 +147,7 @@ valueTag = ask >>= go
 
 
 ------------------------------------------------------------------------------
-explodeTag :: (Monad m) => JsonMonad m [Node]
+explodeTag :: (Monad n) => JsonMonad n n [Node]
 explodeTag = ask >>= go
   where
     --------------------------------------------------------------------------
@@ -164,7 +164,7 @@ explodeTag = ask >>= go
                                       ]
 
     --------------------------------------------------------------------------
-    goArray :: (Monad m) => V.Vector Value -> JsonMonad m [Node]
+    goArray :: (Monad n) => V.Vector Value -> JsonMonad n n [Node]
     goArray a = do
         lift stopRecursion
         dl <- V.foldM f id a
@@ -178,7 +178,7 @@ explodeTag = ask >>= go
     -- search the param node for attribute \"var=expr\", search the given JSON
     -- object for the expression, and if it's found run the JsonMonad action m
     -- using the restricted JSON object.
-    varAttrTag :: (Monad m) => Value -> (JsonMonad m [Node]) -> Splice m
+    varAttrTag :: (Monad m) => Value -> (JsonMonad n m [Node]) -> Splice n m
     varAttrTag v m = do
         node <- getParamNode
         maybe (noVar node) (hasVar node) $ getAttribute "var" node
@@ -201,7 +201,7 @@ explodeTag = ask >>= go
                                  (findExpr expr v)
 
     --------------------------------------------------------------------------
-    genericBindings :: Monad m => JsonMonad m [(Text, Splice m)]
+    genericBindings :: Monad n => JsonMonad n n [(Text, Splice n n)]
     genericBindings = ask >>= \v -> return [ ("with",    varAttrTag v explodeTag)
                                            , ("snippet", varAttrTag v snippetTag)
                                            , ("value",   varAttrTag v valueTag  )

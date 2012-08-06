@@ -20,7 +20,7 @@ htmlTag = "html"
 -- | The html splice runs all children and then traverses the returned node
 -- forest removing all head nodes.  Then it merges them all and prepends it to
 -- the html tag's child list.
-htmlImpl :: Monad m => Splice m
+htmlImpl :: Monad n => Splice n n
 htmlImpl = do
     node <- getParamNode
     children <- runNodeList $ X.childNodes node
