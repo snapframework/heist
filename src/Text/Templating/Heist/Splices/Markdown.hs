@@ -35,6 +35,7 @@ import           System.Process
 import           Text.XmlHtml
 
 ------------------------------------------------------------------------------
+import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Types
 

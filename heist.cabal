@@ -67,6 +67,7 @@ Library
   hs-source-dirs: src
 
   exposed-modules:
+    Caper,
     Text.Templating.Heist,
     Text.Templating.Heist.Splices,
     Text.Templating.Heist.Splices.Apply,
@@ -90,6 +91,7 @@ Library
     base                      >= 4     && < 5,
     blaze-builder             >= 0.2   && < 0.4,
     blaze-html                >= 0.4   && < 0.6,
+    blaze-markup              >= 0.5   && < 0.6,
     bytestring,
     containers                >= 0.2   && < 0.6,
     directory,

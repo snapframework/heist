@@ -5,6 +5,7 @@ import           Data.Text (Text)
 import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
+import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Splices.Apply
 import           Text.Templating.Heist.Types

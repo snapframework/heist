@@ -1,21 +1,30 @@
 {-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Text.Templating.Heist.Common where
 
 import           Control.Applicative
+import           Control.Exception (SomeException)
 import           Control.Monad
+import           Control.Monad.CatchIO
 import qualified Data.Attoparsec.Text            as AP
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import           Data.Either
+import qualified Data.Foldable as F
 import           Data.Hashable
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
+import           Data.List
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text                       as T
+import           Prelude hiding (catch)
+import           System.Directory.Tree hiding (name)
 import           System.FilePath
 import           Text.Templating.Heist.Types
+import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
 -- | Sets the current template file.
@@ -149,5 +158,123 @@ mapSplices :: (Monad m, Monoid r)
            -- ^ The result of all splices concatenated together.
 mapSplices f vs = liftM mconcat $ mapM f vs
 {-# INLINE mapSplices #-}
+
+
+------------------------------------------------------------------------------
+-- | Gets the current context
+getContext :: Monad m => HeistT n m TPath
+getContext = getsTS _curContext
+
+
+------------------------------------------------------------------------------
+-- | Gets the full path to the file holding the template currently being
+-- processed.  Returns Nothing if the template is not associated with a file
+-- on disk or if there is no template being processed.
+getTemplateFilePath :: Monad m => HeistT n m (Maybe FilePath)
+getTemplateFilePath = getsTS _curTemplateFile
+
+
+------------------------------------------------------------------------------
+-- | Loads a template with the specified path and filename.  The
+-- template is only loaded if it has a ".tpl" or ".xtpl" extension.
+loadTemplate :: String -- ^ path of the template root
+             -> String -- ^ full file path (includes the template root)
+             -> IO [Either String (TPath, DocumentFile)] --TemplateMap
+loadTemplate templateRoot fname
+    | isHTMLTemplate = do
+        c <- getDoc fname
+        return [fmap (\t -> (splitLocalPath $ BC.pack tName, t)) c]
+    | isXMLTemplate = do
+        c <- getXMLDoc fname
+        return [fmap (\t -> (splitLocalPath $ BC.pack tName, t)) c]
+    | otherwise = return []
+  where -- tName is path relative to the template root directory
+        isHTMLTemplate = ".tpl"  `isSuffixOf` fname
+        isXMLTemplate  = ".xtpl" `isSuffixOf` fname
+        correction = if last templateRoot == '/' then 0 else 1
+        extLen     = if isHTMLTemplate then 4 else 5
+        tName = drop ((length templateRoot)+correction) $
+                -- We're only dropping the template root, not the whole path
+                take ((length fname) - extLen) fname
+
+
+------------------------------------------------------------------------------
+-- | Traverses the specified directory structure and builds a HeistState by
+-- loading all the files with a ".tpl" or ".xtpl" extension.
+loadTemplates :: Monad m => FilePath -> HeistState n m
+              -> IO (Either String (HeistState n m))
+loadTemplates dir ts = do
+    d <- readDirectoryWith (loadTemplate dir) dir
+    let tlist = F.fold (free d)
+        errs = lefts tlist
+    case errs of
+        [] -> liftM Right $ foldM loadHook ts $ rights tlist
+        _  -> return $ Left $ unlines errs
+
+
+------------------------------------------------------------------------------
+-- | Runs a template modifying function on a DocumentFile.
+runHook :: Monad m => (Template -> m Template)
+        -> DocumentFile
+        -> m DocumentFile
+runHook f t = do
+    n <- f $ X.docContent $ dfDoc t
+    return $ t { dfDoc = (dfDoc t) { X.docContent = n } }
+
+
+------------------------------------------------------------------------------
+-- | Runs the onLoad hook on the template and returns the 'HeistState'
+-- with the result inserted.
+loadHook :: Monad m => HeistState n m -> (TPath, DocumentFile)
+         -> IO (HeistState n m)
+loadHook ts (tp, t) = do
+    t' <- runHook (_onLoadHook ts) t
+    return $ insertTemplate tp t' ts
+
+
+------------------------------------------------------------------------------
+-- | Type synonym for parsers.
+type ParserFun = String -> ByteString -> Either String X.Document
+
+
+------------------------------------------------------------------------------
+-- | Reads an HTML or XML template from disk.
+getDocWith :: ParserFun -> String -> IO (Either String DocumentFile)
+getDocWith parser f = do
+    bs <- catch (liftM Right $ B.readFile f)
+                (\(e::SomeException) -> return $ Left $ show e)
+
+    let eitherDoc = either Left (parser f) bs
+    return $ either (\s -> Left $ f ++ " " ++ s)
+                    (\d -> Right $ DocumentFile d (Just f)) eitherDoc
+
+
+------------------------------------------------------------------------------
+-- | Reads an HTML template from disk.
+getDoc :: String -> IO (Either String DocumentFile)
+getDoc = getDocWith X.parseHTML
+
+
+------------------------------------------------------------------------------
+-- | Reads an XML template from disk.
+getXMLDoc :: String -> IO (Either String DocumentFile)
+getXMLDoc = getDocWith X.parseXML
+
+
+------------------------------------------------------------------------------
+-- | Sets the templateMap in a HeistState.
+setTemplates :: Monad m => TemplateMap -> HeistState n m -> HeistState n m
+setTemplates m ts = ts { _templateMap = m }
+
+
+------------------------------------------------------------------------------
+-- | Adds a template to the heist state.
+insertTemplate :: Monad m =>
+               TPath
+            -> DocumentFile
+            -> HeistState n m
+            -> HeistState n m
+insertTemplate p t st =
+    setTemplates (Map.insert p t (_templateMap st)) st
 
 

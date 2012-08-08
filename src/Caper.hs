@@ -127,65 +127,65 @@ import Debug.Trace
 -- run/rendered.  You should be careful what code you put in these hooks
 -- because it can significantly affect the performance of your site.
 
-{-
 
-dlistRunNode :: Monad m
-             => X.Node
-             -> HeistT (Output m1) m (Output m1)
-dlistRunNode (X.Element nm attrs ch) = do
-    -- Parse the attributes: we have Left for static and Right for runtime
-    -- TODO: decide: do we also want substitution in the key?
-    compiledAttrs <- mapM attSubst attrs
-    childHtml <- runNodeList ch
-    return $ DL.concat [ DL.singleton $ Pure tag0
-                       , DL.concat $ map renderAttr compiledAttrs
-                       , DL.singleton $ Pure ">"
-                       , childHtml
-                       , DL.singleton $ Pure end
-                       ]
-  where
-    tag0 = T.append "<" nm
-    end = T.concat [ "</" , nm , ">"]
-    renderAttr (n,v) = DL.concat [ DL.singleton $ Pure $ T.append " " n
-                                 , DL.singleton $ Pure "="
-                                 , v ]
-dlistRunNode (X.TextNode t) = return $ textSplice t
-dlistRunNode (X.Comment t) = return $ textSplice t
+-- dlistRunNode :: Monad m
+--              => X.Node
+--              -> HeistT (Output m1) m (Output m1)
+-- dlistRunNode (X.Element nm attrs ch) = do
+--     -- Parse the attributes: we have Left for static and Right for runtime
+--     -- TODO: decide: do we also want substitution in the key?
+--     compiledAttrs <- mapM attSubst attrs
+--     childHtml <- runNodeList ch
+--     return $ DL.concat [ DL.singleton $ Pure tag0
+--                        , DL.concat $ map renderAttr compiledAttrs
+--                        , DL.singleton $ Pure ">"
+--                        , childHtml
+--                        , DL.singleton $ Pure end
+--                        ]
+--   where
+--     tag0 = T.append "<" nm
+--     end = T.concat [ "</" , nm , ">"]
+--     renderAttr (n,v) = DL.concat [ DL.singleton $ Pure $ T.append " " n
+--                                  , DL.singleton $ Pure "="
+--                                  , v ]
+-- dlistRunNode (X.TextNode t) = return $ textSplice t
+-- dlistRunNode (X.Comment t) = return $ textSplice t
+-- 
+-- 
+-- 
+-- ------------------------------------------------------------------------------
+-- -- | Renders a template with the specified arguments passed to it.  This is a
+-- -- convenience function for the common pattern of calling renderTemplate after
+-- -- using bindString, bindStrings, or bindSplice to set up the arguments to the
+-- -- template.
+-- renderWithArgs :: Monad m
+--                => [(Text, Text)]
+--                -> HeistState (Output m) m
+--                -> ByteString
+--                -> m (Maybe (Builder, MIMEType))
+-- renderWithArgs args ts = renderTemplate (bindStrings args ts)
+-- 
+-- 
+-- ------------------------------------------------------------------------------
+-- -- | Renders a template from the specified HeistState to a 'Builder'.  The
+-- -- MIME type returned is based on the detected character encoding, and whether
+-- -- the root template was an HTML or XML format template.  It will always be
+-- -- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
+-- -- particular XML application, it must be provided by the application.
+-- renderCaperTemplate :: Monad m
+--                     => HeistState (Output m) m
+--                     -> ByteString
+--                     -> m (Maybe (Builder, MIMEType))
+-- renderCaperTemplate ts name = evalHeistT tpl (X.TextNode "") ts
+--   where
+--     -- FIXME should not use lookupAndRun because that uses heist templates
+--     -- instead of caper templates.
+--     tpl = lookupAndRun name $ \(t,ctx) -> do
+--         addDoctype $ maybeToList $ X.docType $ cdfDoc t
+--         localTS (\ts' -> ts' {_curContext = ctx}) $ do
+--             res <- runNodeList $ X.docContent $ cdfDoc t
+--             return $ Just (res, mimeType $ cdfDoc t)
 
-
-
-------------------------------------------------------------------------------
--- | Renders a template with the specified arguments passed to it.  This is a
--- convenience function for the common pattern of calling renderTemplate after
--- using bindString, bindStrings, or bindSplice to set up the arguments to the
--- template.
-renderWithArgs :: Monad m
-               => [(Text, Text)]
-               -> HeistState (Output m) m
-               -> ByteString
-               -> m (Maybe (Builder, MIMEType))
-renderWithArgs args ts = renderTemplate (bindStrings args ts)
-
-
-------------------------------------------------------------------------------
--- | Renders a template from the specified HeistState to a 'Builder'.  The
--- MIME type returned is based on the detected character encoding, and whether
--- the root template was an HTML or XML format template.  It will always be
--- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
--- particular XML application, it must be provided by the application.
-renderTemplate :: Monad m
-               => HeistState (Output m) m
-               -> ByteString
-               -> m (Maybe (Builder, MIMEType))
-renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
-  where
-    tpl = lookupAndRun name $ \(t,ctx) -> do
-        addDoctype $ maybeToList $ X.docType $ cdfDoc t
-        localTS (\ts' -> ts' {_curContext = ctx}) $ do
-            res <- runNodeList $ X.docContent $ cdfDoc t
-            return $ Just (res, mimeType $ cdfDoc t)
-
--}
 
 ------------------------------------------------------------------------------
 ------------------------------------------------------------------------------
@@ -596,106 +596,6 @@ runChildrenWithTextCaper :: (Monad m)
 runChildrenWithTextCaper = runChildrenWithTransCaper textSplice
 
 
-------------------------------------------------------------------------------
--- Above here should be correct
-------------------------------------------------------------------------------
-
-
--- ------------------------------------------------------------------------------
--- loadTemplate :: FilePath    -- ^ path to the template root
---              -> FilePath    -- ^ full file path (includes template root)
---              -> IO [Either String (TPath, CaperDocumentFile m)]
--- loadTemplate templateRoot fname
---     | isHtmlTemplate = do
---         c <- getDoc fname
---         return $! [fmap (\t -> (splitLocalPath $ S.pack tName, t)) c]
---     | otherwise = return []
--- 
---   where
---     isHtmlTemplate = ".tpl" `isSuffixOf` fname
---     relfile        = makeRelative templateRoot fname
---     tName          = dropExtension relfile
--- 
--- 
--- ------------------------------------------------------------------------------
--- getDoc :: FilePath -> IO (Either String (CaperDocumentFile m))
--- getDoc f = do
---     bs <- catch (liftM Right $ S.readFile f)
---                 (\(e::SomeException) -> return $ Left $ show e)
--- 
---     let eitherDoc = either Left (X.parseHTML f) bs
---     return $ either (\s -> Left $ f ++ " " ++ s)
---                     (\d -> Right $ CaperDocumentFile d (Just f)) eitherDoc
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Traverses the specified directory structure and builds a HeistState by
--- -- loading all the files with a ".tpl" extension.
--- --loadTemplates :: Monad m
--- --              => FilePath
--- --              -> HeistState n m
--- --              -> IO (Either String (HeistState n m))
--- loadTemplates dir ts = do
---     d <- readDirectoryWith (loadTemplate dir) dir
---     let tlist = F.fold (free d)
---         errs = lefts tlist
---     case errs of
---         [] -> return $! Right $! foldl' ins ts $ rights tlist
---         _  -> return $ Left $ unlines errs
--- 
---   where
---     ins !ss (tp, t) = insertTemplate tp t ss
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Adds a template to the splice state.
--- insertTemplate :: Monad m
---                => TPath
---                -> CaperDocumentFile m
---                -> HeistState n m
---                -> HeistState n m
--- insertTemplate p t st =
---     setTemplates (H.insert p t (_caperTemplateMap st)) st
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Sets the templateMap in a HeistState.
--- setTemplates :: HashMap TPath (CaperDocumentFile m)
---              -> HeistState n m
---              -> HeistState n m
--- setTemplates m ts = ts { _caperTemplateMap = m }
--- 
--- 
--- ------------------------------------------------------------------------------
--- --lookupAndRun :: Monad m
--- --             => ByteString
--- --             -> ((CaperDocumentFile, TPath) -> HeistT n m (Maybe a))
--- --             -> HeistT n m (Maybe a)
--- lookupAndRun name k = do
---     ts <- getTS
---     let mt = lookupTemplate name ts _caperTemplateMap
---     maybe (return Nothing)
---           (\dftp -> do
---                let curPath = join $ fmap (cdfFile . fst) mt
---                modifyTS (setCurTemplateFile curPath)
---                k dftp)
---           mt
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Gets the current context
--- getContext :: Monad m => HeistT n m TPath
--- getContext = getsTS _curContext
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Gets the full path to the file holding the template currently being
--- -- processed.  Returns Nothing if the template is not associated with a file
--- -- on disk or if there is no template being processed.
--- --getTemplateFilePath :: Monad m => HeistT n m (Maybe FilePath)
--- getTemplateFilePath = getsTS _curTemplateFile
--- 
--- 
 -- ------------------------------------------------------------------------------
 -- {-
 -- 
