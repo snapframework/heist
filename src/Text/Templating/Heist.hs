@@ -139,12 +139,13 @@ import           Data.Either
 import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as Map
 import qualified Data.HeterogeneousEnvironment   as HE
+import           Data.Text (Text)
 import           System.Directory.Tree hiding (name)
 import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Splices
 import           Text.Templating.Heist.Types
-import           Caper (compileTemplates)
+import           Caper (compileTemplates, bindCaperSplices)
 
 
 ------------------------------------------------------------------------------
@@ -162,7 +163,7 @@ defaultSpliceMap = Map.fromList
 -- | An empty heist state, with Heist's default splices (@\<apply\>@,
 -- @\<bind\>@, @\<ignore\>@, and @\<markdown\>@) mapped.  The cache tag is
 -- not mapped here because it must be mapped manually in your application.
-defaultHeistState :: MonadIO n => IO (HeistState n n)
+defaultHeistState :: MonadIO n => IO (HeistState n m)
 defaultHeistState =
     liftM (HeistState (defaultSpliceMap) Map.empty
                       Map.empty Map.empty True [] 0 return [] Nothing)
@@ -182,16 +183,27 @@ defaultHeistState =
 
 
 ------------------------------------------------------------------------------
--- | Traverses the specified directory structure and builds a HeistState by
--- loading all the files with a ".tpl" or ".xtpl" extension.
-loadTemplates :: Monad n => FilePath -> HeistState n IO
+-- | This is the main heist initialization function.  First it traverses the
+-- specified directory structure and builds a HeistState by loading all the
+-- files with a ".tpl" or ".xtpl" extension.  Next all caper splices are
+-- processed.  We don't provide functions to bind caper splices because it
+-- doesn't make any sense unless you re-compile all templates with the new
+-- splices.  If you add any heist splices after loadTemplates, they will still
+-- work fine.  If you add any templates later, then those templates will be
+-- available for heist rendering, but not for caper rendering.
+loadTemplates :: Monad n
+              => FilePath
+              -> [(Text, CaperSplice n)]
+              -- ^ Caper splices must be all bound at load time
+              -> HeistState n IO
               -> IO (Either String (HeistState n IO))
-loadTemplates dir hs = do
+loadTemplates dir caperSplices hs = do
     d <- readDirectoryWith (loadTemplate dir) dir
     let tlist = F.fold (free d)
         errs = lefts tlist
+        hs' = bindCaperSplices caperSplices hs
     case errs of
-        [] -> do ts' <- compileTemplates =<< foldM loadHook hs (rights tlist)
+        [] -> do ts' <- compileTemplates =<< foldM loadHook hs' (rights tlist)
                  return $ Right ts'
         _  -> return $ Left $ unlines errs
 

@@ -12,6 +12,7 @@ module Text.Templating.Heist.Tests
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Monad.State
+import qualified Control.Monad.Trans.State as ST
 import           Data.Aeson
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
@@ -42,6 +43,7 @@ import           Text.Templating.Heist.Splices.Json
 import           Text.Templating.Heist.Splices.Markdown
 import qualified Text.XmlHtml        as X
 import qualified Text.XmlHtml.Cursor as X
+import qualified Caper as C
 
 
 ------------------------------------------------------------------------------
@@ -69,6 +71,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attrSpliceContext"     attrSpliceContext
         , testCase     "heist/json/values"           jsonValueTest
         , testCase     "heist/json/object"           jsonObjectTest
+        , testCase     "caper/splice"                caperTest
         ]
 
 
@@ -311,7 +314,7 @@ attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a><a href='b
 -- | Markdown test on supplied text
 markdownTextTest :: H.Assertion
 markdownTextTest = do
-    hs <- defaultHeistState
+    hs <- defaultHeistState :: IO (HeistState IO IO)
     result <- evalHeistT markdownSplice
                          (X.TextNode "This *is* a test.")
                          hs
@@ -358,17 +361,17 @@ isLeft (Right _) = False
 
 
 ------------------------------------------------------------------------------
---loadT :: String -> IO (Either String (HeistState IO IO))
+loadT :: String -> IO (Either String (HeistState IO IO))
 loadT s = do
     hs <- defaultHeistState
-    loadTemplates s hs
+    loadTemplates s [] hs
 
 
 ------------------------------------------------------------------------------
---loadTS :: FilePath -> IO (HeistState IO IO)
+loadTS :: FilePath -> IO (HeistState IO IO)
 loadTS baseDir = do
     hs <- defaultHeistState
-    etm <- loadTemplates baseDir hs
+    etm <- loadTemplates baseDir [] hs
     return $ either error id etm
 
 
@@ -382,6 +385,33 @@ testTemplateEval tname = do
     ts <- loadTS "templates"
     evalHeistT (evalWithHooks tname) (X.TextNode "") ts
 
+
+------------------------------------------------------------------------------
+-- Caper tests
+------------------------------------------------------------------------------
+
+stateSplice :: MonadIO m => CaperSplice (StateT Int m)
+stateSplice = C.yieldRuntimeHtml $ do
+    val <- lift ST.get
+    liftIO $ putStrLn "running state splice"
+    return $ T.pack $ show (val+1)
+
+loadWithCaper :: MonadIO n
+              => FilePath
+              -> [(Text, CaperSplice n)]
+              -> IO (HeistState n IO)
+loadWithCaper baseDir splices = do
+    hs <- defaultHeistState
+    liftM (either error id) $ loadTemplates baseDir splices hs
+
+caperTest = do
+    hs <- loadWithCaper "templates" [ ("div", stateSplice) ]
+    let mt = fromJust $ C.lookupCompiledTemplate "index" hs
+    builder <- ST.evalStateT mt (2::Int)
+    let res = toByteString builder
+    H.assertBool "caper state splice" $ res ==
+      "<bind tag=\"att\">ultralongname</bind>&#10;<html>&#10;3&#10;</html>&#10;"
+    
 
 ------------------------------------------------------------------------------
 identStartChar :: [Char]
@@ -617,34 +647,6 @@ calcResult apply@(Apply name _ callee _ _) = do
         (X.TextNode "") hs'
 
 
-
-
-{-
--- The beginning of some future tests for hook functions.
-
-p :: ByteString -> Node
-p t = X.Element "p" [] [X.Text t]
-
-hookG :: Monad m => ByteString -> Template -> m Template
-hookG str t = return $ (p str) : t
-
-onLoad = hookG "Inserted on load"
-preRun = hookG "Inserted on preRun"
-postRun = hookG "Inserted on postRun"
-
-ts :: IO (Either String (HeistState IO IO))
-ts = loadTemplates "test/templates" $
-    foldr ($) (defaultHeistState ".")
-    [setOnLoadHook onLoad
-    ,setPreRunHook preRun
-    ,setPostRunHook postRun
-    ]
-
-r name etm = do
-    let ts = either (error "Danger Will Robinson!") id etm
-    ns <- runNodeList ts name
-    return $ (Just . formatList') =<< ns
--}
 
 
 {-

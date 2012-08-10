@@ -134,8 +134,14 @@ type Splice n m = HeistT n m Template
 
 
 ------------------------------------------------------------------------------
+-- | Caper splices have the running monad fixed to IO because they can only
+-- run at load time.
+type CaperT n a = HeistT n IO a
+
+
+------------------------------------------------------------------------------
 -- | A Splice is a HeistT computation that returns a 'Template'.
-type CaperSplice n m = HeistT n m (DList (Chunk n))
+type CaperSplice n = CaperT n (DList (Chunk n))
 
 
 ------------------------------------------------------------------------------
@@ -158,7 +164,7 @@ data HeistState n m = HeistState {
     , _templateMap      :: TemplateMap
 
     -- | A mapping of splice names to splice actions
-    , _caperSpliceMap   :: HashMap Text (CaperSplice n m)
+    , _caperSpliceMap   :: HashMap Text (CaperSplice n)
     -- | A mapping of template names to templates
     , _caperTemplateMap :: HashMap TPath (n Builder)
 

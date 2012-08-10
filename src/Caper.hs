@@ -111,20 +111,21 @@ import qualified Text.XmlHtml                    as X
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
-runNodeList :: (Monad m) => Template -> CaperSplice n m
+runNodeList :: Template -> CaperSplice n
 runNodeList nodes = liftM DL.concat $ mapM runNode nodes
 
 
 ------------------------------------------------------------------------------
-lookupCompiledTemplate :: TPath -> HeistState n m -> Maybe (n Builder)
-lookupCompiledTemplate nm = H.lookup nm . _caperTemplateMap
+--lookupCompiledTemplate :: ByteString -> HeistState n m -> Maybe (n Builder)
+lookupCompiledTemplate nm hs =
+    fmap fst $ lookupTemplate nm hs _caperTemplateMap
 
 
 ------------------------------------------------------------------------------
 runSplice :: (Monad n)
           => X.Node
           -> HeistState n IO
-          -> CaperSplice n IO
+          -> CaperSplice n
           -> IO (n Builder)
 runSplice node hs splice = do
     (!a,_) <- runHeistT splice node hs
@@ -132,10 +133,9 @@ runSplice node hs splice = do
 
 
 ------------------------------------------------------------------------------
-runDocumentFile :: (Monad m)
-                => TPath
+runDocumentFile :: TPath
                 -> DocumentFile
-                -> CaperSplice n m
+                -> CaperSplice n
 runDocumentFile tpath df = do
     modifyTS (setCurTemplateFile curPath .  setCurContext tpath)
     runNodeList nodes
@@ -235,42 +235,42 @@ yieldChunk = return . DL.singleton
 
 
 ------------------------------------------------------------------------------
-yield :: (Monad m) => Text -> CaperSplice n m
+yield :: Text -> CaperSplice n
 yield = yieldChunk . Pure
 {-# INLINE yield #-}
 
 
 ------------------------------------------------------------------------------
-yieldRuntimeSplice :: (Monad m) => RuntimeSplice n () -> CaperSplice n m
+yieldRuntimeSplice :: RuntimeSplice n () -> CaperSplice n
 yieldRuntimeSplice = yieldChunk . RuntimeAction
 {-# INLINE yieldRuntimeSplice #-}
 
 
 ------------------------------------------------------------------------------
-yieldRuntimeHtml :: (Monad m) => RuntimeSplice n Text -> CaperSplice n m
+yieldRuntimeHtml :: RuntimeSplice n Text -> CaperSplice n
 yieldRuntimeHtml = yieldChunk . RuntimeHtml
 {-# INLINE yieldRuntimeHtml #-}
 
 
 ------------------------------------------------------------------------------
-yieldLater :: (Monad n, Monad m) => n Text -> CaperSplice n m
+yieldLater :: (Monad n) => n Text -> CaperSplice n
 yieldLater = yieldRuntimeHtml . RuntimeSplice . lift
 {-# INLINE yieldLater #-}
 
 
 ------------------------------------------------------------------------------
-yieldPromise :: (Monad m, Monad n) => Promise Text -> CaperSplice n m
+yieldPromise :: (Monad n) => Promise Text -> CaperSplice n
 yieldPromise p = yieldRuntimeHtml $ getPromise p
 {-# INLINE yieldPromise #-}
 
 
 ------------------------------------------------------------------------------
-lookupCaperSplice :: Monad m => Text -> HeistT n m (Maybe (CaperSplice n m))
+lookupCaperSplice :: Text -> CaperT n (Maybe (CaperSplice n))
 lookupCaperSplice nm = getsTS (H.lookup nm . _caperSpliceMap)
 
 
 ------------------------------------------------------------------------------
-runNode :: (Monad m) => X.Node -> CaperSplice n m
+runNode :: X.Node -> CaperSplice n
 runNode node = localParamNode (const node) $ do
     isStatic <- subtreeIsStatic node
     if isStatic
@@ -281,7 +281,7 @@ runNode node = localParamNode (const node) $ do
 
 
 ------------------------------------------------------------------------------
-subtreeIsStatic :: Monad m => X.Node -> HeistT n m Bool
+subtreeIsStatic :: X.Node -> CaperT n Bool
 subtreeIsStatic (X.Element nm attrs ch) = do
     isNodeDynamic <- liftM isJust $ lookupCaperSplice nm
     if isNodeDynamic
@@ -313,7 +313,7 @@ hasAttributeSubstitutions txt = all isLiteral ast
 ------------------------------------------------------------------------------
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
 -- generate html at runtime. Leaves the writer monad state untouched.
-compileNode :: (Monad m) => X.Node -> CaperSplice n m
+compileNode :: X.Node -> CaperSplice n
 compileNode (X.Element nm attrs ch) =
     -- Is this node a splice, or does it merely contain splices?
     lookupCaperSplice nm >>= fromMaybe compileStaticElement
@@ -341,7 +341,7 @@ compileNode _ = error "impossible"
 -- | If this function returns a 'Nothing', there are no dynamic splices in the
 -- attribute text, and you can just spit out the text value statically.
 -- Otherwise, the splice has to be resolved at runtime.
-parseAtt :: Monad m => (Text, Text) -> HeistT n m (DList (Chunk n))
+parseAtt :: (Text, Text) -> CaperT n (DList (Chunk n))
 parseAtt (k,v) = do
     let ast = case AP.feed (AP.parse attParser v) "" of
                 (AP.Done _ res) -> res
@@ -358,7 +358,7 @@ parseAtt (k,v) = do
 
 
 ------------------------------------------------------------------------------
-getAttributeSplice :: Monad m => Text -> HeistT n m (DList (Chunk n))
+getAttributeSplice :: Text -> CaperT n (DList (Chunk n))
 getAttributeSplice name =
     lookupCaperSplice name >>= fromMaybe (return DL.empty)
 {-# INLINE getAttributeSplice #-}
@@ -389,7 +389,7 @@ adjustPromise (Promise k) f = modify (HE.adjust f k)
 
 
 ------------------------------------------------------------------------------
-newEmptyPromise :: MonadIO m => HeistT n m (Promise a)
+newEmptyPromise :: CaperT n (Promise a)
 newEmptyPromise = do
     keygen <- getsTS _keygen
     key    <- liftIO $ HE.makeKey keygen
@@ -398,8 +398,8 @@ newEmptyPromise = do
 
 
 ------------------------------------------------------------------------------
-newEmptyPromiseWithError :: (Monad n, MonadIO m)
-                         => String -> HeistT n m (Promise a)
+newEmptyPromiseWithError :: (Monad n)
+                         => String -> CaperT n (Promise a)
 newEmptyPromiseWithError from = do
     keygen <- getsTS _keygen
     prom   <- liftM Promise $ liftIO $ HE.makeKey keygen
@@ -413,15 +413,15 @@ newEmptyPromiseWithError from = do
 
 
 ------------------------------------------------------------------------------
-promise :: (Monad n, MonadIO m) => n a -> HeistT n m (Promise a)
+promise :: (Monad n) => n a -> CaperT n (Promise a)
 promise act = runtimeSplicePromise (lift act)
 {-# INLINE promise #-}
 
 
 ------------------------------------------------------------------------------
-runtimeSplicePromise :: (Monad n, MonadIO m)
+runtimeSplicePromise :: (Monad n)
                      => RuntimeSplice n a
-                     -> HeistT n m (Promise a)
+                     -> CaperT n (Promise a)
 runtimeSplicePromise act = do
     prom <- newEmptyPromiseWithError "runtimeSplicePromise"
 
@@ -436,10 +436,10 @@ runtimeSplicePromise act = do
 
 
 ------------------------------------------------------------------------------
-withPromise :: (Monad n, MonadIO m)
+withPromise :: (Monad n)
             => Promise a
             -> (a -> n b)
-            -> HeistT n m (Promise b)
+            -> CaperT n (Promise b)
 withPromise promA f = do
     promB <- newEmptyPromiseWithError "withPromise"
 
@@ -456,7 +456,7 @@ withPromise promA f = do
 
 ------------------------------------------------------------------------------
 bindCaperSplice :: Text             -- ^ tag name
-                -> CaperSplice n m  -- ^ splice action
+                -> CaperSplice n  -- ^ splice action
                 -> HeistState n m   -- ^ source state
                 -> HeistState n m
 bindCaperSplice n v ts =
@@ -464,7 +464,7 @@ bindCaperSplice n v ts =
 
 
 ------------------------------------------------------------------------------
-bindCaperSplices :: [(Text, CaperSplice n m)]  -- ^ splices to bind
+bindCaperSplices :: [(Text, CaperSplice n)]  -- ^ splices to bind
                  -> HeistState n m             -- ^ source state
                  -> HeistState n m
 bindCaperSplices ss ts = foldr (uncurry bindCaperSplice) ts ss
@@ -472,22 +472,22 @@ bindCaperSplices ss ts = foldr (uncurry bindCaperSplice) ts ss
 
 ------------------------------------------------------------------------------
 -- | Converts 'Text' to a splice yielding the text, html-encoded.
-textSplice :: Monad m => Text -> CaperSplice n m
+textSplice :: Text -> CaperSplice n
 textSplice = yield
 
 
 ------------------------------------------------------------------------------
-runChildrenCaper :: (Monad m) => CaperSplice n m
+runChildrenCaper :: CaperSplice n
 runChildrenCaper = getParamNode >>= runNodeList . X.childNodes
 
 
 ------------------------------------------------------------------------------
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
-runChildrenWithCaper :: (Monad m)
-    => [(Text, CaperSplice n m)]
+runChildrenWithCaper ::
+       [(Text, CaperSplice n)]
     -- ^ List of splices to bind before running the param nodes.
-    -> CaperSplice n m
+    -> CaperSplice n
     -- ^ Returns the passed in view.
 runChildrenWithCaper splices = localTS (bindCaperSplices splices) runChildrenCaper
 
@@ -495,20 +495,18 @@ runChildrenWithCaper splices = localTS (bindCaperSplices splices) runChildrenCap
 ------------------------------------------------------------------------------
 -- | Wrapper around runChildrenWithCaper that applies a transformation function to
 -- the second item in each of the tuples before calling runChildrenWithCaper.
-runChildrenWithTransCaper :: (Monad m)
-    => (b -> CaperSplice n m)
-    -- ^ Splice generating function
-    -> [(Text, b)]
-    -- ^ List of tuples to be bound
-    -> CaperSplice n m
+runChildrenWithTransCaper :: (b -> CaperSplice n)
+                          -- ^ Splice generating function
+                          -> [(Text, b)]
+                          -- ^ List of tuples to be bound
+                          -> CaperSplice n
 runChildrenWithTransCaper f = runChildrenWithCaper . map (second f)
 
 
 ------------------------------------------------------------------------------
-runChildrenWithTextCaper :: (Monad m)
-                    => [(Text, Text)]
-                    -- ^ List of tuples to be bound
-                    -> CaperSplice n m
+runChildrenWithTextCaper :: [(Text, Text)]
+                         -- ^ List of tuples to be bound
+                         -> CaperSplice n
 runChildrenWithTextCaper = runChildrenWithTransCaper textSplice
 
 
