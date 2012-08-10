@@ -12,7 +12,6 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import           Data.Either
-import qualified Data.Foldable as F
 import           Data.Hashable
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
@@ -21,7 +20,6 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text                       as T
 import           Prelude hiding (catch)
-import           System.Directory.Tree hiding (name)
 import           System.FilePath
 import           Text.Templating.Heist.Types
 import qualified Text.XmlHtml as X
@@ -196,20 +194,6 @@ loadTemplate templateRoot fname
         tName = drop ((length templateRoot)+correction) $
                 -- We're only dropping the template root, not the whole path
                 take ((length fname) - extLen) fname
-
-
-------------------------------------------------------------------------------
--- | Traverses the specified directory structure and builds a HeistState by
--- loading all the files with a ".tpl" or ".xtpl" extension.
-loadTemplates :: Monad m => FilePath -> HeistState n m
-              -> IO (Either String (HeistState n m))
-loadTemplates dir ts = do
-    d <- readDirectoryWith (loadTemplate dir) dir
-    let tlist = F.fold (free d)
-        errs = lefts tlist
-    case errs of
-        [] -> liftM Right $ foldM loadHook ts $ rights tlist
-        _  -> return $ Left $ unlines errs
 
 
 ------------------------------------------------------------------------------

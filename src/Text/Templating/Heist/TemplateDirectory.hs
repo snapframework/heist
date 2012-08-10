@@ -35,10 +35,9 @@ data TemplateDirectory n m
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory' wrapped in an Either for
 -- error handling.
-newTemplateDirectory :: (MonadIO n)
-                     => FilePath
-                     -> HeistState n n
-                     -> n (Either String (TemplateDirectory n n))
+newTemplateDirectory :: FilePath
+                     -> HeistState IO IO
+                     -> IO (Either String (TemplateDirectory IO IO))
 newTemplateDirectory dir templateState = liftIO $ do
     (modTs,cts) <- mkCacheTag
     let origTs = modTs templateState
@@ -51,10 +50,9 @@ newTemplateDirectory dir templateState = liftIO $ do
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory', using the monad's fail
 -- function on error.
-newTemplateDirectory' :: (MonadIO n)
-                      => FilePath
-                      -> HeistState n n
-                      -> n (TemplateDirectory n n)
+newTemplateDirectory' :: FilePath
+                      -> HeistState IO IO
+                      -> IO (TemplateDirectory IO IO)
 newTemplateDirectory' = ((either fail return =<<) .) . newTemplateDirectory
 
 
@@ -68,8 +66,8 @@ getDirectoryTS (TemplateDirectory _ _ tsMVar _) = liftIO $ readMVar $ tsMVar
 
 ------------------------------------------------------------------------------
 -- | Clears cached content and reloads templates from disk.
-reloadTemplateDirectory :: (MonadIO m, MonadIO n)
-                        => TemplateDirectory n m
+reloadTemplateDirectory :: (MonadIO n)
+                        => TemplateDirectory n IO
                         -> n (Either String ())
 reloadTemplateDirectory (TemplateDirectory p origTs tsMVar cts) = liftIO $ do
     clearCacheTagState cts

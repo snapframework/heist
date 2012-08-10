@@ -135,12 +135,16 @@ module Text.Templating.Heist
 
 import           Control.Monad
 import           Control.Monad.Trans
+import           Data.Either
+import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as Map
 import qualified Data.HeterogeneousEnvironment   as HE
+import           System.Directory.Tree hiding (name)
 import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Splices
 import           Text.Templating.Heist.Types
+import           Caper (compileTemplates)
 
 
 ------------------------------------------------------------------------------
@@ -175,5 +179,20 @@ defaultHeistState =
 -- The pre-run and post-run hooks are run before and after every template is
 -- run/rendered.  You should be careful what code you put in these hooks
 -- because it can significantly affect the performance of your site.
+
+
+------------------------------------------------------------------------------
+-- | Traverses the specified directory structure and builds a HeistState by
+-- loading all the files with a ".tpl" or ".xtpl" extension.
+loadTemplates :: Monad n => FilePath -> HeistState n IO
+              -> IO (Either String (HeistState n IO))
+loadTemplates dir hs = do
+    d <- readDirectoryWith (loadTemplate dir) dir
+    let tlist = F.fold (free d)
+        errs = lefts tlist
+    case errs of
+        [] -> do ts' <- compileTemplates =<< foldM loadHook hs (rights tlist)
+                 return $ Right ts'
+        _  -> return $ Left $ unlines errs
 
 

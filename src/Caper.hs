@@ -6,115 +6,34 @@
 {-# LANGUAGE TypeSynonymInstances       #-}
 
 module Caper where
---   (
---     -- * Types
---     Template
---   , MIMEType
---   , CaperSplice
---   , HeistT
---   , HeistState
---   , evalHeistT
---   , templateNames
---   , spliceNames
--- 
---     -- * Functions and declarations on HeistState values
---   , addTemplate
---   , addXMLTemplate
---   , defaultHeistState
---   , bindSplice
---   , bindSplices
---   , lookupCaperSplice
---   , setTemplates
---   , loadTemplates
---   , hasTemplate
---   , addTemplatePathPrefix
--- 
---     -- * Hook functions
---     -- $hookDoc
---   , addOnLoadHook
---   , addPreRunHook
---   , addPostRunHook
--- 
---     -- * HeistT functions
---   , stopRecursion
---   , getParamNode
---   , runNodeList
---   , getContext
---   , getTemplateFilePath
--- 
---   , localParamNode
---   , getsTS
---   , getTS
---   , putTS
---   , modifyTS
---   , restoreTS
---   , localTS
--- 
---     -- * Functions for running splices and templates
---  , evalTemplate
---  , callTemplate
---  , callTemplateWithText
---  , renderTemplate
---  , renderWithArgs
---  , bindStrings
---  , bindString
---
---    -- * Functions for creating splices
---  , textSplice
---  , runChildren
---  , runChildrenWith
---  , runChildrenWithTrans
---  , runChildrenWithTemplates
---  , runChildrenWithText
---  , mapSplices
---
---    -- * Misc functions
---  , getDoc
---  , getXMLDoc
---  , mkCacheTag
---  ) where
 
 import           Blaze.ByteString.Builder
-import           Blaze.ByteString.Builder.ByteString
-import           Control.Applicative
+--import           Blaze.ByteString.Builder.ByteString
 import           Control.Arrow
-import           Control.Exception
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict
 import qualified Data.Attoparsec.Text            as AP
-import           Data.ByteString.Char8           (ByteString)
-import qualified Data.ByteString.Char8           as S
-import qualified Data.ByteString.Lazy.Char8      as L
 import           Data.DList                      (DList)
 import qualified Data.DList                      as DL
-import           Data.Either
-import qualified Data.Foldable                   as F
-import           Data.HashMap.Strict             (HashMap)
 import qualified Data.HashMap.Strict             as H
-import           Data.HeterogeneousEnvironment   (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment   as HE
-import           Data.List                       (foldl', isSuffixOf)
 import           Data.Maybe
 import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
-import qualified Data.Text.Lazy                  as LT
 import qualified Data.Vector                     as V
 import           Prelude                         hiding (catch)
-import           System.Directory.Tree           hiding (name)
-import           System.FilePath
-import           Text.Blaze.Html
-import qualified Text.Blaze.Html                 as Blaze
-import           Text.Blaze.Internal
-import qualified Text.Blaze.Html.Renderer.String as BlazeString
-import qualified Text.Blaze.Html.Renderer.Text   as BlazeText
-import           Text.Blaze.Html.Renderer.Utf8
+--import           Text.Blaze.Html
+--import qualified Text.Blaze.Html                 as Blaze
+--import           Text.Blaze.Internal
+--import qualified Text.Blaze.Html.Renderer.String as BlazeString
+--import qualified Text.Blaze.Html.Renderer.Text   as BlazeText
+--import           Text.Blaze.Html.Renderer.Utf8
 import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Types
 import qualified Text.XmlHtml                    as X
 
-import Debug.Trace
 
 -- $hookDoc
 -- Heist hooks allow you to modify templates when they are loaded and before
@@ -197,10 +116,8 @@ runNodeList nodes = liftM DL.concat $ mapM runNode nodes
 
 
 ------------------------------------------------------------------------------
-lookupCompiledTemplate :: ByteString
-                       -> CompiledTemplateMap m
-                       -> Maybe (m Builder)
-lookupCompiledTemplate nm (CompiledTemplateMap m) = H.lookup nm m
+lookupCompiledTemplate :: TPath -> HeistState n m -> Maybe (n Builder)
+lookupCompiledTemplate nm = H.lookup nm . _caperTemplateMap
 
 
 ------------------------------------------------------------------------------
@@ -233,27 +150,26 @@ compileTemplate :: Monad n
                 -> TPath
                 -> DocumentFile
                 -> IO (n Builder)
-compileTemplate ss tpath df = do
-    runSplice nullNode ss $ runDocumentFile tpath df
+compileTemplate hs tpath df = do
+    runSplice nullNode hs $ runDocumentFile tpath df
   where
     -- This gets overwritten in runDocumentFile
     nullNode = X.TextNode ""
 
 
 ------------------------------------------------------------------------------
-compileTemplates :: Monad n => HeistState n IO -> IO (CompiledTemplateMap n)
-compileTemplates hs =
-    liftM CompiledTemplateMap $ foldM runOne H.empty tpathDocfiles
+compileTemplates :: Monad n => HeistState n IO -> IO (HeistState n IO)
+compileTemplates hs = do
+    ctm <- foldM runOne H.empty tpathDocfiles
+    return $ hs { _caperTemplateMap = ctm }
   where
-    tpathDocfiles :: [(TPath, ByteString, DocumentFile)]
-    tpathDocfiles = map (\(a,b) -> (a, tpathToPath a, b))
+    tpathDocfiles :: [(TPath, DocumentFile)]
+    tpathDocfiles = map (\(a,b) -> (a, b))
                         (H.toList $ _templateMap hs)
 
-    tpathToPath tp = S.intercalate "/" $ reverse tp
-
-    runOne tmap (tpath, nm, df) = do
+    runOne tmap (tpath, df) = do
         mHtml <- compileTemplate hs tpath df
-        return $! H.insert nm mHtml tmap
+        return $! H.insert tpath mHtml tmap
 
 
 ------------------------------------------------------------------------------
@@ -452,11 +368,11 @@ getAttributeSplice name =
 getPromise :: (Monad m) => Promise a -> RuntimeSplice m a
 getPromise (Promise k) = do
     mb <- gets (HE.lookup k)
-    return $ fromMaybe err mb
+    return $ fromMaybe e mb
 
   where
-    err = error $ "getPromise: dereferenced empty key (id "
-                  ++ show (HE.getKeyId k) ++ ")"
+    e = error $ "getPromise: dereferenced empty key (id "
+                ++ show (HE.getKeyId k) ++ ")"
 {-# INLINE getPromise #-}
 
 

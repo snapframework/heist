@@ -112,14 +112,7 @@ instance Show (Chunk m) where
     show (RuntimeAction _) = "RuntimeAction <m>"
 
 
-data CaperDocumentFile m = CaperDocumentFile
-    { cdfDoc  :: CaperOutput m
-    , cdfFile :: Maybe FilePath
-    }
-
-
-newtype CompiledTemplateMap m =
-    CompiledTemplateMap (HashMap ByteString (m Builder))
+type CompiledTemplateMap m = HashMap ByteString (m Builder)
 
 
 ------------------------------------------------------------------------------
@@ -167,7 +160,7 @@ data HeistState n m = HeistState {
     -- | A mapping of splice names to splice actions
     , _caperSpliceMap   :: HashMap Text (CaperSplice n m)
     -- | A mapping of template names to templates
-    , _caperTemplateMap :: HashMap TPath (CaperDocumentFile m)
+    , _caperTemplateMap :: HashMap TPath (n Builder)
 
     -- | A flag to control splice recursion
     , _recurse          :: Bool

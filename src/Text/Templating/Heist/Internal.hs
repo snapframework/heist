@@ -7,30 +7,25 @@
 module Text.Templating.Heist.Internal where
 
 ------------------------------------------------------------------------------
-import             Blaze.ByteString.Builder
-import             Control.Arrow hiding (loop)
-import             Control.Exception (SomeException)
-import             Control.Monad
-import             Control.Monad.CatchIO
-import qualified   Data.Attoparsec.Text as AP
-import             Data.ByteString (ByteString)
-import qualified   Data.ByteString as B
-import qualified   Data.ByteString.Char8 as BC
-import             Data.Either
-import qualified   Data.Foldable as F
-import             Data.List
-import qualified   Data.HashMap.Strict as Map
-import             Data.Maybe
-import             Data.Monoid
-import qualified   Data.Text as T
-import             Data.Text (Text)
-import             Prelude hiding (catch)
-import             System.Directory.Tree hiding (name)
-import qualified   Text.XmlHtml as X
+import           Blaze.ByteString.Builder
+import           Control.Arrow hiding (loop)
+import           Control.Monad
+import qualified Data.Attoparsec.Text as AP
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import           Data.List
+import qualified Data.HashMap.Strict as Map
+import           Data.Maybe
+import           Data.Monoid
+import qualified Data.Text as T
+import           Data.Text (Text)
+import           Prelude hiding (catch)
+import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
-import             Text.Templating.Heist.Common
-import             Text.Templating.Heist.Types
+import           Text.Templating.Heist.Common
+import           Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
