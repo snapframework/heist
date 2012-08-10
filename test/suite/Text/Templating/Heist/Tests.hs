@@ -33,6 +33,7 @@ import           Test.QuickCheck.Monadic
 
 ------------------------------------------------------------------------------
 import           Text.Templating.Heist
+import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Internal
 import           Text.Templating.Heist.Types
 import           Text.Templating.Heist.Splices.Apply
@@ -47,7 +48,6 @@ import qualified Text.XmlHtml.Cursor as X
 tests :: [Test]
 tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testProperty "heist/simpleApply"           simpleApplyTest
-        , testCase     "heist/stateMonoid"           monoidTest
         , testCase     "heist/templateAdd"           addTest
         , testCase     "heist/hasTemplate"           hasTemplateTest
         , testCase     "heist/getDoc"                getDocTest
@@ -81,9 +81,10 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
         let template = buildBindTemplate bind
         let result   = buildResult bind
 
-        spliceResult <- run $ evalHeistT (runNodeList template)
-                                         (X.TextNode "")
-                                         defaultHeistState
+        spliceResult <- run $ do
+            hs <- defaultHeistState
+            evalHeistT (runNodeList template)
+                       (X.TextNode "") hs
         assert $ result == spliceResult
 
 
@@ -99,23 +100,13 @@ simpleApplyTest = monadicIO $ forAllM arbitrary prop
 
 
 ------------------------------------------------------------------------------
-monoidTest :: IO ()
-monoidTest = do
-    H.assertBool "left monoid identity" $ mempty `mappend` es == es
-    H.assertBool "right monoid identity" $ es `mappend` mempty == es
-  where es = defaultHeistState :: HeistState IO
-
-
-------------------------------------------------------------------------------
 addTest :: IO ()
 addTest = do
+    es <- defaultHeistState :: IO (HeistState IO IO)
+    let hs = addTemplate "aoeu" [] Nothing es
     H.assertEqual "lookup test" (Just []) $
-        fmap (X.docContent . dfDoc . fst) $ lookupTemplate "aoeu" ts
-
-    H.assertEqual "splice touched" 0 $ Map.size (_spliceMap ts)
-
-  where
-    ts = addTemplate "aoeu" [] Nothing (mempty::HeistState IO)
+        fmap (X.docContent . dfDoc . fst) $
+        lookupTemplate "aoeu" hs _templateMap
 
 
 ------------------------------------------------------------------------------
@@ -123,8 +114,9 @@ hasTemplateTest :: H.Assertion
 hasTemplateTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    let ts = setTemplates tm defaultHeistState :: HeistState IO
-    H.assertBool "hasTemplate ts" (hasTemplate "index" ts)
+    hs <- defaultHeistState :: IO (HeistState IO IO)
+    let hs's = setTemplates tm hs
+    H.assertBool "hasTemplate hs's" (hasTemplate "index" hs's)
 
 
 ------------------------------------------------------------------------------
@@ -151,8 +143,9 @@ fsLoadTest :: H.Assertion
 fsLoadTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    let ts = setTemplates tm defaultHeistState :: HeistState IO
-    let f  = g ts
+    es <- defaultHeistState :: IO (HeistState IO IO)
+    let hs = setTemplates tm es
+    let f  = g hs
 
     f isNothing "abc/def/xyz"
     f isJust "a"
@@ -161,7 +154,7 @@ fsLoadTest = do
 
   where
     g ts p n = H.assertBool ("loading template " ++ n) $ p $
-               lookupTemplate (B.pack n) ts
+               lookupTemplate (B.pack n) ts _templateMap
 
 ------------------------------------------------------------------------------
 renderNoNameTest :: H.Assertion
@@ -318,9 +311,10 @@ attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a><a href='b
 -- | Markdown test on supplied text
 markdownTextTest :: H.Assertion
 markdownTextTest = do
+    hs <- defaultHeistState
     result <- evalHeistT markdownSplice
                          (X.TextNode "This *is* a test.")
-                         defaultHeistState
+                         hs
     H.assertEqual "Markdown text" htmlExpected 
       (B.filter (/= '\n') $ toByteString $
         X.render (X.HtmlDocument X.UTF8 Nothing result))
@@ -329,7 +323,7 @@ markdownTextTest = do
 ------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
-    let es = defaultHeistState :: HeistState IO
+    es <- defaultHeistState :: IO (HeistState IO IO)
     res <- evalHeistT applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
 
@@ -339,22 +333,18 @@ applyTest = do
 ------------------------------------------------------------------------------
 ignoreTest :: H.Assertion
 ignoreTest = do
-    let es = defaultHeistState :: HeistState IO
+    es <- defaultHeistState :: IO (HeistState IO IO)
     res <- evalHeistT ignoreImpl
         (X.Element "ignore" [("tag", "ignorable")] 
           [X.TextNode "This should be ignored"]) es
     H.assertEqual "<ignore> tag" [] res
 
 
---localTSTest :: H.Assertion
---localTSTest = do
---    let es = defaultHeistState :: HeistState IO
-
 lookupTemplateTest = do
     ts <- loadTS "templates"
     let k = do
-            setContext ["foo"]
-            getsTS $ lookupTemplate "/user/menu"
+            modifyTS (\st -> st { _curContext = ["foo"] })
+            getsTS $ (\ts -> lookupTemplate "/user/menu" ts _templateMap)
     res <- runHeistT k (X.TextNode "") ts
     H.assertBool "lookup context test" $ isJust $ fst res
 
@@ -368,14 +358,17 @@ isLeft (Right _) = False
 
 
 ------------------------------------------------------------------------------
-loadT :: String -> IO (Either String (HeistState IO))
-loadT s = loadTemplates s defaultHeistState
+--loadT :: String -> IO (Either String (HeistState IO IO))
+loadT s = do
+    hs <- defaultHeistState
+    loadTemplates s hs
 
 
 ------------------------------------------------------------------------------
-loadTS :: FilePath -> IO (HeistState IO)
+--loadTS :: FilePath -> IO (HeistState IO IO)
 loadTS baseDir = do
-    etm <- loadTemplates baseDir defaultHeistState
+    hs <- defaultHeistState
+    etm <- loadTemplates baseDir hs
     return $ either error id etm
 
 
@@ -538,9 +531,10 @@ instance Show Bind where
     , "Result:"
     , L.unpack $ L.concat $ map formatNode $ buildResult b
     , "Splice result:"
-    , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $
+    , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $ do
+        hs <- defaultHeistState
         evalHeistT (runNodeList $ buildBindTemplate b)
-                          (X.TextNode "") defaultHeistState
+                          (X.TextNode "") hs
     , "Template:"
     , L.unpack $ L.concat $ map formatNode $ buildBindTemplate b
     ]
@@ -613,15 +607,15 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 
 
 ------------------------------------------------------------------------------
-calcResult :: (MonadIO m) => Apply -> m [X.Node]
-calcResult apply@(Apply name _ callee _ _) =
+calcResult :: Apply -> IO [X.Node]
+calcResult apply@(Apply name _ callee _ _) = do
+    hs <- defaultHeistState
+    let hs' = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
+                           (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
+                                         Nothing)) hs
     evalHeistT (runNodeList $ buildApplyCaller apply)
-        (X.TextNode "") ts
+        (X.TextNode "") hs'
 
-  where ts = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
-                          (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
-                                        Nothing))
-                          defaultHeistState
 
 
 
@@ -638,7 +632,7 @@ onLoad = hookG "Inserted on load"
 preRun = hookG "Inserted on preRun"
 postRun = hookG "Inserted on postRun"
 
-ts :: IO (Either String (HeistState IO))
+ts :: IO (Either String (HeistState IO IO))
 ts = loadTemplates "test/templates" $
     foldr ($) (defaultHeistState ".")
     [setOnLoadHook onLoad
