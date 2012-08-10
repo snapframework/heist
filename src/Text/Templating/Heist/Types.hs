@@ -130,7 +130,7 @@ type TemplateMap = HashMap TPath DocumentFile
 
 ------------------------------------------------------------------------------
 -- | A Splice is a HeistT computation that returns a 'Template'.
-type Splice n m = HeistT n m Template
+type Splice n = HeistT n n Template
 
 
 ------------------------------------------------------------------------------
@@ -146,7 +146,7 @@ type CaperSplice n = CaperT n (DList (Chunk n))
 
 ------------------------------------------------------------------------------
 -- | SpliceMap associates a name and a Splice.
-type SpliceMap n m = HashMap Text (Splice n m)
+type SpliceMap n = HashMap Text (Splice n)
 
 
 ------------------------------------------------------------------------------
@@ -159,7 +159,7 @@ type SpliceMap n m = HashMap Text (Splice n m)
 -- m is the load time monad
 data HeistState n m = HeistState {
     -- | A mapping of splice names to splice actions
-      _spliceMap        :: SpliceMap n n
+      _spliceMap        :: SpliceMap n
     -- | A mapping of template names to templates
     , _templateMap      :: TemplateMap
 

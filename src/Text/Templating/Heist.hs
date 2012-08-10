@@ -150,7 +150,7 @@ import           Caper (compileTemplates, bindCaperSplices)
 
 ------------------------------------------------------------------------------
 -- | The default set of built-in splices.
-defaultSpliceMap :: MonadIO n => SpliceMap n n
+defaultSpliceMap :: MonadIO n => SpliceMap n
 defaultSpliceMap = Map.fromList
     [(applyTag, applyImpl)
     ,(bindTag, bindImpl)

@@ -30,7 +30,7 @@ rawApply :: (Monad n)
          => [X.Node]
          -> TPath
          -> [X.Node]
-         -> Splice n n
+         -> Splice n
 rawApply calledNodes newContext paramNodes = do
     st <- getTS  -- Can't use localTS here because the modifier is not pure
     processedParams <- runNodeList paramNodes
@@ -44,7 +44,7 @@ rawApply calledNodes newContext paramNodes = do
 ------------------------------------------------------------------------------
 -- | Applies a template as if the supplied nodes were the children of the
 -- <apply> tag.
-applyNodes :: Monad n => Template -> Text -> Splice n n
+applyNodes :: Monad n => Template -> Text -> Splice n
 applyNodes nodes template = do
     st <- getTS
     maybe (return []) -- TODO: error handling
@@ -56,7 +56,7 @@ applyNodes nodes template = do
 
 ------------------------------------------------------------------------------
 -- | Implementation of the apply splice.
-applyImpl :: Monad n => Splice n n
+applyImpl :: Monad n => Splice n
 applyImpl = do
     node <- getParamNode
     case X.getAttribute applyAttr node of

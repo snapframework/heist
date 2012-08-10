@@ -71,7 +71,6 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attrSpliceContext"     attrSpliceContext
         , testCase     "heist/json/values"           jsonValueTest
         , testCase     "heist/json/object"           jsonObjectTest
-        , testCase     "caper/splice"                caperTest
         ]
 
 
@@ -385,33 +384,6 @@ testTemplateEval tname = do
     ts <- loadTS "templates"
     evalHeistT (evalWithHooks tname) (X.TextNode "") ts
 
-
-------------------------------------------------------------------------------
--- Caper tests
-------------------------------------------------------------------------------
-
-stateSplice :: MonadIO m => CaperSplice (StateT Int m)
-stateSplice = C.yieldRuntimeHtml $ do
-    val <- lift ST.get
-    liftIO $ putStrLn "running state splice"
-    return $ T.pack $ show (val+1)
-
-loadWithCaper :: MonadIO n
-              => FilePath
-              -> [(Text, CaperSplice n)]
-              -> IO (HeistState n IO)
-loadWithCaper baseDir splices = do
-    hs <- defaultHeistState
-    liftM (either error id) $ loadTemplates baseDir splices hs
-
-caperTest = do
-    hs <- loadWithCaper "templates" [ ("div", stateSplice) ]
-    let mt = fromJust $ C.lookupCompiledTemplate "index" hs
-    builder <- ST.evalStateT mt (2::Int)
-    let res = toByteString builder
-    H.assertBool "caper state splice" $ res ==
-      "<bind tag=\"att\">ultralongname</bind>&#10;<html>&#10;3&#10;</html>&#10;"
-    
 
 ------------------------------------------------------------------------------
 identStartChar :: [Char]

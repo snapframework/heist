@@ -18,8 +18,10 @@ module Text.Templating.Heist.TemplateDirectory
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
+import           Data.Text (Text)
 import           Text.Templating.Heist
 import           Text.Templating.Heist.Splices.Cache
+import           Text.Templating.Heist.Types
 
 
 ------------------------------------------------------------------------------
@@ -35,13 +37,15 @@ data TemplateDirectory n m
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory' wrapped in an Either for
 -- error handling.
-newTemplateDirectory :: FilePath
-                     -> HeistState IO IO
-                     -> IO (Either String (TemplateDirectory IO IO))
-newTemplateDirectory dir templateState = liftIO $ do
+newTemplateDirectory :: MonadIO n
+                     => FilePath
+                     -> [(Text, CaperSplice n)]
+                     -> HeistState n IO
+                     -> IO (Either String (TemplateDirectory n IO))
+newTemplateDirectory dir caperSplices templateState = do
     (modTs,cts) <- mkCacheTag
     let origTs = modTs templateState
-    ets <- loadTemplates dir origTs
+    ets <- loadTemplates dir caperSplices origTs
     leftPass ets $ \ts -> do
         tsMVar <- newMVar $ ts
         return $ TemplateDirectory dir origTs tsMVar cts
@@ -50,10 +54,13 @@ newTemplateDirectory dir templateState = liftIO $ do
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory', using the monad's fail
 -- function on error.
-newTemplateDirectory' :: FilePath
-                      -> HeistState IO IO
-                      -> IO (TemplateDirectory IO IO)
-newTemplateDirectory' = ((either fail return =<<) .) . newTemplateDirectory
+newTemplateDirectory' :: MonadIO n
+                      => FilePath
+                      -> [(Text, CaperSplice n)]
+                      -> HeistState n IO
+                      -> IO (TemplateDirectory n IO)
+newTemplateDirectory' p =
+    ((either fail return =<<) .) . newTemplateDirectory p
 
 
 ------------------------------------------------------------------------------
@@ -71,7 +78,7 @@ reloadTemplateDirectory :: (MonadIO n)
                         -> n (Either String ())
 reloadTemplateDirectory (TemplateDirectory p origTs tsMVar cts) = liftIO $ do
     clearCacheTagState cts
-    ets <- loadTemplates p origTs
+    ets <- loadTemplates p [] origTs
     leftPass ets $ \ts -> modifyMVar_ tsMVar (const $ return ts)
 
 

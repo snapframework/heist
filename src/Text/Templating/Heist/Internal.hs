@@ -52,7 +52,7 @@ addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 ------------------------------------------------------------------------------
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
 bindSplice :: Text              -- ^ tag name
-           -> Splice n n          -- ^ splice action
+           -> Splice n          -- ^ splice action
            -> HeistState n m      -- ^ source state
            -> HeistState n m
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
@@ -61,7 +61,7 @@ bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
 bindSplices :: Monad m =>
-               [(Text, Splice n n)] -- ^ splices to bind
+               [(Text, Splice n)] -- ^ splices to bind
             -> HeistState n m       -- ^ start state
             -> HeistState n m
 bindSplices ss ts = foldl' (flip id) ts acts
@@ -71,7 +71,7 @@ bindSplices ss ts = foldl' (flip id) ts acts
 
 ------------------------------------------------------------------------------
 -- | Converts 'Text' to a splice returning a single 'TextNode'.
-textSplice :: Monad n => Text -> Splice n n
+textSplice :: Monad n => Text -> Splice n
 textSplice t = return [X.TextNode t]
 
 
@@ -80,7 +80,7 @@ textSplice t = return [X.TextNode t]
 -- By itself this function is a simple passthrough splice that makes the
 -- spliced node disappear.  In combination with locally bound splices, this
 -- function makes it easier to pass the desired view into your splices.
-runChildren :: Monad n => Splice n n
+runChildren :: Monad n => Splice n
 runChildren = runNodeList . X.childNodes =<< getParamNode
 
 
@@ -88,9 +88,9 @@ runChildren = runNodeList . X.childNodes =<< getParamNode
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
 runChildrenWith :: (Monad n)
-                => [(Text, Splice n n)]
+                => [(Text, Splice n)]
                 -- ^ List of splices to bind before running the param nodes.
-                -> Splice n n
+                -> Splice n
                 -- ^ Returns the passed in view.
 runChildrenWith splices = localTS (bindSplices splices) runChildren
 
@@ -99,24 +99,24 @@ runChildrenWith splices = localTS (bindSplices splices) runChildren
 -- | Wrapper around runChildrenWith that applies a transformation function to
 -- the second item in each of the tuples before calling runChildrenWith.
 runChildrenWithTrans :: (Monad n)
-          => (b -> Splice n n)
+          => (b -> Splice n)
           -- ^ Splice generating function
           -> [(Text, b)]
           -- ^ List of tuples to be bound
-          -> Splice n n
+          -> Splice n
 runChildrenWithTrans f = runChildrenWith . map (second f)
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using constant templates rather than dynamic
 -- splices.
-runChildrenWithTemplates :: (Monad n) => [(Text, Template)] -> Splice n n
+runChildrenWithTemplates :: (Monad n) => [(Text, Template)] -> Splice n
 runChildrenWithTemplates = runChildrenWithTrans return
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using literal text rather than dynamic splices.
-runChildrenWithText :: (Monad n) => [(Text, Text)] -> Splice n n
+runChildrenWithText :: (Monad n) => [(Text, Text)] -> Splice n
 runChildrenWithText = runChildrenWithTrans textSplice
 
 
@@ -125,7 +125,7 @@ runChildrenWithText = runChildrenWithTrans textSplice
 lookupSplice :: Monad m =>
                 Text
              -> HeistState n m
-             -> Maybe (Splice n n)
+             -> Maybe (Splice n)
 lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 {-# INLINE lookupSplice #-}
 
@@ -186,7 +186,7 @@ stopRecursion = modifyTS (\st -> st { _recurse = False })
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a single node.
-runNode :: Monad n => X.Node -> Splice n n
+runNode :: Monad n => X.Node -> Splice n
 runNode (X.Element nm at ch) = do
     newAtts <- mapM attSubst at
     let n = X.Element nm newAtts ch
@@ -255,7 +255,7 @@ getAttributeSplice name = do
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
-runNodeList :: Monad n => [X.Node] -> Splice n n
+runNodeList :: Monad n => [X.Node] -> Splice n
 runNodeList = mapSplices runNode
 {-# INLINE runNodeList #-}
 
@@ -269,7 +269,7 @@ mAX_RECURSION_DEPTH = 50
 ------------------------------------------------------------------------------
 -- | Checks the recursion flag and recurses accordingly.  Does not recurse
 -- deeper than mAX_RECURSION_DEPTH to avoid infinite loops.
-recurseSplice :: Monad n => X.Node -> Splice n n -> Splice n n
+recurseSplice :: Monad n => X.Node -> Splice n -> Splice n
 recurseSplice node splice = do
     result <- localParamNode (const node) splice
     ts' <- getTS
@@ -371,7 +371,7 @@ bindString n = bindSplice n . textSplice
 -- returns an empty list.
 callTemplate :: Monad n
              => ByteString         -- ^ The name of the template
-             -> [(Text, Splice n n)] -- ^ Association list of
+             -> [(Text, Splice n)] -- ^ Association list of
                                    -- (name,value) parameter pairs
              -> HeistT n n Template
 callTemplate name params = do

@@ -53,7 +53,7 @@ import           Text.XmlHtml
 -- @\<value\/\>@    --  the given JSON value, as a string
 -- @\<snippet\/\>@  --  the given JSON value, parsed and spliced in as HTML
 --
-bindJson :: (ToJSON a, Monad n) => a -> Splice n n
+bindJson :: (ToJSON a, Monad n) => a -> Splice n
 bindJson = runReaderT explodeTag . toJSON
 
 
@@ -178,7 +178,7 @@ explodeTag = ask >>= go
     -- search the param node for attribute \"var=expr\", search the given JSON
     -- object for the expression, and if it's found run the JsonMonad action m
     -- using the restricted JSON object.
-    varAttrTag :: (Monad m) => Value -> (JsonMonad n m [Node]) -> Splice n m
+    varAttrTag :: (Monad m) => Value -> (JsonMonad m m [Node]) -> Splice m
     varAttrTag v m = do
         node <- getParamNode
         maybe (noVar node) (hasVar node) $ getAttribute "var" node
@@ -201,7 +201,7 @@ explodeTag = ask >>= go
                                  (findExpr expr v)
 
     --------------------------------------------------------------------------
-    genericBindings :: Monad n => JsonMonad n n [(Text, Splice n n)]
+    genericBindings :: Monad n => JsonMonad n n [(Text, Splice n)]
     genericBindings = ask >>= \v -> return [ ("with",    varAttrTag v explodeTag)
                                            , ("snippet", varAttrTag v snippetTag)
                                            , ("value",   varAttrTag v valueTag  )
