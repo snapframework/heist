@@ -40,13 +40,16 @@ import           Caper.Tutorial
 
 tests :: [Test]
 tests = [ testCase     "caper/simple"  simpleCaperTest
+        , testCase     "caper/people"  peopleTest
         ]
 
 simpleCaperTest = do
-    hs <- load "templates" [ ("div", stateSplice) ]
-    let mt = fromJust $ C.lookupCompiledTemplate "index" hs
-    builder <- ST.evalStateT mt (2::Int)
-    let res = toByteString builder
+    res <- runWithStateSplice "templates"
     H.assertBool "caper state splice" $ res ==
       "<bind tag=\"att\">ultralongname</bind>&#10;<html>&#10;3&#10;</html>&#10;"
-    
+
+peopleTest = do
+    res <- personListTest "templates"
+    H.assertBool "people splice" $ res ==
+      "&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
+

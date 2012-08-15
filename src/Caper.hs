@@ -8,11 +8,12 @@
 module Caper where
 
 import           Blaze.ByteString.Builder
---import           Blaze.ByteString.Builder.ByteString
+import           Blaze.ByteString.Builder.ByteString
 import           Control.Arrow
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict
 import qualified Data.Attoparsec.Text            as AP
+import           Data.ByteString (ByteString)
 import           Data.DList                      (DList)
 import qualified Data.DList                      as DL
 import qualified Data.HashMap.Strict             as H
@@ -111,12 +112,12 @@ import qualified Text.XmlHtml                    as X
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
-runNodeList :: Template -> CaperSplice n
-runNodeList nodes = liftM DL.concat $ mapM runNode nodes
+runNodeList :: [X.Node] -> CaperSplice n
+runNodeList = mapSplices runNode
 
 
 ------------------------------------------------------------------------------
---lookupCompiledTemplate :: ByteString -> HeistState n m -> Maybe (n Builder)
+lookupCompiledTemplate :: ByteString -> HeistState n m -> Maybe (n Builder)
 lookupCompiledTemplate nm hs =
     fmap fst $ lookupTemplate nm hs _caperTemplateMap
 
@@ -219,8 +220,8 @@ codeGen = compileConsolidated . consolidate . DL.toList
     compileConsolidated :: (Monad m) => [Chunk m] -> RuntimeSplice m Builder
     compileConsolidated l = V.foldr mappend mempty v
       where
-        toAct (RuntimeHtml m)   = liftM (fromByteString . T.encodeUtf8) m
-        toAct (Pure h)          = return $ fromByteString $ T.encodeUtf8 h
+        toAct (RuntimeHtml m)   = m
+        toAct (Pure h)          = return h
         toAct (RuntimeAction m) = m >> return mempty
 
         !v = V.map toAct $! V.fromList l
@@ -235,9 +236,21 @@ yieldChunk = return . DL.singleton
 
 
 ------------------------------------------------------------------------------
-yield :: Text -> CaperSplice n
+yield :: Builder -> CaperSplice n
 yield = yieldChunk . Pure
 {-# INLINE yield #-}
+
+
+------------------------------------------------------------------------------
+pureText :: Text -> Chunk n
+pureText = Pure . fromByteString . T.encodeUtf8
+{-# INLINE pureText #-}
+
+
+------------------------------------------------------------------------------
+yieldText :: Text -> CaperSplice n
+yieldText = yieldChunk . pureText
+{-# INLINE yieldText #-}
 
 
 ------------------------------------------------------------------------------
@@ -247,20 +260,27 @@ yieldRuntimeSplice = yieldChunk . RuntimeAction
 
 
 ------------------------------------------------------------------------------
-yieldRuntimeHtml :: RuntimeSplice n Text -> CaperSplice n
-yieldRuntimeHtml = yieldChunk . RuntimeHtml
-{-# INLINE yieldRuntimeHtml #-}
+yieldRuntime :: RuntimeSplice n Builder -> CaperSplice n
+yieldRuntime = yieldChunk . RuntimeHtml
+{-# INLINE yieldRuntime #-}
 
 
 ------------------------------------------------------------------------------
-yieldLater :: (Monad n) => n Text -> CaperSplice n
-yieldLater = yieldRuntimeHtml . RuntimeSplice . lift
+yieldRuntimeText :: Monad n => RuntimeSplice n Text -> CaperSplice n
+yieldRuntimeText = yieldChunk . RuntimeHtml .
+                   liftM (fromByteString . T.encodeUtf8)
+{-# INLINE yieldRuntimeText #-}
+
+
+------------------------------------------------------------------------------
+yieldLater :: (Monad n) => n Builder -> CaperSplice n
+yieldLater = yieldRuntime . RuntimeSplice . lift
 {-# INLINE yieldLater #-}
 
 
 ------------------------------------------------------------------------------
-yieldPromise :: (Monad n) => Promise Text -> CaperSplice n
-yieldPromise p = yieldRuntimeHtml $ getPromise p
+yieldPromise :: (Monad n) => Promise Builder -> CaperSplice n
+yieldPromise p = yieldRuntime $ getPromise p
 {-# INLINE yieldPromise #-}
 
 
@@ -274,9 +294,7 @@ runNode :: X.Node -> CaperSplice n
 runNode node = localParamNode (const node) $ do
     isStatic <- subtreeIsStatic node
     if isStatic
-      then yield $! T.decodeUtf8
-                 $! toByteString
-                 $! X.renderHtmlFragment X.UTF8 [node]
+      then yield $! X.renderHtmlFragment X.UTF8 [node]
       else compileNode node
 
 
@@ -328,11 +346,11 @@ compileNode (X.Element nm attrs ch) =
 
         childHtml <- runNodeList ch
 
-        return $ DL.concat [ DL.singleton $ Pure tag0
+        return $ DL.concat [ DL.singleton $ pureText tag0
                            , DL.concat compiledAttrs
-                           , DL.singleton $ Pure ">"
+                           , DL.singleton $ pureText ">"
                            , childHtml
-                           , DL.singleton $ Pure end
+                           , DL.singleton $ pureText end
                            ]
 compileNode _ = error "impossible"
 
@@ -349,10 +367,10 @@ parseAtt (k,v) = do
                 (AP.Partial _ ) -> []
     chunks <- mapM cvt ast
     let value = DL.concat chunks
-    return $ DL.concat [ DL.singleton $ Pure $ T.concat [" ", k, "=\""]
-                       , value, DL.singleton $ Pure "\"" ]
+    return $ DL.concat [ DL.singleton $ pureText $ T.concat [" ", k, "=\""]
+                       , value, DL.singleton $ pureText "\"" ]
   where
-    cvt (Literal x) = return $ DL.singleton $ Pure x
+    cvt (Literal x) = yieldText x
     cvt (Ident x) =
         localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
 
@@ -470,44 +488,51 @@ bindCaperSplices :: [(Text, CaperSplice n)]  -- ^ splices to bind
 bindCaperSplices ss ts = foldr (uncurry bindCaperSplice) ts ss
 
 
+addCaperSplices :: Monad m => [(Text, CaperSplice n)] -> HeistT n m ()
+addCaperSplices ss = modifyTS (bindCaperSplices ss)
+
+
 ------------------------------------------------------------------------------
 -- | Converts 'Text' to a splice yielding the text, html-encoded.
 textSplice :: Text -> CaperSplice n
-textSplice = yield
+textSplice = yieldText
 
 
 ------------------------------------------------------------------------------
-runChildrenCaper :: CaperSplice n
-runChildrenCaper = getParamNode >>= runNodeList . X.childNodes
+--runChildrenCaper :: CaperSplice n
+runChildrenCaper :: Monad m => HeistT m IO (RuntimeSplice m Builder)
+runChildrenCaper = do
+    res <- runNodeList . X.childNodes =<< getParamNode
+    return $ codeGen res
 
 
 ------------------------------------------------------------------------------
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
-runChildrenWithCaper ::
-       [(Text, CaperSplice n)]
-    -- ^ List of splices to bind before running the param nodes.
-    -> CaperSplice n
-    -- ^ Returns the passed in view.
+--runChildrenWithCaper ::
+--       [(Text, CaperSplice n)]
+--    -- ^ List of splices to bind before running the param nodes.
+--    -> CaperSplice n
+--    -- ^ Returns the passed in view.
 runChildrenWithCaper splices = localTS (bindCaperSplices splices) runChildrenCaper
 
 
-------------------------------------------------------------------------------
--- | Wrapper around runChildrenWithCaper that applies a transformation function to
--- the second item in each of the tuples before calling runChildrenWithCaper.
-runChildrenWithTransCaper :: (b -> CaperSplice n)
-                          -- ^ Splice generating function
-                          -> [(Text, b)]
-                          -- ^ List of tuples to be bound
-                          -> CaperSplice n
-runChildrenWithTransCaper f = runChildrenWithCaper . map (second f)
-
-
-------------------------------------------------------------------------------
-runChildrenWithTextCaper :: [(Text, Text)]
-                         -- ^ List of tuples to be bound
-                         -> CaperSplice n
-runChildrenWithTextCaper = runChildrenWithTransCaper textSplice
+-- ------------------------------------------------------------------------------
+-- -- | Wrapper around runChildrenWithCaper that applies a transformation function to
+-- -- the second item in each of the tuples before calling runChildrenWithCaper.
+-- runChildrenWithTransCaper :: (b -> CaperSplice n)
+--                           -- ^ Splice generating function
+--                           -> [(Text, b)]
+--                           -- ^ List of tuples to be bound
+--                           -> CaperSplice n
+-- runChildrenWithTransCaper f = runChildrenWithCaper . map (second f)
+-- 
+-- 
+-- ------------------------------------------------------------------------------
+-- runChildrenWithTextCaper :: [(Text, Text)]
+--                          -- ^ List of tuples to be bound
+--                          -> CaperSplice n
+-- runChildrenWithTextCaper = runChildrenWithTransCaper textSplice
 
 
 -- ------------------------------------------------------------------------------

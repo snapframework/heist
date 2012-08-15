@@ -4,6 +4,7 @@ module Caper.TutorialImports
   , module Control.Monad
   , module Control.Monad.Trans
   , module Data.Maybe
+  , module Data.Monoid
   , module Text.Templating.Heist.Types
   , defaultHeistState
   , loadTemplates
@@ -22,6 +23,7 @@ import           Control.Monad.Trans
 import qualified Control.Monad.Trans.State as ST
 import           Data.ByteString.Char8 (ByteString)
 import           Data.Maybe
+import           Data.Monoid
 import qualified Data.Text as T
 import           Text.Templating.Heist (loadTemplates, defaultHeistState)
 import           Text.Templating.Heist.Types

@@ -39,6 +39,7 @@ import qualified Data.HeterogeneousEnvironment as HE
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text                       as T
+import           Data.Text.Encoding
 import           Data.Typeable
 import           Prelude hiding (catch)
 import qualified Text.XmlHtml as X
@@ -97,9 +98,9 @@ instance (Monad m, Monoid a) => Monoid (RuntimeSplice m a) where
 
 
 ------------------------------------------------------------------------------
-data Chunk m = Pure !Text
+data Chunk m = Pure !Builder
                -- ^ output known at load time
-             | RuntimeHtml !(RuntimeSplice m Text)
+             | RuntimeHtml !(RuntimeSplice m Builder)
                -- ^ output computed at run time
              | RuntimeAction !(RuntimeSplice m ())
                -- ^ runtime action used only for its side-effect
@@ -107,12 +108,10 @@ data Chunk m = Pure !Text
 
 ------------------------------------------------------------------------------
 instance Show (Chunk m) where
-    show (Pure a)          = T.unpack $ T.concat ["Pure \"", a, "\""]
+    show (Pure a)          = T.unpack $ T.concat
+        ["Pure \"", decodeUtf8 $ toByteString a, "\""]
     show (RuntimeHtml _)   = "RuntimeHtml <m>"
     show (RuntimeAction _) = "RuntimeAction <m>"
-
-
-type CompiledTemplateMap m = HashMap ByteString (m Builder)
 
 
 ------------------------------------------------------------------------------

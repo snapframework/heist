@@ -147,12 +147,12 @@ traversePath tm path name =
 -- >         => (a -> Splice n n)
 -- >         -> [a]
 -- >         -> Splice n n
-mapSplices :: (Monad m, Monoid r)
-           => (a -> m r)
+mapSplices :: (Monad m, Monoid b)
+           => (a -> m b)
            -- ^ Splice generating function
            -> [a]
            -- ^ List of items to generate splices for
-           -> m r
+           -> m b
            -- ^ The result of all splices concatenated together.
 mapSplices f vs = liftM mconcat $ mapM f vs
 {-# INLINE mapSplices #-}

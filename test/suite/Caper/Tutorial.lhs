@@ -60,13 +60,31 @@ computation in the RuntimeSplice monad transformer that is parameterized by
 to a real example.
 
 > stateSplice :: CaperSplice (StateT Int IO)
-> stateSplice = yieldRuntimeHtml $ do
+> stateSplice = yieldRuntimeText $ do
 >     val <- lift get
 >     return $ pack $ show (val+1)
 
 Here we see that our splice's runtime monad is `StateT Int IO`.  This makes
 for a simple example that can clearly demonstrate the different contexts that
-we are operating in.  Here's a function demonstrating this splice in action.
+we are operating in.  To make things more clear, here's a version with some
+print statements that clarify the details of which monad is executed when.
+
+> stateSplice2 :: CaperSplice (StateT Int IO)
+> stateSplice2 = do
+>     -- :: CaperSplice (StateT Int IO)
+>     lift $ putStrLn "This executed at load time"
+>     res <- yieldRuntimeText $ do
+>         -- :: RuntimeSplice (StateT Int IO) a
+>         lift $ lift $ putStrLn "This executed at run/render time"
+>         val <- lift get
+>         return $ pack $ show (val+1)
+>     lift $ putStrLn "This also executed at load time"
+>     return res
+
+Note here that even though the type parameter to CaperSplice is a monad,
+CaperSplice is not a monad transformer.  RuntimeSplice, however, is.  Now
+let's look at a simple load function that sets up a default HeistState and
+loads templates from a directory with Caper splices.
 
 > load :: MonadIO n
 >      => FilePath
@@ -76,16 +94,13 @@ we are operating in.  Here's a function demonstrating this splice in action.
 >     hs <- defaultHeistState
 >     liftM (either error id) $ loadTemplates baseDir splices hs
 
-This is a simple load function that sets up a default HeistState and loads
-templates from a directory with Caper splices.
+Here's a function demonstrating all of this in action.
 
-> runWithStateSplice :: HeistState (StateT Int IO) IO 
->                    -> FilePath
+> runWithStateSplice :: FilePath
 >                    -> IO ByteString
-> runWithStateSplice hs baseDir = do
->     hs' <- liftM (either error id) $
->            loadTemplates baseDir [ ("div", stateSplice) ] hs
->     let runtime = fromJust $ lookupCompiledTemplate "index" hs'
+> runWithStateSplice baseDir = do
+>     hs <- load baseDir [ ("div", stateSplice) ]
+>     let runtime = fromJust $ lookupCompiledTemplate "index" hs
 >     builder <- evalStateT runtime 2
 >     return $ toByteString builder
 
@@ -97,6 +112,50 @@ recompiled, a potentially expensive operation.  Next, the function renders the
 template called "index" using a runtime (StateT Int IO) seeded with a value of
 2 and returns the resulting ByteString.
 
-Now lets look at a more complicated example.  We want to render a data
+Now let's look at a more complicated example.  We want to render a data
 structure with a Caper splice.
+
+> data Person = Person
+>     { pFirstName :: Text
+>     , pLastName  :: Text
+>     , pAge       :: Int
+>     }
+> 
+> fieldSplice :: (Monad n, Functor n)
+>             => Promise a -> (a -> Text) -> CaperSplice n
+> fieldSplice prom f = yieldRuntimeText $ fmap f $ getPromise prom
+> 
+> personSplice :: (Monad n, Functor n)
+>              => Promise Person -> HeistT n IO (RuntimeSplice n Builder)
+> personSplice prom = localTS id $
+>     runChildrenWithCaper
+>         [ ("firstName", fieldSplice prom pFirstName)
+>         , ("lastName", fieldSplice prom pLastName)
+>         , ("age", fieldSplice prom (pack . show . pAge))
+>         ]
+> 
+> peopleSplice :: (Monad n, Functor n)
+>              => n [Person]
+>              -> CaperSplice n
+> peopleSplice getPeople = do
+>     personPromise <- newEmptyPromiseWithError "personPromise"
+>     output <- personSplice personPromise
+>     yieldRuntime $ do
+>         people <- lift getPeople
+>         htmls <- forM people $ \p -> do
+>             putPromise personPromise p >> output
+>         return $ mconcat htmls
+>
+> allPeopleSplice = peopleSplice get
+
+> personListTest :: FilePath
+>                -> IO ByteString
+> personListTest baseDir = do
+>     hs <- load baseDir [ ("people", allPeopleSplice) ]
+>     let runtime = fromJust $ lookupCompiledTemplate "people" hs
+>     builder <- evalStateT runtime
+>                  [ Person "John" "Doe" 42
+>                  , Person "Jane" "Smith" 21
+>                  ]
+>     return $ toByteString builder
 
