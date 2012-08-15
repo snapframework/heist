@@ -25,12 +25,6 @@ import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
 import           Prelude                         hiding (catch)
---import           Text.Blaze.Html
---import qualified Text.Blaze.Html                 as Blaze
---import           Text.Blaze.Internal
---import qualified Text.Blaze.Html.Renderer.String as BlazeString
---import qualified Text.Blaze.Html.Renderer.Text   as BlazeText
---import           Text.Blaze.Html.Renderer.Utf8
 import           Text.Templating.Heist.Common
 import           Text.Templating.Heist.Types
 import qualified Text.XmlHtml                    as X
@@ -47,69 +41,6 @@ import qualified Text.XmlHtml                    as X
 -- run/rendered.  You should be careful what code you put in these hooks
 -- because it can significantly affect the performance of your site.
 
-
--- dlistRunNode :: Monad m
---              => X.Node
---              -> HeistT (Output m1) m (Output m1)
--- dlistRunNode (X.Element nm attrs ch) = do
---     -- Parse the attributes: we have Left for static and Right for runtime
---     -- TODO: decide: do we also want substitution in the key?
---     compiledAttrs <- mapM attSubst attrs
---     childHtml <- runNodeList ch
---     return $ DL.concat [ DL.singleton $ Pure tag0
---                        , DL.concat $ map renderAttr compiledAttrs
---                        , DL.singleton $ Pure ">"
---                        , childHtml
---                        , DL.singleton $ Pure end
---                        ]
---   where
---     tag0 = T.append "<" nm
---     end = T.concat [ "</" , nm , ">"]
---     renderAttr (n,v) = DL.concat [ DL.singleton $ Pure $ T.append " " n
---                                  , DL.singleton $ Pure "="
---                                  , v ]
--- dlistRunNode (X.TextNode t) = return $ textSplice t
--- dlistRunNode (X.Comment t) = return $ textSplice t
--- 
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Renders a template with the specified arguments passed to it.  This is a
--- -- convenience function for the common pattern of calling renderTemplate after
--- -- using bindString, bindStrings, or bindSplice to set up the arguments to the
--- -- template.
--- renderWithArgs :: Monad m
---                => [(Text, Text)]
---                -> HeistState (Output m) m
---                -> ByteString
---                -> m (Maybe (Builder, MIMEType))
--- renderWithArgs args ts = renderTemplate (bindStrings args ts)
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Renders a template from the specified HeistState to a 'Builder'.  The
--- -- MIME type returned is based on the detected character encoding, and whether
--- -- the root template was an HTML or XML format template.  It will always be
--- -- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
--- -- particular XML application, it must be provided by the application.
--- renderCaperTemplate :: Monad m
---                     => HeistState (Output m) m
---                     -> ByteString
---                     -> m (Maybe (Builder, MIMEType))
--- renderCaperTemplate ts name = evalHeistT tpl (X.TextNode "") ts
---   where
---     -- FIXME should not use lookupAndRun because that uses heist templates
---     -- instead of caper templates.
---     tpl = lookupAndRun name $ \(t,ctx) -> do
---         addDoctype $ maybeToList $ X.docType $ cdfDoc t
---         localTS (\ts' -> ts' {_curContext = ctx}) $ do
---             res <- runNodeList $ X.docContent $ cdfDoc t
---             return $ Just (res, mimeType $ cdfDoc t)
-
-
-------------------------------------------------------------------------------
-------------------------------------------------------------------------------
-------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 runNodeList :: [X.Node] -> CaperSplice n
@@ -516,25 +447,60 @@ textSplice = yieldText
 
 
 ------------------------------------------------------------------------------
---runChildrenCaper :: CaperSplice n
-runChildrenCaper :: Monad m => HeistT m IO (RuntimeSplice m Builder)
-runChildrenCaper = do
+promiseChildren :: Monad m => HeistT m IO (RuntimeSplice m Builder)
+promiseChildren = do
     res <- runNodeList . X.childNodes =<< getParamNode
     return $ codeGen res
 
 
 ------------------------------------------------------------------------------
--- | Binds a list of splices before using the children of the spliced node as
--- a view.
+-- | Binds a list of Builder splices before using the children of the spliced
+-- node as a view.
+promiseChildrenWith :: (Monad n)
+                    => [(Text, a -> Builder)]
+                    -> Promise a
+                    -> HeistT n IO (RuntimeSplice n Builder)
+promiseChildrenWith splices prom =
+    localTS (bindCaperSplices splices') promiseChildren
+  where
+    fieldSplice p f = yieldRuntime $ liftM f $ getPromise p
+    splices' = map (second (fieldSplice prom)) splices
+
+
+------------------------------------------------------------------------------
+-- | Wrapper that composes a transformation function with the second item in
+-- each of the tuples before calling promiseChildren.
+promiseChildrenWithTrans :: Monad n
+                         => (b -> Builder)
+                         -> [(Text, a -> b)]
+                         -> Promise a
+                         -> HeistT n IO (RuntimeSplice n Builder)
+promiseChildrenWithTrans f = promiseChildrenWith . map (second (f .))
+
+
+------------------------------------------------------------------------------
+-- | Binds a list of Text splices before using the children of the spliced
+-- node as a view.
 promiseChildrenWithText :: (Monad n)
                         => [(Text, a -> Text)]
                         -> Promise a
                         -> HeistT n IO (RuntimeSplice n Builder)
-promiseChildrenWithText splices prom =
-    localTS (bindCaperSplices splices') runChildrenCaper
-  where
-    fieldSplice p f = yieldRuntimeText $ liftM f $ getPromise p
-    splices' = map (second (fieldSplice prom)) splices
+promiseChildrenWithText =
+    promiseChildrenWithTrans (fromByteString . T.encodeUtf8)
+
+
+------------------------------------------------------------------------------
+-- | Binds a list of Node splices before using the children of the spliced
+-- node as a view.  Note that this will slow down page generation because the
+-- nodes generated by the splices must be traversed and rendered into a
+-- ByteString at runtime.
+promiseChildrenWithNodes :: (Monad n)
+                         => [(Text, a -> [X.Node])]
+                         -> Promise a
+                         -> HeistT n IO (RuntimeSplice n Builder)
+promiseChildrenWithNodes =
+    promiseChildrenWithTrans (X.renderHtmlFragment X.UTF8)
+    
 
 
 -- ------------------------------------------------------------------------------
