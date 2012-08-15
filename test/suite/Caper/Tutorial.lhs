@@ -13,6 +13,7 @@ literate Haskell code from our test suite.  All the code you see here is
 compiled into our test suite and the results automatically checked by our
 buildbot.  So first we need to get some boilerplate and imports out of the way.
 
+> {-# LANGUAGE NoMonomorphismRestriction #-}
 > module Caper.Tutorial where
 > import Caper.TutorialImports
 
@@ -121,23 +122,23 @@ structure with a Caper splice.
 >     , pAge       :: Int
 >     }
 > 
-> personSplice :: (Monad n, Functor n)
+> personSplice :: (Monad n)
 >              => Promise Person
 >              -> HeistT n IO (RuntimeSplice n Builder)
-> personSplice prom = promiseChildrenWithText prom
+> personSplice = promiseChildrenWithText
 >     [ ("firstName", pFirstName)
 >     , ("lastName", pLastName)
 >     , ("age", pack . show . pAge)
 >     ]
 > 
-> peopleSplice :: (Monad n, Functor n)
+> peopleSplice :: (Monad n)
 >              => n [Person]
 >              -> CaperSplice n
 > peopleSplice getPeople = mapPromises personSplice getPeople
->
+> 
 > allPeopleSplice :: CaperSplice (StateT [Person] IO)
 > allPeopleSplice = peopleSplice get
->
+> 
 > personListTest :: FilePath
 >                -> IO ByteString
 > personListTest baseDir = do

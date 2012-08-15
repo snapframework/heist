@@ -526,33 +526,15 @@ runChildrenCaper = do
 ------------------------------------------------------------------------------
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
-promiseChildrenWithText :: (Monad n, Functor n)
-                        => Promise a
-                        -> [(Text, a -> Text)]
+promiseChildrenWithText :: (Monad n)
+                        => [(Text, a -> Text)]
+                        -> Promise a
                         -> HeistT n IO (RuntimeSplice n Builder)
-promiseChildrenWithText prom splices =
+promiseChildrenWithText splices prom =
     localTS (bindCaperSplices splices') runChildrenCaper
   where
-    fieldSplice p f = yieldRuntimeText $ fmap f $ getPromise p
+    fieldSplice p f = yieldRuntimeText $ liftM f $ getPromise p
     splices' = map (second (fieldSplice prom)) splices
-
-
--- ------------------------------------------------------------------------------
--- -- | Wrapper around runChildrenWithCaper that applies a transformation function to
--- -- the second item in each of the tuples before calling runChildrenWithCaper.
--- runChildrenWithTransCaper :: (b -> CaperSplice n)
---                           -- ^ Splice generating function
---                           -> [(Text, b)]
---                           -- ^ List of tuples to be bound
---                           -> CaperSplice n
--- runChildrenWithTransCaper f = runChildrenWithCaper . map (second f)
--- 
--- 
--- ------------------------------------------------------------------------------
--- runChildrenWithTextCaper :: [(Text, Text)]
---                          -- ^ List of tuples to be bound
---                          -> CaperSplice n
--- runChildrenWithTextCaper = runChildrenWithTransCaper textSplice
 
 
 -- ------------------------------------------------------------------------------
