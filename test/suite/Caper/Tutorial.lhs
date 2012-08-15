@@ -137,17 +137,11 @@ structure with a Caper splice.
 > peopleSplice :: (Monad n, Functor n)
 >              => n [Person]
 >              -> CaperSplice n
-> peopleSplice getPeople = do
->     personPromise <- newEmptyPromiseWithError "personPromise"
->     output <- personSplice personPromise
->     yieldRuntime $ do
->         people <- lift getPeople
->         htmls <- forM people $ \p -> do
->             putPromise personPromise p >> output
->         return $ mconcat htmls
+> peopleSplice getPeople = mapPromises personSplice getPeople
 >
+> allPeopleSplice :: CaperSplice (StateT [Person] IO)
 > allPeopleSplice = peopleSplice get
-
+>
 > personListTest :: FilePath
 >                -> IO ByteString
 > personListTest baseDir = do

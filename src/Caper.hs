@@ -473,6 +473,23 @@ withPromise promA f = do
 
 
 ------------------------------------------------------------------------------
+-- | Takes a promise function and a runtime action returning a list of items
+-- that fit in the promise and returns a CaperSplice that executes the promise
+-- function for each item and concatenates the results.
+mapPromises :: Monad n
+            => (Promise a -> HeistT n IO (RuntimeSplice n Builder))
+            -> n [a] -> CaperSplice n
+mapPromises f getList = do
+    singlePromise <- newEmptyPromise
+    runSingle <- f singlePromise
+    yieldRuntime $ do
+        list <- lift getList
+        htmls <- forM list $ \item ->
+            putPromise singlePromise item >> runSingle
+        return $ mconcat htmls
+
+
+------------------------------------------------------------------------------
 bindCaperSplice :: Text             -- ^ tag name
                 -> CaperSplice n  -- ^ splice action
                 -> HeistState n m   -- ^ source state
