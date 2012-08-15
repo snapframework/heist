@@ -526,12 +526,15 @@ runChildrenCaper = do
 ------------------------------------------------------------------------------
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
---runChildrenWithCaper ::
---       [(Text, CaperSplice n)]
---    -- ^ List of splices to bind before running the param nodes.
---    -> CaperSplice n
---    -- ^ Returns the passed in view.
-runChildrenWithCaper splices = localTS (bindCaperSplices splices) runChildrenCaper
+promiseChildrenWithText :: (Monad n, Functor n)
+                        => Promise a
+                        -> [(Text, a -> Text)]
+                        -> HeistT n IO (RuntimeSplice n Builder)
+promiseChildrenWithText prom splices =
+    localTS (bindCaperSplices splices') runChildrenCaper
+  where
+    fieldSplice p f = yieldRuntimeText $ fmap f $ getPromise p
+    splices' = map (second (fieldSplice prom)) splices
 
 
 -- ------------------------------------------------------------------------------

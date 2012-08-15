@@ -121,18 +121,14 @@ structure with a Caper splice.
 >     , pAge       :: Int
 >     }
 > 
-> fieldSplice :: (Monad n, Functor n)
->             => Promise a -> (a -> Text) -> CaperSplice n
-> fieldSplice prom f = yieldRuntimeText $ fmap f $ getPromise prom
-> 
 > personSplice :: (Monad n, Functor n)
->              => Promise Person -> HeistT n IO (RuntimeSplice n Builder)
-> personSplice prom = localTS id $
->     runChildrenWithCaper
->         [ ("firstName", fieldSplice prom pFirstName)
->         , ("lastName", fieldSplice prom pLastName)
->         , ("age", fieldSplice prom (pack . show . pAge))
->         ]
+>              => Promise Person
+>              -> HeistT n IO (RuntimeSplice n Builder)
+> personSplice prom = promiseChildrenWithText prom
+>     [ ("firstName", pFirstName)
+>     , ("lastName", pLastName)
+>     , ("age", pack . show . pAge)
+>     ]
 > 
 > peopleSplice :: (Monad n, Functor n)
 >              => n [Person]
