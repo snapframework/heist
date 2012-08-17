@@ -1,5 +1,5 @@
 name:           heist
-version:        0.8.1.1
+version:        0.9
 synopsis:       An (x)html templating system
 description:    An (x)html templating system
 license:        BSD3
@@ -67,23 +67,31 @@ Library
   hs-source-dirs: src
 
   exposed-modules:
-    Caper,
-    Text.Templating.Heist,
-    Text.Templating.Heist.Splices,
-    Text.Templating.Heist.Splices.Apply,
-    Text.Templating.Heist.Splices.Bind,
-    Text.Templating.Heist.Splices.BindStrict,
-    Text.Templating.Heist.Splices.Cache,
-    Text.Templating.Heist.Splices.Html,
-    Text.Templating.Heist.Splices.Ignore,
-    Text.Templating.Heist.Splices.Json,
-    Text.Templating.Heist.Splices.Markdown,
-    Text.Templating.Heist.TemplateDirectory
+    Heist,
+    Heist.Compiled,
+    Heist.Compiled.Splices.Apply,
+    Heist.Compiled.Splices.Bind,
+    Heist.Compiled.Splices.Cache,
+    Heist.Compiled.Splices.Html,
+    Heist.Compiled.Splices.Ignore,
+    Heist.Interpreted,
+    Heist.Interpreted.Splices,
+    Heist.Interpreted.Splices.Apply,
+    Heist.Interpreted.Splices.Bind,
+    Heist.Interpreted.Splices.BindStrict,
+    Heist.Interpreted.Splices.Cache,
+    Heist.Interpreted.Splices.Html,
+    Heist.Interpreted.Splices.Ignore,
+    Heist.Interpreted.Splices.Json,
+    Heist.Interpreted.Splices.Markdown,
+    Heist.TemplateDirectory
 
   other-modules:
-    Text.Templating.Heist.Common,
-    Text.Templating.Heist.Internal,
-    Text.Templating.Heist.Types
+    Data.HeterogeneousEnvironment,
+    Heist.Common,
+    Heist.Compiled.Internal,
+    Heist.Interpreted.Internal,
+    Heist.Types
 
   build-depends:
     aeson                     >= 0.6   && < 0.7,
