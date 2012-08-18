@@ -69,22 +69,17 @@ Library
   exposed-modules:
     Heist,
     Heist.Compiled,
-    Heist.Compiled.Splices.Apply,
-    Heist.Compiled.Splices.Bind,
-    Heist.Compiled.Splices.Cache,
-    Heist.Compiled.Splices.Html,
-    Heist.Compiled.Splices.Ignore,
     Heist.Interpreted,
     Heist.Interpreted.Splices,
     Heist.Interpreted.Splices.Apply,
     Heist.Interpreted.Splices.Bind,
     Heist.Interpreted.Splices.BindStrict,
-    Heist.Interpreted.Splices.Cache,
+--    Heist.Interpreted.Splices.Cache,
     Heist.Interpreted.Splices.Html,
     Heist.Interpreted.Splices.Ignore,
     Heist.Interpreted.Splices.Json,
-    Heist.Interpreted.Splices.Markdown,
-    Heist.TemplateDirectory
+    Heist.Interpreted.Splices.Markdown
+--    Heist.TemplateDirectory
 
   other-modules:
     Data.HeterogeneousEnvironment,

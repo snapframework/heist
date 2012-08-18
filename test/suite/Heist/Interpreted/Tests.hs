@@ -83,7 +83,7 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
         let result   = buildResult bind
 
         spliceResult <- run $ do
-            hs <- defaultHeistState
+            hs <- initHeist [] [] [] Map.empty
             evalHeistT (runNodeList template)
                        (X.TextNode "") hs
         assert $ result == spliceResult
@@ -103,7 +103,7 @@ simpleApplyTest = monadicIO $ forAllM arbitrary prop
 ------------------------------------------------------------------------------
 addTest :: IO ()
 addTest = do
-    es <- defaultHeistState :: IO (HeistState IO IO)
+    es <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
     let hs = addTemplate "aoeu" [] Nothing es
     H.assertEqual "lookup test" (Just []) $
         fmap (X.docContent . dfDoc . fst) $
@@ -115,7 +115,7 @@ hasTemplateTest :: H.Assertion
 hasTemplateTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    hs <- defaultHeistState :: IO (HeistState IO IO)
+    hs <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
     let hs's = setTemplates tm hs
     H.assertBool "hasTemplate hs's" (hasTemplate "index" hs's)
 
@@ -144,7 +144,7 @@ fsLoadTest :: H.Assertion
 fsLoadTest = do
     ets <- loadT "templates"
     let tm = either (error "Error loading templates") _templateMap ets
-    es <- defaultHeistState :: IO (HeistState IO IO)
+    es <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
     let hs = setTemplates tm es
     let f  = g hs
 
@@ -312,7 +312,7 @@ attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a><a href='b
 -- | Markdown test on supplied text
 markdownTextTest :: H.Assertion
 markdownTextTest = do
-    hs <- defaultHeistState :: IO (HeistState IO IO)
+    hs <- initHeist [] [] [] Map.empty
     result <- evalHeistT markdownSplice
                          (X.TextNode "This *is* a test.")
                          hs
@@ -324,7 +324,7 @@ markdownTextTest = do
 ------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
-    es <- defaultHeistState :: IO (HeistState IO IO)
+    es <- initHeist [] [] [] Map.empty
     res <- evalHeistT applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
 
@@ -334,7 +334,7 @@ applyTest = do
 ------------------------------------------------------------------------------
 ignoreTest :: H.Assertion
 ignoreTest = do
-    es <- defaultHeistState :: IO (HeistState IO IO)
+    es <- initHeist [] [] [] Map.empty
     res <- evalHeistT ignoreImpl
         (X.Element "ignore" [("tag", "ignorable")] 
           [X.TextNode "This should be ignored"]) es
@@ -361,16 +361,15 @@ isLeft (Right _) = False
 ------------------------------------------------------------------------------
 loadT :: String -> IO (Either String (HeistState IO IO))
 loadT s = do
-    hs <- defaultHeistState
-    loadTemplates s [] hs
+    ets <- loadTemplates s
+    either (return . Left) (liftM Right . initHeist [] [] []) ets
 
 
 ------------------------------------------------------------------------------
 loadTS :: FilePath -> IO (HeistState IO IO)
 loadTS baseDir = do
-    hs <- defaultHeistState
-    etm <- loadTemplates baseDir [] hs
-    return $ either error id etm
+    etm <- loadTemplates baseDir
+    either error (initHeist [] [] []) etm
 
 
 testTemplate tdir tname = do
@@ -533,7 +532,7 @@ instance Show Bind where
     , L.unpack $ L.concat $ map formatNode $ buildResult b
     , "Splice result:"
     , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $ do
-        hs <- defaultHeistState
+        hs <- initHeist [] [] [] Map.empty
         evalHeistT (runNodeList $ buildBindTemplate b)
                           (X.TextNode "") hs
     , "Template:"
@@ -610,7 +609,7 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 ------------------------------------------------------------------------------
 calcResult :: Apply -> IO [X.Node]
 calcResult apply@(Apply name _ callee _ _) = do
-    hs <- defaultHeistState
+    hs <- initHeist [] [] [] Map.empty
     let hs' = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
                            (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
                                          Nothing)) hs

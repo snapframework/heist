@@ -24,10 +24,10 @@ import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
 import           Prelude                         hiding (catch)
-import           Heist.Common
-import           Heist.Types
 import qualified Text.XmlHtml                    as X
 
+import           Heist.Common
+import           Heist.Types
 
 ------------------------------------------------------------------------------
 -- | A Splice is a HeistT computation that returns a 'Template'.
@@ -418,17 +418,17 @@ mapPromises f getList = do
 
 ------------------------------------------------------------------------------
 bindSplice :: Text             -- ^ tag name
-                -> Splice n  -- ^ splice action
-                -> HeistState n m   -- ^ source state
-                -> HeistState n m
+           -> Splice n         -- ^ splice action
+           -> HeistState n m   -- ^ source state
+           -> HeistState n m
 bindSplice n v ts =
     ts { _compiledSpliceMap = H.insert n v (_compiledSpliceMap ts) }
 
 
 ------------------------------------------------------------------------------
 bindSplices :: [(Text, Splice n)]  -- ^ splices to bind
-                 -> HeistState n m             -- ^ source state
-                 -> HeistState n m
+            -> HeistState n m      -- ^ source state
+            -> HeistState n m
 bindSplices ss ts = foldr (uncurry bindSplice) ts ss
 
 

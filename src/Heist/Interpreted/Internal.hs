@@ -28,7 +28,6 @@ import           Heist.Common
 import           Heist.Types
 
 
-
 type Splice n = HeistT n n Template
 
 
@@ -283,10 +282,6 @@ recurseSplice node splice = do
                 restoreTS ts'
                 return res
         else return result
-  where
-    modRecursionDepth :: Monad m => (Int -> Int) -> HeistT n m ()
-    modRecursionDepth f =
-        modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
 
 ------------------------------------------------------------------------------

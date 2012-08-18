@@ -6,8 +6,8 @@ module Heist.Compiled.TutorialImports
   , module Data.Maybe
   , module Data.Monoid
   , module Heist.Types
-  , defaultHeistState
   , loadTemplates
+  , initHeist
   , ST.get
   , ST.StateT(..)
   , ST.evalStateT

@@ -28,7 +28,10 @@ import qualified Text.XmlHtml as X
 ------------------------------------------------------------------------------
 -- | Function for showing a TPath.
 showTPath :: TPath -> String
-showTPath = BC.unpack . (`BC.append` ".tpl") . BC.intercalate "/" . reverse
+showTPath = BC.unpack . (`BC.append` ".tpl") . tpathName
+
+tpathName :: TPath -> ByteString
+tpathName = BC.intercalate "/" . reverse
 
 
 ------------------------------------------------------------------------------

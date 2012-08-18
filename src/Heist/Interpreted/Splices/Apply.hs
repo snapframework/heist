@@ -36,9 +36,14 @@ rawApply calledNodes newContext paramNodes = do
     processedParams <- runNodeList paramNodes
     modifyTS (bindSplice "content" (return processedParams) .
               setCurContext newContext)
-    result <- runNodeList calledNodes
-    restoreTS st
-    return result
+
+    if _recursionDepth st < mAX_RECURSION_DEPTH
+        then do modRecursionDepth (+1)
+                result <- runNodeList calledNodes
+                restoreTS st
+                return result
+        else return [] -- Need to crap out hard here if running at load time
+
 
 
 ------------------------------------------------------------------------------

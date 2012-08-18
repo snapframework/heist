@@ -92,8 +92,8 @@ loads templates from a directory with compiled splices.
 >      -> [(Text, CompiledSplice n)]
 >      -> IO (HeistState n IO)
 > load baseDir splices = do
->     hs <- defaultHeistState
->     liftM (either error id) $ loadTemplates baseDir splices hs
+>     tmap <- loadTemplates baseDir
+>     either error (initHeist [] [] splices) tmap
 
 Here's a function demonstrating all of this in action.
 

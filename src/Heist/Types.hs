@@ -141,19 +141,27 @@ data HeistState n m = HeistState {
     , _doctypes         :: [X.DocType]
     -- | The full path to the current template's file on disk.
     , _curTemplateFile  :: Maybe FilePath
-      -- | A key generator used to produce new unique Promises.
+    -- | A key generator used to produce new unique Promises.
     , _keygen           :: HE.KeyGen
 }
 
+
+-- NOTE: We got rid of the Monoid instance because it is absolutely not safe
+-- to combine two compiledTemplateMaps.  All compiled templates must be known
+-- at load time and processed in a single call to initHeist/loadTemplates or
+-- whatever we end up calling it..
 
 instance (Typeable1 m) => Typeable (HeistState n m) where
     typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
 
 
 ------------------------------------------------------------------------------
--- | HeistT is the monad used for 'Splice' processing.  HeistT provides
--- \"passthrough\" instances for many of the monads you might use in the inner
--- monad.
+-- | HeistT is the monad transformer used for 'Splice' processing.  HeistT
+-- provides \"passthrough\" instances for many of the monads you might use in
+-- the inner monad.
+--
+-- n is the runtime monad (the first parameter passed to HeistState)
+-- m is the monad being run now
 newtype HeistT n m a = HeistT {
     runHeistT :: X.Node
               -> HeistState n m
@@ -425,6 +433,13 @@ localTS f k = do
     restoreTS ts
     return res
 {-# INLINE localTS #-}
+
+
+------------------------------------------------------------------------------
+-- | Modifies the recursion depth.
+modRecursionDepth :: Monad m => (Int -> Int) -> HeistT n m ()
+modRecursionDepth f =
+    modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
 
 ------------------------------------------------------------------------------
