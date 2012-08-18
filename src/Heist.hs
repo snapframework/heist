@@ -2,6 +2,9 @@
 
 module Heist where
 
+import           Control.Exception (SomeException)
+import           Control.Monad
+import           Control.Monad.CatchIO
 import           Control.Monad.Trans
 import           Data.Either
 import qualified Data.Foldable as F
@@ -70,14 +73,20 @@ initHeist :: Monad n
 initHeist rSplices sSplices dSplices rawTemplates = do
     keyGen <- HE.newKeyGen
     let empty = HeistState Map.empty Map.empty Map.empty Map.empty
-                           True [] 0 return [] Nothing keyGen
+                           True [] 0 return [] Nothing keyGen False
         hs0 = empty { _spliceMap = defaultStaticSplices `mappend`
                                    Map.fromList sSplices
-                    , _templateMap = rawTemplates }
+                    , _templateMap = rawTemplates
+                    , _failHardAndFast = True }
     tPairs <- evalHeistT (mapM preprocess $ Map.toList rawTemplates)
                          (X.TextNode "") hs0
+    let bad = lefts tPairs
+    when (not $ null bad) $ do
+        putStrLn "Errors in template processing:"
+        mapM_ (\e -> putStrLn $ "  " ++ show e) bad
+        error "exiting..."
     let hs1 = empty { _spliceMap = Map.fromList rSplices
-                    , _templateMap = Map.fromList tPairs
+                    , _templateMap = Map.fromList $ rights tPairs
                     , _compiledSpliceMap = Map.fromList dSplices
                     }
     C.compileTemplates hs1
@@ -85,13 +94,13 @@ initHeist rSplices sSplices dSplices rawTemplates = do
 
 ------------------------------------------------------------------------------
 -- | 
-preprocess :: Monad n
-           => (TPath, DocumentFile) -> HeistT n n (TPath, DocumentFile)
+preprocess :: (TPath, DocumentFile)
+           -> HeistT IO IO (Either SomeException (TPath, DocumentFile))
 preprocess (tpath, docFile) = do
     let tname = tpathName tpath
-    !mdoc <- I.evalWithHooksInternal tname
+    !emdoc <- try $ I.evalWithHooksInternal tname
     let f doc = (tpath, docFile { dfDoc = doc })
-    return $! maybe die f mdoc
+    return $! fmap (maybe die f) emdoc
   where
     die = error "Preprocess didn't succeed!  This should never happen."
 

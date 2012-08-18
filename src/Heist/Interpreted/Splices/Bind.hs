@@ -2,6 +2,7 @@ module Heist.Interpreted.Splices.Bind where
 
 ------------------------------------------------------------------------------
 import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
@@ -26,15 +27,15 @@ bindAttr = "tag"
 bindImpl :: Monad n => Splice n
 bindImpl = do
     node <- getParamNode
-    maybe (return ())
+    let err = "must supply \"" ++ T.unpack bindAttr ++
+              "\" attribute in <" ++ T.unpack (X.elementTag node) ++ ">"
+    maybe (return () `orError` err)
           (add node)
           (X.getAttribute bindAttr node)
     return []
-
   where
     add node nm = modifyTS $ bindSplice nm $ do
         caller <- getParamNode
         ctx <- getContext
         rawApply (X.childNodes node) ctx (X.childNodes caller)
-
 

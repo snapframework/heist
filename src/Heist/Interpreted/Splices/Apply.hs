@@ -3,6 +3,7 @@ module Heist.Interpreted.Splices.Apply where
 ------------------------------------------------------------------------------
 import           Data.Maybe
 import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Text.XmlHtml as X
 
@@ -42,7 +43,10 @@ rawApply calledNodes newContext paramNodes = do
                 result <- runNodeList calledNodes
                 restoreTS st
                 return result
-        else return [] -- Need to crap out hard here if running at load time
+        else return [] `orError` err
+  where
+    err = "template recursion exceeded max depth, "++
+          "you probably have infinite splice recursion!"
 
 
 
@@ -52,11 +56,13 @@ rawApply calledNodes newContext paramNodes = do
 applyNodes :: Monad n => Template -> Text -> Splice n
 applyNodes nodes template = do
     st <- getTS
-    maybe (return []) -- TODO: error handling
+    maybe (return [] `orError` err)
           (\(t,ctx) -> do
               addDoctype $ maybeToList $ X.docType $ dfDoc t
               rawApply (X.docContent $ dfDoc t) ctx nodes)
           (lookupTemplate (T.encodeUtf8 template) st _templateMap)
+  where
+    err = "apply tag cannot find template \""++(T.unpack template)++"\""
 
 
 ------------------------------------------------------------------------------
@@ -64,8 +70,10 @@ applyNodes nodes template = do
 applyImpl :: Monad n => Splice n
 applyImpl = do
     node <- getParamNode
+    let err = "must supply \"" ++ T.unpack applyAttr ++
+              "\" attribute in <" ++ T.unpack (X.elementTag node) ++ ">"
     case X.getAttribute applyAttr node of
-        Nothing   -> return [] -- TODO: error handling
+        Nothing   -> return [] `orError` err
         Just template -> applyNodes (X.childNodes node) template
 
 

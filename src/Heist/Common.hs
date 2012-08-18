@@ -176,6 +176,23 @@ getContext = getsTS _curContext
 
 
 ------------------------------------------------------------------------------
+-- | If Heist is running in fail fast mode, then this function will throw an
+-- exception with the second argument as the error message.  Otherwise, the
+-- first argument will be executed to represent silent failure.
+--
+-- This behavior allows us to fail quickly if an error crops up during
+-- load-time splice processing or degrade more gracefully if the error occurs
+-- while a user request is being processed.
+orError :: Monad m => HeistT n m b -> String -> HeistT n m b
+orError silent msg = do
+    hs <- getTS
+    if _failHardAndFast hs
+      then error $ (fromMaybe "" $ _curTemplateFile hs) ++
+                   ": " ++ msg
+      else silent
+
+
+------------------------------------------------------------------------------
 -- | Gets the full path to the file holding the template currently being
 -- processed.  Returns Nothing if the template is not associated with a file
 -- on disk or if there is no template being processed.

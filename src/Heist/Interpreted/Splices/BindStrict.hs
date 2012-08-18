@@ -22,7 +22,9 @@ bindStrictImpl :: Monad n => Splice n
 bindStrictImpl = do
     node <- getParamNode
     cs <- runChildren
-    maybe (return ()) (add cs)
+    let err = "must supply \"" ++ T.unpack bindAttr ++
+              "\" attribute in <" ++ T.unpack (X.elementTag node) ++ ">"
+    maybe (return () `orError` err) (add cs)
           (X.getAttribute bindAttr node)
     return []
 

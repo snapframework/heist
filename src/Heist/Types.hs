@@ -44,6 +44,9 @@ import           Data.Typeable
 import           Prelude hiding (catch)
 import qualified Text.XmlHtml as X
 
+import Debug.Trace
+
+tr s x = trace (s++show x) x
 
 ------------------------------------------------------------------------------
 -- | A 'Template' is a forest of XML nodes.  Here we deviate from the "single
@@ -143,6 +146,8 @@ data HeistState n m = HeistState {
     , _curTemplateFile  :: Maybe FilePath
     -- | A key generator used to produce new unique Promises.
     , _keygen           :: HE.KeyGen
+
+    , _failHardAndFast  :: Bool
 }
 
 

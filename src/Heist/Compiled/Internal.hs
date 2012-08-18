@@ -132,10 +132,6 @@ codeGen = compileConsolidated . consolidate . DL.toList
         go soFar a (b : xs) = go (a : soFar) b xs
 
         ----------------------------------------------------------------------
-        -- FIXME Why isn't this used?
-        --render h = unsafeByteString $! S.concat $! L.toChunks $! renderHtml h
-
-        ----------------------------------------------------------------------
         boilDown soFar []              = soFar
 
         boilDown soFar ((Pure h) : xs) = boilDown ((Pure $! h) : soFar) xs
