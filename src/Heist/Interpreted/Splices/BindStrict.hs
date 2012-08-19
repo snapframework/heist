@@ -2,6 +2,7 @@ module Heist.Interpreted.Splices.BindStrict where
 
 ------------------------------------------------------------------------------
 import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------

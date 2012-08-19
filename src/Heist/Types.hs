@@ -46,6 +46,7 @@ import qualified Text.XmlHtml as X
 
 import Debug.Trace
 
+tr :: Show a => String -> a -> a
 tr s x = trace (s++show x) x
 
 ------------------------------------------------------------------------------

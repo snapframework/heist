@@ -11,7 +11,6 @@ import qualified Data.Foldable as F
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
-import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                       (Text)
 import           System.Directory.Tree
@@ -87,8 +86,7 @@ initHeist rSplices sSplices dSplices rawTemplates = do
         mapM_ (\e -> putStrLn $ "  " ++ show e) bad
         error "exiting..."
     let tmap = Map.fromList $ rights tPairs
---    print $ dfDoc $ fromJust $ Map.lookup ["markdown"] tmap
-    let hs1 = empty { _spliceMap = Map.fromList rSplices
+        hs1 = empty { _spliceMap = Map.fromList rSplices
                     , _templateMap = tmap
                     , _compiledSpliceMap = Map.fromList dSplices
                     }
