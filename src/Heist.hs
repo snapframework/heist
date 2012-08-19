@@ -68,7 +68,7 @@ initHeist :: Monad n
           -> [(Text, C.Splice n)]
           -- ^ Dynamic loadtime splices
           -> HashMap TPath DocumentFile
-          -> EitherT [String] IO (HeistState n IO)
+          -> EitherT [String] IO (HeistState n)
 initHeist rSplices sSplices dSplices rawTemplates = do
     keyGen <- lift HE.newKeyGen
     let empty = HeistState Map.empty Map.empty Map.empty Map.empty

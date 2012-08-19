@@ -40,14 +40,14 @@ loadT :: FilePath
       -> [(Text, Splice IO)]
       -> [(Text, Splice IO)]
       -> [(Text, C.Splice IO)]
-      -> IO (Either [String] (HeistState IO IO))
+      -> IO (Either [String] (HeistState IO))
 loadT baseDir r s d = runEitherT $ do
     ts <- loadTemplates baseDir
     initHeist r s d ts
 
 
 ------------------------------------------------------------------------------
-loadTS :: FilePath -> IO (HeistState IO IO)
+loadTS :: FilePath -> IO (HeistState IO)
 loadTS baseDir = do
     etm <- runEitherT $
         loadTemplates baseDir >>= initHeist [] [] []
@@ -57,7 +57,7 @@ loadTS baseDir = do
 loadEmpty :: [(Text, Splice IO)]
           -> [(Text, Splice IO)]
           -> [(Text, C.Splice IO)]
-          -> IO (HeistState IO IO)
+          -> IO (HeistState IO)
 loadEmpty a b c = do
     res <- runEitherT $ initHeist a b c Map.empty
     either (error . concat) return res

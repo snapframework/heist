@@ -45,10 +45,9 @@ addDoctype dt = do
 
 ------------------------------------------------------------------------------
 -- | Adds an on-load hook to a `HeistState`.
-addOnLoadHook :: (Monad m) =>
-                 (Template -> IO Template)
-              -> HeistState n m
-              -> HeistState n m
+addOnLoadHook :: (Template -> IO Template)
+              -> HeistState n
+              -> HeistState n
 addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 
 
@@ -56,17 +55,16 @@ addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
 bindSplice :: Text              -- ^ tag name
            -> Splice n          -- ^ splice action
-           -> HeistState n m    -- ^ source state
-           -> HeistState n m
+           -> HeistState n    -- ^ source state
+           -> HeistState n
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 
 
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
-bindSplices :: Monad m
-            => [(Text, Splice n)] -- ^ splices to bind
-            -> HeistState n m     -- ^ start state
-            -> HeistState n m
+bindSplices :: [(Text, Splice n)] -- ^ splices to bind
+            -> HeistState n       -- ^ start state
+            -> HeistState n
 bindSplices ss ts = foldl' (flip id) ts acts
   where
     acts = map (uncurry bindSplice) ss
@@ -125,9 +123,8 @@ runChildrenWithText = runChildrenWithTrans textSplice
 
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a splice.
-lookupSplice :: Monad m =>
-                Text
-             -> HeistState n m
+lookupSplice :: Text
+             -> HeistState n
              -> Maybe (Splice n)
 lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 {-# INLINE lookupSplice #-}
@@ -135,16 +132,15 @@ lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
 
 ------------------------------------------------------------------------------
 -- | Adds an HTML format template to the heist state.
-addTemplate :: Monad m
-            => ByteString
+addTemplate :: ByteString
             -- ^ Path that the template will be referenced by
             -> Template
             -- ^ The template's DOM nodes
             -> Maybe FilePath
             -- ^ An optional path to the actual file on disk where the
             -- template is stored
-            -> HeistState n m
-            -> HeistState n m
+            -> HeistState n
+            -> HeistState n
 addTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -153,16 +149,15 @@ addTemplate n t mfp st =
 
 ------------------------------------------------------------------------------
 -- | Adds an XML format template to the heist state.
-addXMLTemplate :: Monad m
-               => ByteString
+addXMLTemplate :: ByteString
                -- ^ Path that the template will be referenced by
                -> Template
                -- ^ The template's DOM nodes
                -> Maybe FilePath
                -- ^ An optional path to the actual file on disk where the
                -- template is stored
-               -> HeistState n m
-               -> HeistState n m
+               -> HeistState n
+               -> HeistState n
 addXMLTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -358,8 +353,8 @@ evalWithHooks name = liftM (liftM X.docContent) (evalWithHooksInternal name)
 -- | Binds a list of constant string splices.
 bindStrings :: Monad n
             => [(Text, Text)]
-            -> HeistState n n
-            -> HeistState n n
+            -> HeistState n
+            -> HeistState n
 bindStrings pairs ts = foldr (uncurry bindString) ts pairs
 
 
@@ -368,8 +363,8 @@ bindStrings pairs ts = foldr (uncurry bindString) ts pairs
 bindString :: Monad n
            => Text
            -> Text
-           -> HeistState n n
-           -> HeistState n n
+           -> HeistState n
+           -> HeistState n
 bindString n = bindSplice n . textSplice
 
 
@@ -422,7 +417,7 @@ mimeType d = case d of
 -- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
 -- particular XML application, it must be provided by the application.
 renderTemplate :: Monad n
-               => HeistState n n
+               => HeistState n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
 renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
@@ -439,7 +434,7 @@ renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
 -- template.
 renderWithArgs :: Monad n
                => [(Text, Text)]
-               -> HeistState n n
+               -> HeistState n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
 renderWithArgs args ts = renderTemplate (bindStrings args ts)
@@ -455,7 +450,7 @@ renderWithArgs args ts = renderTemplate (bindStrings args ts)
 -- want to add multiple levels of directories, separate them with slashes as
 -- in "foo/bar".  Using an empty string as a path prefix will leave the
 -- 'HeistState' unchanged.
-addTemplatePathPrefix :: ByteString -> HeistState n m -> HeistState n m
+addTemplatePathPrefix :: ByteString -> HeistState n -> HeistState n
 addTemplatePathPrefix dir ts
   | B.null dir = ts
   | otherwise  = ts { _templateMap = Map.fromList $

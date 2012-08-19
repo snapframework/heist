@@ -90,7 +90,7 @@ loads templates from a directory with compiled splices.
 > load :: MonadIO n
 >      => FilePath
 >      -> [(Text, CompiledSplice n)]
->      -> IO (HeistState n IO)
+>      -> IO (HeistState n)
 > load baseDir splices = do
 >     tmap <- runEitherT $ initHeist [] [] splices =<< loadTemplates baseDir
 >     either (error . concat) return tmap

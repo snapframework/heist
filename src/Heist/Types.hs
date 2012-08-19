@@ -119,18 +119,17 @@ type CompiledSplice m = HeistT m IO (DList (Chunk m))
 -- \"filter\" functions.  Then you use the resulting @HeistState@ in calls to
 -- @renderTemplate@.
 --
--- n is the runtime monad
--- m is the load time monad
-data HeistState n m = HeistState {
+-- m is the runtime monad
+data HeistState m = HeistState {
     -- | A mapping of splice names to splice actions
-      _spliceMap        :: HashMap Text (HeistT n n Template)
+      _spliceMap        :: HashMap Text (HeistT m m Template)
     -- | A mapping of template names to templates
     , _templateMap      :: HashMap TPath DocumentFile
 
     -- | A mapping of splice names to splice actions
-    , _compiledSpliceMap   :: HashMap Text (CompiledSplice n)
+    , _compiledSpliceMap   :: HashMap Text (CompiledSplice m)
     -- | A mapping of template names to templates
-    , _compiledTemplateMap :: HashMap TPath (n Builder)
+    , _compiledTemplateMap :: HashMap TPath (m Builder)
 
     -- | A flag to control splice recursion
     , _recurse          :: Bool
@@ -157,7 +156,7 @@ data HeistState n m = HeistState {
 -- at load time and processed in a single call to initHeist/loadTemplates or
 -- whatever we end up calling it..
 
-instance (Typeable1 m) => Typeable (HeistState n m) where
+instance (Typeable1 m) => Typeable (HeistState m) where
     typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
 
 
@@ -170,26 +169,26 @@ instance (Typeable1 m) => Typeable (HeistState n m) where
 -- m is the monad being run now
 newtype HeistT n m a = HeistT {
     runHeistT :: X.Node
-              -> HeistState n m
-              -> m (a, HeistState n m)
+              -> HeistState n
+              -> m (a, HeistState n)
 }
 
 
 ------------------------------------------------------------------------------
 -- | Gets the names of all the templates defined in a HeistState.
-templateNames :: HeistState n m -> [TPath]
+templateNames :: HeistState m -> [TPath]
 templateNames ts = H.keys $ _templateMap ts
 
 
 ------------------------------------------------------------------------------
 -- | Gets the names of all the templates defined in a HeistState.
-compiledTemplateNames :: HeistState n m -> [TPath]
+compiledTemplateNames :: HeistState m -> [TPath]
 compiledTemplateNames ts = H.keys $ _compiledTemplateMap ts
 
 
 ------------------------------------------------------------------------------
 -- | Gets the names of all the splices defined in a HeistState.
-spliceNames :: HeistState n m -> [Text]
+spliceNames :: HeistState m -> [Text]
 spliceNames ts = H.keys $ _spliceMap ts
 
 
@@ -205,7 +204,7 @@ templateStateTyCon = mkTyCon "Heist.HeistState"
 evalHeistT :: (Monad m)
            => HeistT n m a
            -> X.Node
-           -> HeistState n m
+           -> HeistState n
            -> m a
 evalHeistT m r s = do
     (a, _) <- runHeistT m r s
@@ -304,9 +303,9 @@ instance MonadReader r m => MonadReader r (HeistT n m) where
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadError instance.
-liftCatch :: (m (a,HeistState n m)
-              -> (e -> m (a,HeistState n m))
-              -> m (a,HeistState n m))
+liftCatch :: (m (a,HeistState n)
+              -> (e -> m (a,HeistState n))
+              -> m (a,HeistState n))
           -> HeistT n m a
           -> (e -> HeistT n m a)
           -> HeistT n m a
@@ -325,9 +324,9 @@ instance (MonadError e m) => MonadError e (HeistT n m) where
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadCont instance.
-liftCallCC :: ((((a,HeistState n m) -> m (b, HeistState n m))
-                  -> m (a, HeistState n m))
-                -> m (a, HeistState n m))
+liftCallCC :: ((((a,HeistState n) -> m (b, HeistState n))
+                  -> m (a, HeistState n))
+                -> m (a, HeistState n))
            -> ((a -> HeistT n m b) -> HeistT n m a)
            -> HeistT n m a
 liftCallCC ccc f = HeistT $ \r s ->
@@ -386,21 +385,21 @@ localParamNode f m = HeistT $ \r s -> runHeistT m (f r) s
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'gets'.
-getsTS :: Monad m => (HeistState n m -> r) -> HeistT n m r
+getsTS :: Monad m => (HeistState n -> r) -> HeistT n m r
 getsTS f = HeistT $ \_ s -> return (f s, s)
 {-# INLINE getsTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'get'.
-getTS :: Monad m => HeistT n m (HeistState n m)
+getTS :: Monad m => HeistT n m (HeistState n)
 getTS = HeistT $ \_ s -> return (s, s)
 {-# INLINE getTS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'put'.
-putTS :: Monad m => HeistState n m -> HeistT n m ()
+putTS :: Monad m => HeistState n -> HeistT n m ()
 putTS s = HeistT $ \_ _ -> return ((), s)
 {-# INLINE putTS #-}
 
@@ -408,7 +407,7 @@ putTS s = HeistT $ \_ _ -> return ((), s)
 ------------------------------------------------------------------------------
 -- | HeistT's 'modify'.
 modifyTS :: Monad m
-         => (HeistState n m -> HeistState n m)
+         => (HeistState n -> HeistState n)
          -> HeistT n m ()
 modifyTS f = HeistT $ \_ s -> return ((), f s)
 {-# INLINE modifyTS #-}
@@ -420,7 +419,7 @@ modifyTS f = HeistT $ \_ s -> return ((), f s)
 -- @putTS@ to restore an old state.  This was needed because doctypes needs to
 -- be in a "global scope" as opposed to the template call "local scope" of
 -- state items such as recursionDepth, curContext, and spliceMap.
-restoreTS :: Monad m => HeistState n m -> HeistT n m ()
+restoreTS :: Monad m => HeistState n -> HeistT n m ()
 restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
 {-# INLINE restoreTS #-}
 
@@ -429,7 +428,7 @@ restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
 -- | Abstracts the common pattern of running a HeistT computation with
 -- a modified heist state.
 localTS :: Monad m
-        => (HeistState n m -> HeistState n m)
+        => (HeistState n -> HeistState n)
         -> HeistT n m a
         -> HeistT n m a
 localTS f k = do

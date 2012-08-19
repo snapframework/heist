@@ -36,13 +36,12 @@ tpathName = BC.intercalate "/" . reverse
 
 ------------------------------------------------------------------------------
 -- | Sets the current template file.
-setCurTemplateFile :: Monad m
-                   => Maybe FilePath -> HeistState n m -> HeistState n m
+setCurTemplateFile :: Maybe FilePath -> HeistState n -> HeistState n
 setCurTemplateFile fp ts = ts { _curTemplateFile = fp }
 
 
 ------------------------------------------------------------------------------
-setCurContext :: Monad m => TPath -> HeistState n m -> HeistState n m
+setCurContext :: TPath -> HeistState n -> HeistState n
 setCurContext tp ts = ts { _curContext = tp }
 
 
@@ -111,8 +110,8 @@ splitTemplatePath = splitPathWith '/'
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a template.
 lookupTemplate :: ByteString
-               -> HeistState n m
-               -> (HeistState n m -> HashMap TPath t)
+               -> HeistState n
+               -> (HeistState n -> HashMap TPath t)
                -> Maybe (t, [ByteString])
 lookupTemplate nameStr ts tm = f (tm ts) path name
   where
@@ -128,7 +127,7 @@ lookupTemplate nameStr ts tm = f (tm ts) path name
 
 ------------------------------------------------------------------------------
 -- | Returns 'True' if the given template can be found in the heist state.
-hasTemplate :: ByteString -> HeistState n m -> Bool
+hasTemplate :: ByteString -> HeistState n -> Bool
 hasTemplate nameStr ts =
     isJust $ lookupTemplate nameStr ts _templateMap
 
@@ -240,8 +239,7 @@ runHook f t = do
 ------------------------------------------------------------------------------
 -- | Runs the onLoad hook on the template and returns the 'HeistState'
 -- with the result inserted.
-loadHook :: Monad m => HeistState n m -> (TPath, DocumentFile)
-         -> IO (HeistState n m)
+loadHook :: HeistState n -> (TPath, DocumentFile) -> IO (HeistState n)
 loadHook ts (tp, t) = do
     t' <- runHook (_onLoadHook ts) t
     return $ insertTemplate tp t' ts
@@ -278,18 +276,16 @@ getXMLDoc = getDocWith X.parseXML
 
 ------------------------------------------------------------------------------
 -- | Sets the templateMap in a HeistState.
-setTemplates :: Monad m => HashMap TPath DocumentFile
-                        -> HeistState n m -> HeistState n m
+setTemplates :: HashMap TPath DocumentFile -> HeistState n -> HeistState n
 setTemplates m ts = ts { _templateMap = m }
 
 
 ------------------------------------------------------------------------------
 -- | Adds a template to the heist state.
-insertTemplate :: Monad m =>
-               TPath
-            -> DocumentFile
-            -> HeistState n m
-            -> HeistState n m
+insertTemplate :: TPath
+               -> DocumentFile
+               -> HeistState n
+               -> HeistState n
 insertTemplate p t st =
     setTemplates (Map.insert p t (_templateMap st)) st
 

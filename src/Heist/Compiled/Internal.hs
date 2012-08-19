@@ -44,7 +44,7 @@ runNodeList = mapSplices runNode
 
 
 ------------------------------------------------------------------------------
-lookupCompiledTemplate :: ByteString -> HeistState n m -> Maybe (n Builder)
+lookupCompiledTemplate :: ByteString -> HeistState n -> Maybe (n Builder)
 lookupCompiledTemplate nm hs =
     fmap fst $ lookupTemplate nm hs _compiledTemplateMap
 
@@ -52,7 +52,7 @@ lookupCompiledTemplate nm hs =
 ------------------------------------------------------------------------------
 runSplice :: (Monad n)
           => X.Node
-          -> HeistState n IO
+          -> HeistState n
           -> Splice n
           -> IO (n Builder)
 runSplice node hs splice = do
@@ -74,7 +74,7 @@ runDocumentFile tpath df = do
 
 ------------------------------------------------------------------------------
 compileTemplate :: Monad n
-                => HeistState n IO
+                => HeistState n
                 -> TPath
                 -> DocumentFile
                 -> IO (n Builder)
@@ -86,7 +86,7 @@ compileTemplate hs tpath df = do
 
 
 ------------------------------------------------------------------------------
-compileTemplates :: Monad n => HeistState n IO -> IO (HeistState n IO)
+compileTemplates :: Monad n => HeistState n -> IO (HeistState n)
 compileTemplates hs = do
     ctm <- foldM runOne H.empty tpathDocfiles
     return $ hs { _compiledTemplateMap = ctm }
@@ -416,16 +416,16 @@ mapPromises f getList = do
 ------------------------------------------------------------------------------
 bindSplice :: Text             -- ^ tag name
            -> Splice n         -- ^ splice action
-           -> HeistState n m   -- ^ source state
-           -> HeistState n m
+           -> HeistState n   -- ^ source state
+           -> HeistState n
 bindSplice n v ts =
     ts { _compiledSpliceMap = H.insert n v (_compiledSpliceMap ts) }
 
 
 ------------------------------------------------------------------------------
 bindSplices :: [(Text, Splice n)]  -- ^ splices to bind
-            -> HeistState n m      -- ^ source state
-            -> HeistState n m
+            -> HeistState n      -- ^ source state
+            -> HeistState n
 bindSplices ss ts = foldr (uncurry bindSplice) ts ss
 
 
