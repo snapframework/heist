@@ -73,7 +73,8 @@ testTemplate tdir tname = do
 testTemplateEval :: ByteString -> IO (Maybe Template)
 testTemplateEval tname = do
     ts <- loadTS "templates"
-    evalHeistT (evalWithHooks tname) (X.TextNode "") ts
+    md <- evalHeistT (evalWithDoctypes tname) (X.TextNode "") ts
+    return $ fmap X.docContent md
 
 
 ------------------------------------------------------------------------------

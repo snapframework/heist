@@ -44,14 +44,6 @@ addDoctype dt = do
 
 
 ------------------------------------------------------------------------------
--- | Adds an on-load hook to a `HeistState`.
-addOnLoadHook :: (Template -> IO Template)
-              -> HeistState n
-              -> HeistState n
-addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
-
-
-------------------------------------------------------------------------------
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
 bindSplice :: Text              -- ^ tag name
            -> Splice n          -- ^ splice action
@@ -323,13 +315,12 @@ fixDocType d = do
 
 
 ------------------------------------------------------------------------------
--- | Same as evalWithHooks, but returns the entire 'X.Document' rather than
--- just the nodes.  This is the right thing to do if we are starting at the
--- top level.
-evalWithHooksInternal :: Monad n
-                      => ByteString
-                      -> HeistT n n (Maybe X.Document)
-evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
+-- | Runs a template and sets the doctype properly.  This is the right thing
+-- to do if we are starting at the top level.
+evalWithDoctypes :: Monad n
+                 => ByteString
+                 -> HeistT n n (Maybe X.Document)
+evalWithDoctypes name = lookupAndRun name $ \(t,ctx) -> do
     addDoctype $ maybeToList $ X.docType $ dfDoc t
     ts <- getTS
     let nodes = X.docContent $ dfDoc t
@@ -338,15 +329,6 @@ evalWithHooksInternal name = lookupAndRun name $ \(t,ctx) -> do
     restoreTS ts
     newDoc   <- fixDocType $ (dfDoc t) { X.docContent = newNodes }
     return (Just newDoc)
-
-
-------------------------------------------------------------------------------
--- | Looks up a template name evaluates it by calling runNodeList.  This also
--- executes pre- and post-run hooks and adds the doctype.
-evalWithHooks :: Monad n
-              => ByteString
-              -> HeistT n n (Maybe Template)
-evalWithHooks name = liftM (liftM X.docContent) (evalWithHooksInternal name)
 
 
 ------------------------------------------------------------------------------
@@ -421,7 +403,7 @@ renderTemplate :: Monad n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
 renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
-  where tpl = do mt <- evalWithHooksInternal name
+  where tpl = do mt <- evalWithDoctypes name
                  case mt of
                     Nothing  -> return Nothing
                     Just doc -> return $ Just $ (X.render doc, mimeType doc)

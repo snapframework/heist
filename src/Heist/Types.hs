@@ -138,8 +138,6 @@ data HeistState m = HeistState {
     -- | A counter keeping track of the current recursion depth to prevent
     -- infinite loops.
     , _recursionDepth   :: Int
-    -- | A hook run on all templates at load time.
-    , _onLoadHook       :: Template -> IO Template
     -- | The doctypes encountered during template processing.
     , _doctypes         :: [X.DocType]
     -- | The full path to the current template's file on disk.

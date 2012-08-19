@@ -4,18 +4,21 @@
 --
 -- Use the ttl attribute to set the amount of time between reloads.  The ttl
 -- value should be a positive integer followed by a single character
--- specifying the units.  Valid units are seconds, minutes, hours, days, and
--- weeks.  If the ttl string is invalid or the ttl attribute is not specified,
--- the cache is never refreshed unless explicitly cleared with
--- clearCacheTagState.
+-- specifying the units.  Valid units are a single letter abbreviation for one
+-- of seconds, minutes, hours, days, and weeks.  If the ttl string is invalid
+-- or the ttl attribute is not specified, the cache is never refreshed unless
+-- explicitly cleared with clearCacheTagState.
 module Heist.Interpreted.Splices.Cache
   ( CacheTagState
+  , cacheImpl
   , mkCacheTag
   , clearCacheTagState
+  , initHeistWithCacheTag 
   ) where
 
 ------------------------------------------------------------------------------
 import           Control.Concurrent
+import           Control.Error
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.IORef
@@ -27,13 +30,14 @@ import qualified Data.Text as T
 import           Data.Text.Read
 import           Data.Time.Clock
 import           System.Random
-import           Text.XmlHtml.Cursor
 import           Text.XmlHtml hiding (Node)
 
 
 ------------------------------------------------------------------------------
+import qualified Heist.Compiled.Internal as C
 import           Heist.Interpreted.Internal
 import           Heist.Types
+import           Heist
 
 
 ------------------------------------------------------------------------------
@@ -67,10 +71,14 @@ parseTTL s = value * multiplier
         'w' -> 604800
         _   -> 0
 
+
 ------------------------------------------------------------------------------
+-- | This is the splice that actually does the work.  You should bind it to
+-- the same tag name as you bound the splice returned by mkCacheTag otherwise
+-- it won't work and you'll get runtime errors.
 cacheImpl :: (MonadIO n)
-           => CacheTagState
-           -> Splice n
+          => CacheTagState
+          -> Splice n
 cacheImpl (CTS mv) = do
     tree <- getParamNode
     let err = error $ unwords ["cacheImpl is bound to a tag"
@@ -102,51 +110,70 @@ cacheImpl (CTS mv) = do
 
 
 ------------------------------------------------------------------------------
--- | Returns a function that modifies a HeistState to include a \"cache\"
--- tag.  The cache tag is not bound automatically with the other default Heist
--- tags.  This is because this function also returns CacheTagState, so the
--- user will be able to clear it with the 'clearCacheTagState' function.
-mkCacheTag :: (MonadIO n, Monad m)
-           => IO (HeistState n m -> HeistState n m, CacheTagState)
+-- | Returns items necessary to set up a \"cache\" tag.  The cache tag cannot
+-- be bound automatically with the other default Heist tags.  This is because
+-- this function also returns CacheTagState, so the user will be able to clear
+-- it with the 'clearCacheTagState' function.
+--
+-- This function returns a splice and a CacheTagState.  The splice is of type
+-- @Splice IO@ because it has to be bound as load time preprocessing splice.
+-- Haskell's type system won't allow you to screw up and pass this splice as
+-- the wrong argument to initHeist.
+mkCacheTag :: IO (Splice IO, CacheTagState)
 mkCacheTag = do
     sr <- newIORef $ Set.empty
     mv <- liftM CTS $ newMVar H.empty
 
-    return $ ( addOnLoadHook (assignIds sr) .
-               -- The cache tag allows the ttl attribute.
-               bindSplice cacheTagName (cacheImpl mv) .
-               -- Like the old static tag...does not allow ttl
-               bindSplice "static" (cacheImpl mv)
-             , mv)
-
-  where
-    generateId :: IO Int
-    generateId = getStdRandom random
-
-    assignIds setref = mapM f
-        where
-          f node = g $ fromNode node
-
-          getId = do
-              i  <- liftM (T.pack . show) generateId
-              st <- readIORef setref
-              if Set.member i st
-                then getId
-                else do
-                    writeIORef setref $ Set.insert i st
-                    return $ T.append "cache-id-" i
-
-          g curs = do
-              let node = current curs
-              curs' <- if tagName node == Just cacheTagName ||
-                          tagName node == Just "static"
-                         then do
-                             i <- getId
-                             return $ modifyNode (setAttribute "id" i) curs
-                         else return curs
-              let mbc = nextDF curs'
-              maybe (return $ topNode curs') g mbc
+    return $ (setupSplice sr, mv)
 
 
+------------------------------------------------------------------------------
+-- | Explicit type signature to avoid the Show polymorphism problem.
+generateId :: IO Int
+generateId = getStdRandom random
 
+
+------------------------------------------------------------------------------
+-- | Gets a unique ID for use in the cache tags.
+getId :: IORef (Set.HashSet Text) -> IO Text
+getId setref = do
+    i <- liftM (T.pack . show) generateId
+    st <- readIORef setref
+    if Set.member i st
+      then getId setref
+      else do
+          writeIORef setref $ Set.insert i st
+          return $ T.append "cache-id-" i
+
+
+------------------------------------------------------------------------------
+-- | A splice that sets the id attribute so that nodes can be cache-aware.
+setupSplice :: IORef (Set.HashSet Text) -> Splice IO
+setupSplice setref = do
+    i <- liftIO $ getId setref
+    node <- getParamNode
+    return $ [setAttribute "id" i node]
+
+
+------------------------------------------------------------------------------
+-- | This function is the easiest way to set up your HeistState with a cache
+-- tag.  It sets up all the necessary splices properly.  If you need to do
+-- configure the cache tag differently than how this function does it, you
+-- will still probably want to pattern your approach after this function's
+-- implementation.
+initHeistWithCacheTag :: MonadIO n
+                      => [(Text, Splice n)]
+                      -- ^ Runtime splices
+                      -> [(Text, Splice IO)]
+                      -- ^ Static loadtime splices
+                      -> [(Text, C.Splice n)]
+                      -- ^ Dynamic loadtime splices
+                      -> HashMap TPath DocumentFile
+                      -> EitherT [String] IO (HeistState n, CacheTagState)
+initHeistWithCacheTag rSplices sSplices dSplices rawTemplates = do
+    (ss, cts) <- liftIO mkCacheTag
+    hs <- initHeist (("cache", cacheImpl cts) : rSplices)
+                    (("cache", ss) : sSplices)
+                    dSplices rawTemplates
+    return (hs, cts)
 

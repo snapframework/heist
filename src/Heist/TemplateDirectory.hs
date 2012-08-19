@@ -16,21 +16,26 @@ module Heist.TemplateDirectory
 
 ------------------------------------------------------------------------------
 import           Control.Concurrent
+import           Control.Error
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Text (Text)
 import           Heist
+import qualified Heist.Compiled.Internal as C
+import qualified Heist.Interpreted.Internal as I
 import           Heist.Interpreted.Splices.Cache
 import           Heist.Types
 
 
 ------------------------------------------------------------------------------
 -- | Structure representing a template directory.
-data TemplateDirectory n m
+data TemplateDirectory n
     = TemplateDirectory
         FilePath
-        (HeistState n m)
-        (MVar (HeistState n m))
+        [(Text, I.Splice n)]
+        [(Text, I.Splice IO)]
+        [(Text, C.Splice n)]
+        (MVar (HeistState n))
         CacheTagState
 
 
@@ -39,16 +44,17 @@ data TemplateDirectory n m
 -- error handling.
 newTemplateDirectory :: MonadIO n
                      => FilePath
-                     -> [(Text, CompiledSplice n)]
-                     -> HeistState n IO
-                     -> IO (Either String (TemplateDirectory n IO))
-newTemplateDirectory dir splices templateState = do
-    (modTs,cts) <- mkCacheTag
-    let origTs = modTs templateState
-    ets <- loadTemplates dir splices origTs
-    leftPass ets $ \ts -> do
-        tsMVar <- newMVar $ ts
-        return $ TemplateDirectory dir origTs tsMVar cts
+                     -> [(Text, I.Splice n)]
+                     -> [(Text, I.Splice IO)]
+                     -> [(Text, C.Splice n)]
+                     -> EitherT [String] IO (TemplateDirectory n)
+newTemplateDirectory dir a b c = do
+    (ss, cts) <- liftIO mkCacheTag
+    let a' = ("cache", cacheImpl cts) : a
+        b' = ("cache", ss) : b
+    hs <- loadTemplates dir >>= initHeist a' b' c
+    tsMVar <- liftIO $ newMVar hs
+    return $ TemplateDirectory dir a' b' c tsMVar cts
 
 
 ------------------------------------------------------------------------------
@@ -56,35 +62,39 @@ newTemplateDirectory dir splices templateState = do
 -- function on error.
 newTemplateDirectory' :: MonadIO n
                       => FilePath
-                      -> [(Text, CompiledSplice n)]
-                      -> HeistState n IO
-                      -> IO (TemplateDirectory n IO)
-newTemplateDirectory' p =
-    ((either fail return =<<) .) . newTemplateDirectory p
+                      -> [(Text, I.Splice n)]
+                      -> [(Text, I.Splice IO)]
+                      -> [(Text, C.Splice n)]
+                      -> IO (TemplateDirectory n)
+newTemplateDirectory' dir rSplices sSplices dSplices = do
+    res <- runEitherT $ 
+        newTemplateDirectory dir rSplices sSplices dSplices
+    either (error . concat) return res
 
 
 ------------------------------------------------------------------------------
 -- | Gets the 'HeistState' from a TemplateDirectory.
-getDirectoryTS :: (Monad m, MonadIO n)
-               => TemplateDirectory n m
-               -> n (HeistState n m)
-getDirectoryTS (TemplateDirectory _ _ tsMVar _) = liftIO $ readMVar $ tsMVar
+getDirectoryTS :: (MonadIO n)
+               => TemplateDirectory n
+               -> n (HeistState n)
+getDirectoryTS (TemplateDirectory _ _ _ _ tsMVar _) =
+    liftIO $ readMVar $ tsMVar
 
 
 ------------------------------------------------------------------------------
 -- | Clears cached content and reloads templates from disk.
 reloadTemplateDirectory :: (MonadIO n)
-                        => TemplateDirectory n IO
+                        => TemplateDirectory n
                         -> n (Either String ())
-reloadTemplateDirectory (TemplateDirectory p origTs tsMVar cts) = liftIO $ do
-    clearCacheTagState cts
-    ets <- loadTemplates p [] origTs
-    leftPass ets $ \ts -> modifyMVar_ tsMVar (const $ return ts)
+reloadTemplateDirectory (TemplateDirectory p a b c tsMVar _) = liftIO $ do
+    ehs <- runEitherT $ loadTemplates p >>= initHeist a b c
+    leftPass ehs $ \hs -> modifyMVar_ tsMVar (const $ return hs)
 
 
 ------------------------------------------------------------------------------
 -- | Prepends an error onto a Left.
-leftPass :: Monad m => Either String b -> (b -> m c) -> m (Either String c)
-leftPass e m = either (return . Left . loadError) (liftM Right . m) e
+leftPass :: Monad m => Either [String] b -> (b -> m c) -> m (Either String c)
+leftPass e m = either (return . Left . loadError . concat)
+                      (liftM Right . m) e
   where
     loadError = (++) "Error loading templates: "

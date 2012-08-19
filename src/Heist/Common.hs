@@ -227,25 +227,6 @@ loadTemplate templateRoot fname
 
 
 ------------------------------------------------------------------------------
--- | Runs a template modifying function on a DocumentFile.
-runHook :: Monad m => (Template -> m Template)
-        -> DocumentFile
-        -> m DocumentFile
-runHook f t = do
-    n <- f $ X.docContent $ dfDoc t
-    return $ t { dfDoc = (dfDoc t) { X.docContent = n } }
-
-
-------------------------------------------------------------------------------
--- | Runs the onLoad hook on the template and returns the 'HeistState'
--- with the result inserted.
-loadHook :: HeistState n -> (TPath, DocumentFile) -> IO (HeistState n)
-loadHook ts (tp, t) = do
-    t' <- runHook (_onLoadHook ts) t
-    return $ insertTemplate tp t' ts
-
-
-------------------------------------------------------------------------------
 -- | Type synonym for parsers.
 type ParserFun = String -> ByteString -> Either String X.Document
 

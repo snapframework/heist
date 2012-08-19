@@ -60,6 +60,11 @@ loadTemplates dir = do
 -- will still work fine.  If you add any templates later, then those templates
 -- will be available for interpreted rendering, but not for compiled
 -- rendering.
+--
+-- In the past you could add templates to your HeistState after initialization
+-- using its Monoid instance.  Due to implementation details, this is no
+-- longer possible.  All of your templates must be known when you call this
+-- function.
 initHeist :: Monad n
           => [(Text, I.Splice n)]
           -- ^ Runtime splices
@@ -72,7 +77,7 @@ initHeist :: Monad n
 initHeist rSplices sSplices dSplices rawTemplates = do
     keyGen <- lift HE.newKeyGen
     let empty = HeistState Map.empty Map.empty Map.empty Map.empty
-                           True [] 0 return [] Nothing keyGen False
+                           True [] 0 [] Nothing keyGen False
         hs0 = empty { _spliceMap = Map.fromList defaultStaticSplices
                                   `mappend` Map.fromList sSplices
                     , _templateMap = rawTemplates
@@ -89,11 +94,6 @@ initHeist rSplices sSplices dSplices rawTemplates = do
     if not (null bad)
       then left bad
       else lift $ C.compileTemplates hs1
---    when (not $ null bad) $ do
---        putStrLn "Errors in template processing:"
---        mapM_ (\e -> putStrLn $ "  " ++ show e) bad
---        error "exiting..."
-    
 
 
 ------------------------------------------------------------------------------

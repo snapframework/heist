@@ -74,12 +74,12 @@ Library
     Heist.Interpreted.Splices.Apply,
     Heist.Interpreted.Splices.Bind,
     Heist.Interpreted.Splices.BindStrict,
---    Heist.Interpreted.Splices.Cache,
+    Heist.Interpreted.Splices.Cache,
     Heist.Interpreted.Splices.Html,
     Heist.Interpreted.Splices.Ignore,
     Heist.Interpreted.Splices.Json,
-    Heist.Interpreted.Splices.Markdown
---    Heist.TemplateDirectory
+    Heist.Interpreted.Splices.Markdown,
+    Heist.TemplateDirectory
 
   other-modules:
     Data.HeterogeneousEnvironment,
