@@ -14,11 +14,13 @@ module Heist.Compiled.TutorialImports
   , T.Text
   , T.pack
   , ByteString
+  , runEitherT
   ) where
 
 import           Blaze.ByteString.Builder
 import           Heist
 import           Heist.Compiled hiding (textSplice, runNodeList)
+import           Control.Error (runEitherT)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Control.Monad.Trans.State as ST

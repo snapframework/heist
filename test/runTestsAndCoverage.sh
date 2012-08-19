@@ -24,13 +24,11 @@ rm -Rf $DIR
 mkdir -p $DIR
 
 EXCLUDES='Main
-Data.CIByteString
-Snap.Internal.Http.Parser.Tests
-Snap.Internal.Http.Server.Tests
-Snap.Internal.Http.Types.Tests
-Snap.Internal.Iteratee.Tests
-Text.Snap.Templates.Tests
-Snap.Test.Common'
+Heist.Compiled.Tests
+Heist.Compiled.Tutorial
+Heist.Compiled.TutorialImports
+Heist.Interpreted.Tests
+Heist.Tests'
 
 EXCL=""
 

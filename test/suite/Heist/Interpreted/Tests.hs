@@ -11,6 +11,7 @@ module Heist.Interpreted.Tests
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
+import           Control.Error
 import           Control.Monad.State
 import qualified Control.Monad.Trans.State as ST
 import           Data.Aeson
@@ -44,6 +45,8 @@ import           Heist.Interpreted.Splices.Json
 import           Heist.Interpreted.Splices.Markdown
 import qualified Text.XmlHtml        as X
 import qualified Text.XmlHtml.Cursor as X
+
+import           Heist.Tests hiding (tests)
 
 
 ------------------------------------------------------------------------------
@@ -84,7 +87,7 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
         let result   = buildResult bind
 
         spliceResult <- run $ do
-            hs <- initHeist defaultStaticSplices [] [] Map.empty
+            hs <- loadEmpty defaultStaticSplices [] []
             evalHeistT (runNodeList template)
                        (X.TextNode "") hs
 
@@ -105,7 +108,7 @@ simpleApplyTest = monadicIO $ forAllM arbitrary prop
 ------------------------------------------------------------------------------
 addTest :: IO ()
 addTest = do
-    es <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
+    es <- loadEmpty [] [] []
     let hs = addTemplate "aoeu" [] Nothing es
     H.assertEqual "lookup test" (Just []) $
         fmap (X.docContent . dfDoc . fst) $
@@ -117,7 +120,7 @@ hasTemplateTest :: H.Assertion
 hasTemplateTest = do
     ets <- loadT "templates" [] [] []
     let tm = either (error "Error loading templates") _templateMap ets
-    hs <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
+    hs <- loadEmpty [] [] []
     let hs's = setTemplates tm hs
     H.assertBool "hasTemplate hs's" (hasTemplate "index" hs's)
 
@@ -146,7 +149,7 @@ fsLoadTest :: H.Assertion
 fsLoadTest = do
     ets <- loadT "templates" [] [] []
     let tm = either (error "Error loading templates") _templateMap ets
-    es <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
+    es <- loadEmpty [] [] []
     let hs = setTemplates tm es
     let f  = g hs
 
@@ -221,14 +224,14 @@ bindAttrTest = do
 
 
 ------------------------------------------------------------------------------
-htmlExpected :: ByteString
-htmlExpected = "<div class=\'markdown\'><p>This <em>is</em> a test.</p></div>"
+markdownHtmlExpected :: ByteString
+markdownHtmlExpected = "<div class=\'markdown\'><p>This <em>is</em> a test.</p></div>"
 
 
 ------------------------------------------------------------------------------
 -- | Markdown test on a file
 markdownTest :: H.Assertion
-markdownTest = renderTest "markdown" htmlExpected
+markdownTest = renderTest "markdown" markdownHtmlExpected
 
 
 ------------------------------------------------------------------------------
@@ -317,11 +320,11 @@ attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a><a href='b
 -- | Markdown test on supplied text
 markdownTextTest :: H.Assertion
 markdownTextTest = do
-    hs <- initHeist [] [] [] Map.empty
+    hs <- loadEmpty [] [] []
     result <- evalHeistT markdownSplice
                          (X.TextNode "This *is* a test.")
                          hs
-    H.assertEqual "Markdown text" htmlExpected 
+    H.assertEqual "Markdown text" markdownHtmlExpected 
       (B.filter (/= '\n') $ toByteString $
         X.render (X.HtmlDocument X.UTF8 Nothing result))
 
@@ -329,7 +332,7 @@ markdownTextTest = do
 ------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
-    es <- initHeist [] [] [] Map.empty
+    es <- loadEmpty [] [] []
     res <- evalHeistT applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
 
@@ -339,7 +342,7 @@ applyTest = do
 ------------------------------------------------------------------------------
 ignoreTest :: H.Assertion
 ignoreTest = do
-    es <- initHeist [] [] [] Map.empty
+    es <- loadEmpty [] [] []
     res <- evalHeistT ignoreImpl
         (X.Element "ignore" [("tag", "ignorable")] 
           [X.TextNode "This should be ignored"]) es
@@ -353,44 +356,6 @@ lookupTemplateTest = do
             getsTS $ (\ts -> lookupTemplate "/user/menu" ts _templateMap)
     res <- runHeistT k (X.TextNode "") ts
     H.assertBool "lookup context test" $ isJust $ fst res
-
-
-------------------------------------------------------------------------------
--- Utility functions
-
-isLeft :: Either a b -> Bool
-isLeft (Left _) = True
-isLeft (Right _) = False
-
-
-------------------------------------------------------------------------------
---loadT :: String -> IO (Either String (HeistState IO IO))
-loadT :: FilePath
-      -> [(Text, Splice IO)]
-      -> [(Text, Splice IO)]
-      -> [(Text, C.Splice IO)]
-      -> IO (Either String (HeistState IO IO))
-loadT baseDir r s d = do
-    ets <- loadTemplates baseDir
-    either (return . Left) (liftM Right . initHeist r s d) ets
-
-
-------------------------------------------------------------------------------
-loadTS :: FilePath -> IO (HeistState IO IO)
-loadTS baseDir = do
-    etm <- loadTemplates baseDir
-    either error (initHeist [] [] []) etm
-
-
-testTemplate tdir tname = do
-    ts <- loadTS tdir
-    Just (resDoc, _) <- renderTemplate ts tname
-    return $ toByteString resDoc
-
-
-testTemplateEval tname = do
-    ts <- loadTS "templates"
-    evalHeistT (evalWithHooks tname) (X.TextNode "") ts
 
 
 ------------------------------------------------------------------------------
@@ -465,16 +430,6 @@ processNode elems loc =
 
 
 ------------------------------------------------------------------------------
--- | Reloads the templates from disk and renders the specified
--- template.  (Old convenience code.)
-quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
-quickRender baseDir name = do
-    ts  <- loadTS baseDir
-    res <- renderTemplate ts name
-    return (fmap (toByteString . fst) res)
-
-
-------------------------------------------------------------------------------
 newtype Name = Name { unName :: Text } deriving (Show)
 
 instance Arbitrary Name where
@@ -542,7 +497,7 @@ instance Show Bind where
     , L.unpack $ L.concat $ map formatNode $ buildResult b
     , "Splice result:"
     , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $ do
-        hs <- initHeist [] [] [] Map.empty
+        hs <- loadEmpty [] [] []
         evalHeistT (runNodeList $ buildBindTemplate b)
                           (X.TextNode "") hs
     , "Template:"
@@ -619,7 +574,7 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 ------------------------------------------------------------------------------
 calcResult :: Apply -> IO [X.Node]
 calcResult apply@(Apply name _ callee _ _) = do
-    hs <- initHeist defaultStaticSplices [] [] Map.empty
+    hs <- loadEmpty defaultStaticSplices [] []
     let hs' = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
                            (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
                                          Nothing)) hs
