@@ -56,16 +56,16 @@ addOnLoadHook hook ts = ts { _onLoadHook = _onLoadHook ts >=> hook }
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
 bindSplice :: Text              -- ^ tag name
            -> Splice n          -- ^ splice action
-           -> HeistState n m      -- ^ source state
+           -> HeistState n m    -- ^ source state
            -> HeistState n m
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 
 
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
-bindSplices :: Monad m =>
-               [(Text, Splice n)] -- ^ splices to bind
-            -> HeistState n m       -- ^ start state
+bindSplices :: Monad m
+            => [(Text, Splice n)] -- ^ splices to bind
+            -> HeistState n m     -- ^ start state
             -> HeistState n m
 bindSplices ss ts = foldl' (flip id) ts acts
   where
@@ -224,8 +224,15 @@ parseAtt bs = do
     return $ T.concat chunks
   where
     cvt (Literal x) = return x
+    cvt (Escaped c) = renderEscaped c
     cvt (Ident x)   =
         localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
+
+    renderEscaped c = do
+        hs <- getTS
+        if _preprocessingMode hs
+          then return $ T.snoc "\\" c
+          else return $ T.singleton c
 
 
 ------------------------------------------------------------------------------
@@ -252,9 +259,12 @@ parseAtt bs = do
 -- it's \"more intuitive\".
 getAttributeSplice :: Monad n => Text -> HeistT n n Text
 getAttributeSplice name = do
-    s <- liftM (lookupSplice name) getTS
-    nodes <- maybe (return []) id s
-    return $ T.concat $ map X.nodeText nodes
+    hs <- getTS
+    let noSplice = if _preprocessingMode hs
+                     then return $ T.concat ["${", name, "}"]
+                     else return ""
+    let s = lookupSplice name hs
+    maybe noSplice (liftM (T.concat . map X.nodeText)) s
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.

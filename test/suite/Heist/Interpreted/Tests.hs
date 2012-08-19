@@ -35,6 +35,7 @@ import           Test.QuickCheck.Monadic
 ------------------------------------------------------------------------------
 import           Heist
 import           Heist.Common
+import qualified Heist.Compiled.Internal as C
 import           Heist.Interpreted.Internal
 import           Heist.Types
 import           Heist.Interpreted.Splices.Apply
@@ -83,9 +84,10 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
         let result   = buildResult bind
 
         spliceResult <- run $ do
-            hs <- initHeist [] [] [] Map.empty
+            hs <- initHeist defaultStaticSplices [] [] Map.empty
             evalHeistT (runNodeList template)
                        (X.TextNode "") hs
+
         assert $ result == spliceResult
 
 
@@ -113,7 +115,7 @@ addTest = do
 ------------------------------------------------------------------------------
 hasTemplateTest :: H.Assertion
 hasTemplateTest = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     let tm = either (error "Error loading templates") _templateMap ets
     hs <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
     let hs's = setTemplates tm hs
@@ -132,17 +134,17 @@ getDocTest = do
 ------------------------------------------------------------------------------
 loadTest :: H.Assertion
 loadTest = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertBool "loadTest size" $ Map.size tm == 28
+                      H.assertEqual "loadTest size" 29 $ Map.size tm
            ) ets
 
 
 ------------------------------------------------------------------------------
 fsLoadTest :: H.Assertion
 fsLoadTest = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     let tm = either (error "Error loading templates") _templateMap ets
     es <- initHeist [] [] [] Map.empty :: IO (HeistState IO IO)
     let hs = setTemplates tm es
@@ -160,7 +162,7 @@ fsLoadTest = do
 ------------------------------------------------------------------------------
 renderNoNameTest :: H.Assertion
 renderNoNameTest = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     either (error "Error loading templates")
            (\ts -> do t <- renderTemplate ts ""
                       H.assertBool "renderNoName" $ isNothing t
@@ -170,39 +172,42 @@ renderNoNameTest = do
 ------------------------------------------------------------------------------
 doctypeTest :: H.Assertion
 doctypeTest = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     let ts = either (error "Error loading templates") id ets
     Just (indexDoc, indexMIME) <- renderTemplate ts "index"
-    H.assertBool "doctype test index" $ isJust $ X.docType $
-        fromRight $ (X.parseHTML "index") $ toByteString $ indexDoc
+    H.assertEqual "index doctype test" indexRes $ toByteString $ indexDoc
     Just (iocDoc, iocMIME) <- renderTemplate ts "ioc"
-    H.assertBool "doctype test ioc" $ isJust $ X.docType $
-        fromRight $ (X.parseHTML "index") $ toByteString $ iocDoc
-  where fromRight (Right x) = x
-        fromRight (Left  s) = error s
+    H.assertEqual "ioc doctype test" indexRes $ toByteString $ indexDoc
+  where
+    fromRight (Right x) = x
+    fromRight (Left  s) = error s
+    indexRes = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n&#10;<html>\n<div id='pre_{att}_post'>\n/index\n</div>\n</html>\n"
+    iocRes = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n<wrapper>\n\nInversion of control content\n\n</wrapper>\n\n"
 
 ------------------------------------------------------------------------------
 attrSubstTest :: H.Assertion
 attrSubstTest = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     let ts = either (error "Error loading templates") id ets
-    check (setTs "meaning_of_everything" ts) "pre_meaning_of_everything_post"
-    check ts "pre__post"
+    check (bindSplices splices ts) out1
+    check ts out2
 
   where
-    setTs val = bindSplice "foo" (return [X.TextNode val])
-    check ts str = do
+    splices = defaultStaticSplices ++
+        [("foo", return [X.TextNode "meaning_of_everything"])]
+        
+    check ts expected = do
         Just (resDoc, resMIME) <- renderTemplate ts "attrs"
-        H.assertBool ("attr subst " ++ (show str)) $ not $ B.null $
-            snd $ B.breakSubstring str $ toByteString $ resDoc
-        H.assertBool ("attr subst foo") $ not $ B.null $
-            snd $ B.breakSubstring "${foo}" $ toByteString $ resDoc
+        H.assertEqual "attr subst" expected $ toByteString $ resDoc
+
+    out1 = "<mytag flag>Empty attribute</mytag>\n<mytag flag='abc${foo}'>No ident capture</mytag>\n<div id='pre_meaning_of_everything_post'></div>\n"
+    out2 = "<mytag flag>Empty attribute</mytag>\n<mytag flag='abc${foo}'>No ident capture</mytag>\n<div id='pre__post'></div>\n"
 
 
 ------------------------------------------------------------------------------
 bindAttrTest :: H.Assertion
 bindAttrTest = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     let ts = either (error "Error loading templates") id ets
     check ts "<div id=\'zzzzz\'"
 
@@ -252,7 +257,7 @@ renderTest  :: ByteString   -- ^ template name
             -> ByteString   -- ^ expected result
             -> H.Assertion
 renderTest templateName expectedResult = do
-    ets <- loadT "templates"
+    ets <- loadT "templates" [] [] []
     let ts = either (error "Error loading templates") id ets
 
     check ts expectedResult
@@ -359,10 +364,15 @@ isLeft (Right _) = False
 
 
 ------------------------------------------------------------------------------
-loadT :: String -> IO (Either String (HeistState IO IO))
-loadT s = do
-    ets <- loadTemplates s
-    either (return . Left) (liftM Right . initHeist [] [] []) ets
+--loadT :: String -> IO (Either String (HeistState IO IO))
+loadT :: FilePath
+      -> [(Text, Splice IO)]
+      -> [(Text, Splice IO)]
+      -> [(Text, C.Splice IO)]
+      -> IO (Either String (HeistState IO IO))
+loadT baseDir r s d = do
+    ets <- loadTemplates baseDir
+    either (return . Left) (liftM Right . initHeist r s d) ets
 
 
 ------------------------------------------------------------------------------
@@ -609,7 +619,7 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 ------------------------------------------------------------------------------
 calcResult :: Apply -> IO [X.Node]
 calcResult apply@(Apply name _ callee _ _) = do
-    hs <- initHeist [] [] [] Map.empty
+    hs <- initHeist defaultStaticSplices [] [] Map.empty
     let hs' = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
                            (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
                                          Nothing)) hs

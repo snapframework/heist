@@ -11,6 +11,7 @@ import qualified Data.Foldable as F
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                       (Text)
 import           System.Directory.Tree
@@ -27,8 +28,8 @@ import           Heist.Types
 -- | The default set of static splices.  All the splices that used to be
 -- enabled by default are included here.  You don't need to include them
 -- anywhere else.
-defaultStaticSplices :: MonadIO m => HashMap Text (I.Splice m)
-defaultStaticSplices = Map.fromList
+defaultStaticSplices :: MonadIO m => [(Text, (I.Splice m))]
+defaultStaticSplices =
     [ (applyTag, applyImpl)
     , (bindTag, bindImpl)
     , (ignoreTag, ignoreImpl)
@@ -74,10 +75,10 @@ initHeist rSplices sSplices dSplices rawTemplates = do
     keyGen <- HE.newKeyGen
     let empty = HeistState Map.empty Map.empty Map.empty Map.empty
                            True [] 0 return [] Nothing keyGen False
-        hs0 = empty { _spliceMap = defaultStaticSplices `mappend`
-                                   Map.fromList sSplices
+        hs0 = empty { _spliceMap = Map.fromList defaultStaticSplices
+                                  `mappend` Map.fromList sSplices
                     , _templateMap = rawTemplates
-                    , _failHardAndFast = True }
+                    , _preprocessingMode = True }
     tPairs <- evalHeistT (mapM preprocess $ Map.toList rawTemplates)
                          (X.TextNode "") hs0
     let bad = lefts tPairs
@@ -85,8 +86,10 @@ initHeist rSplices sSplices dSplices rawTemplates = do
         putStrLn "Errors in template processing:"
         mapM_ (\e -> putStrLn $ "  " ++ show e) bad
         error "exiting..."
+    let tmap = Map.fromList $ rights tPairs
+--    print $ dfDoc $ fromJust $ Map.lookup ["markdown"] tmap
     let hs1 = empty { _spliceMap = Map.fromList rSplices
-                    , _templateMap = Map.fromList $ rights tPairs
+                    , _templateMap = tmap
                     , _compiledSpliceMap = Map.fromList dSplices
                     }
     C.compileTemplates hs1
@@ -98,9 +101,10 @@ preprocess :: (TPath, DocumentFile)
            -> HeistT IO IO (Either SomeException (TPath, DocumentFile))
 preprocess (tpath, docFile) = do
     let tname = tpathName tpath
-    !emdoc <- try $ I.evalWithHooksInternal tname
-    let f doc = (tpath, docFile { dfDoc = doc })
-    return $! fmap (maybe die f) emdoc
+    !emres <- try $ I.evalTemplate tname
+    let f doc = (tpath, docFile { dfDoc = (dfDoc docFile)
+                { X.docContent = doc } })
+    return $! fmap (maybe die f) emres
   where
     die = error "Preprocess didn't succeed!  This should never happen."
 

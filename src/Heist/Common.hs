@@ -63,7 +63,10 @@ attParser = liftM ($! []) (loop id)
 
         go !subDL = (gobbleText >>= go . append subDL)
                     <|> (AP.endOfInput *> finish subDL)
-                    <|> (escChar >>= go . append subDL)
+                    <|> (do
+                            res <- escSequence
+                            dl' <- finish subDL
+                            loop $! append dl' res)
                     <|> (do
                             idp <- identParser
                             dl' <- finish subDL
@@ -71,7 +74,7 @@ attParser = liftM ($! []) (loop id)
 
     gobbleText = AP.takeWhile1 (AP.notInClass "\\$")
 
-    escChar = AP.char '\\' *> (T.singleton <$> AP.anyChar)
+    escSequence = AP.char '\\' *> (Escaped <$> AP.anyChar)
 
     identParser = AP.char '$' *> (ident <|> return (Literal "$"))
     ident = (AP.char '{' *> (Ident <$> AP.takeWhile (/='}')) <* AP.string "}")
@@ -186,7 +189,7 @@ getContext = getsTS _curContext
 orError :: Monad m => HeistT n m b -> String -> HeistT n m b
 orError silent msg = do
     hs <- getTS
-    if _failHardAndFast hs
+    if _preprocessingMode hs
       then error $ (fromMaybe "" $ _curTemplateFile hs) ++
                    ": " ++ msg
       else silent

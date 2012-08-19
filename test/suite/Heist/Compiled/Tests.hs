@@ -43,11 +43,15 @@ tests = [ testCase     "compiled/simple"  simpleCompiledTest
 
 simpleCompiledTest = do
     res <- runWithStateSplice "templates"
-    H.assertBool "compiled state splice" $ res ==
-      "<bind tag=\"att\">ultralongname</bind>&#10;<html>&#10;3&#10;</html>&#10;"
+    H.assertEqual "compiled state splice" expected res
+  where
+    expected =
+      "&#10;<html>&#10;3&#10;</html>&#10;"
 
 peopleTest = do
     res <- personListTest "templates"
-    H.assertBool "people splice" $ res ==
+    H.assertEqual "people splice" expected res
+  where
+    expected =
       "&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
 

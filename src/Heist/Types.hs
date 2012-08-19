@@ -147,7 +147,7 @@ data HeistState n m = HeistState {
     -- | A key generator used to produce new unique Promises.
     , _keygen           :: HE.KeyGen
 
-    , _failHardAndFast  :: Bool
+    , _preprocessingMode :: Bool
 }
 
 
@@ -452,6 +452,7 @@ modRecursionDepth f =
 -- attoparsec doesn't support parsers running in another monad.
 data AttAST = Literal Text
             | Ident   Text
+            | Escaped Char
   deriving (Show)
 
 

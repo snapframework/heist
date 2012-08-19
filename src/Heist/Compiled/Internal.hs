@@ -294,6 +294,7 @@ parseAtt (k,v) = do
                        , value, DL.singleton $ pureText "\"" ]
   where
     cvt (Literal x) = yieldText x
+    cvt (Escaped c) = yieldText $ T.singleton c
     cvt (Ident x) =
         localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
 
