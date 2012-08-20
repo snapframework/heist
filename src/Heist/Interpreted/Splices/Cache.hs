@@ -11,12 +11,14 @@
 module Heist.Interpreted.Splices.Cache
   ( CacheTagState
   , cacheImpl
+  , cacheImplCompiled 
   , mkCacheTag
   , clearCacheTagState
   , initHeistWithCacheTag 
   ) where
 
 ------------------------------------------------------------------------------
+import           Blaze.ByteString.Builder
 import           Control.Concurrent
 import           Control.Error
 import           Control.Monad
@@ -25,6 +27,7 @@ import           Data.IORef
 import qualified Data.HashMap.Strict as H
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as Set
+import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Read
@@ -47,7 +50,8 @@ cacheTagName = "cache"
 
 ------------------------------------------------------------------------------
 -- | State for storing cache tag information
-newtype CacheTagState = CTS (MVar (HashMap Text (UTCTime, Template)))
+newtype CacheTagState =
+    CTS (MVar (HashMap Text (UTCTime, Template, Builder)))
 
 
 ------------------------------------------------------------------------------
@@ -76,9 +80,7 @@ parseTTL s = value * multiplier
 -- | This is the splice that actually does the work.  You should bind it to
 -- the same tag name as you bound the splice returned by mkCacheTag otherwise
 -- it won't work and you'll get runtime errors.
-cacheImpl :: (MonadIO n)
-          => CacheTagState
-          -> Splice n
+cacheImpl :: (MonadIO n) => CacheTagState -> Splice n
 cacheImpl (CTS mv) = do
     tree <- getParamNode
     let err = error $ unwords ["cacheImpl is bound to a tag"
@@ -89,24 +91,55 @@ cacheImpl (CTS mv) = do
     mp <- liftIO $ readMVar mv
 
     (mp',ns) <- do
-                   cur <- liftIO getCurrentTime
-                   let mbn = H.lookup i mp
-                       reload = do
-                           nodes' <- runNodeList $ childNodes tree
-                           return $! (H.insert i (cur,nodes') mp, nodes')
-                   case mbn of
-                       Nothing -> reload
-                       (Just (lastUpdate,n)) -> do
-                           if ttl > 0 && tagName tree == Just cacheTagName &&
-                              diffUTCTime cur lastUpdate > fromIntegral ttl
-                             then reload
-                             else do
-                                 stopRecursion
-                                 return $! (mp,n)
+        cur <- liftIO getCurrentTime
+        let mbn = H.lookup i mp
+            reload builder = do
+                nodes' <- runNodeList $ childNodes tree
+                return $! ( H.insert i (cur,nodes',builder) mp
+                          , nodes')
+        case mbn of
+            Nothing -> reload mempty
+            (Just (lastUpdate,n,builder)) -> do
+                if ttl > 0 && tagName tree == Just cacheTagName &&
+                   diffUTCTime cur lastUpdate > fromIntegral ttl
+                  then reload builder
+                  else do
+                      stopRecursion
+                      return $! (mp,n)
 
     liftIO $ modifyMVar_ mv (const $ return mp')
 
     return ns
+
+
+------------------------------------------------------------------------------
+-- | This is the compiled splice version of cacheImpl.
+cacheImplCompiled :: (MonadIO n) => CacheTagState -> C.Splice n
+cacheImplCompiled (CTS mv) = do
+    tree <- getParamNode
+    let err = error $ unwords ["cacheImplCompiled is bound to a tag"
+                              ,"that didn't get an id attribute."
+                              ," This should never happen."]
+    let i = maybe err id $ getAttribute "id" tree
+        ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
+
+    compiled <- C.runNodeList $ childNodes tree
+    C.yieldRuntime $ do
+        mp <- liftIO $ readMVar mv
+        cur <- liftIO getCurrentTime
+        let mbn = H.lookup i mp
+            reload nodes = do
+                out <- C.codeGen compiled
+                return $! (H.insert i (cur,nodes,out) mp, out)
+        (mp',builder) <- case mbn of
+            Nothing -> reload []
+            (Just (lastUpdate,n,builder)) -> do
+                if ttl > 0 && tagName tree == Just cacheTagName &&
+                   diffUTCTime cur lastUpdate > fromIntegral ttl
+                  then reload n
+                  else return $! (mp, builder)
+        liftIO $ modifyMVar_ mv (const $ return mp')
+        return builder
 
 
 ------------------------------------------------------------------------------
@@ -172,8 +205,10 @@ initHeistWithCacheTag :: MonadIO n
                       -> EitherT [String] IO (HeistState n, CacheTagState)
 initHeistWithCacheTag rSplices sSplices dSplices rawTemplates = do
     (ss, cts) <- liftIO mkCacheTag
-    hs <- initHeist (("cache", cacheImpl cts) : rSplices)
-                    (("cache", ss) : sSplices)
-                    dSplices rawTemplates
+    let tag = "cache"
+    hs <- initHeist ((tag, cacheImpl cts) : rSplices)
+                    ((tag, ss) : sSplices)
+                    ((tag, cacheImplCompiled cts) : dSplices)
+                    rawTemplates
     return (hs, cts)
 
