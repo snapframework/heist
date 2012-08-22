@@ -15,7 +15,9 @@ buildbot.  So first we need to get some boilerplate and imports out of the way.
 
 > {-# LANGUAGE NoMonomorphismRestriction #-}
 > module Heist.Compiled.Tutorial where
-> import Heist.Compiled.TutorialImports
+> import           Heist
+> import qualified Heist.Compiled as C
+> import           Heist.Compiled.TutorialImports
 
 As a review, Heist splices are defined like this.
 
@@ -32,14 +34,14 @@ Compiled Heist is designed so that all the DOM traversals happen once at load
 time in the IO monad.  This is the "compile" phase.  The type signature for
 compiled splices is this.
 
-< type CompiledSplice n = HeistT n IO (DList (Chunk n))
+< type Splice n = HeistT n IO (DList (Chunk n))
 
 We see that where Heist splices ran in the m monad, compiled splices run in the
 IO monad.  This also explains why HeistT now has two monad type parameters.
 The first parameter is a placeholder for the runtime monad and the second
 parameter is the monad that we're actually running in now.
 
-But the key point of the CompiledSplice type signature is the return value.
+But the key point of the compiled splice type signature is the return value.
 They return a DList of Chunks.  DList is a list that supports efficient
 insertion to both the front and back of the list.  The Chunk type defined like
 this.
@@ -60,8 +62,8 @@ computation in the RuntimeSplice monad transformer that is parameterized by
 `m` which we saw above is the runtime monad.  With that background, let's get
 to a real example.
 
-> stateSplice :: CompiledSplice (StateT Int IO)
-> stateSplice = yieldRuntimeText $ do
+> stateSplice :: C.Splice (StateT Int IO)
+> stateSplice = C.yieldRuntimeText $ do
 >     val <- lift get
 >     return $ pack $ show (val+1)
 
@@ -70,11 +72,11 @@ for a simple example that can clearly demonstrate the different contexts that
 we are operating in.  To make things more clear, here's a version with some
 print statements that clarify the details of which monad is executed when.
 
-> stateSplice2 :: CompiledSplice (StateT Int IO)
+> stateSplice2 :: C.Splice (StateT Int IO)
 > stateSplice2 = do
->     -- :: CompiledSplice (StateT Int IO)
+>     -- :: C.Splice (StateT Int IO)
 >     lift $ putStrLn "This executed at load time"
->     res <- yieldRuntimeText $ do
+>     res <- C.yieldRuntimeText $ do
 >         -- :: RuntimeSplice (StateT Int IO) a
 >         lift $ lift $ putStrLn "This executed at run/render time"
 >         val <- lift get
@@ -82,14 +84,14 @@ print statements that clarify the details of which monad is executed when.
 >     lift $ putStrLn "This also executed at load time"
 >     return res
 
-Note here that even though the type parameter to CompiledSplice is a monad,
-CompiledSplice is not a monad transformer.  RuntimeSplice, however, is.  Now
-let's look at a simple load function that sets up a default HeistState and
-loads templates from a directory with compiled splices.
+Note here that even though the type parameter to C.Splice is a monad, it is not
+a monad transformer.  RuntimeSplice, however, is.  Now let's look at a simple
+load function that sets up a default HeistState and loads templates from a
+directory with compiled splices.
 
 > load :: MonadIO n
 >      => FilePath
->      -> [(Text, CompiledSplice n)]
+>      -> [(Text, C.Splice n)]
 >      -> IO (HeistState n)
 > load baseDir splices = do
 >     tmap <- runEitherT $ initHeist [] [] splices =<< loadTemplates baseDir
@@ -101,7 +103,7 @@ Here's a function demonstrating all of this in action.
 >                    -> IO ByteString
 > runWithStateSplice baseDir = do
 >     hs <- load baseDir [ ("div", stateSplice) ]
->     let runtime = fromJust $ lookupCompiledTemplate "index" hs
+>     let runtime = fromJust $ C.lookupCompiledTemplate "index" hs
 >     builder <- evalStateT runtime 2
 >     return $ toByteString builder
 
@@ -123,9 +125,9 @@ structure with a compiled splice.
 >     }
 > 
 > personSplice :: (Monad n)
->              => Promise Person
+>              => C.Promise Person
 >              -> HeistT n IO (RuntimeSplice n Builder)
-> personSplice = promiseChildrenWithText
+> personSplice = C.promiseChildrenWithText
 >     [ ("firstName", pFirstName)
 >     , ("lastName", pLastName)
 >     , ("age", pack . show . pAge)
@@ -133,17 +135,17 @@ structure with a compiled splice.
 > 
 > peopleSplice :: (Monad n)
 >              => n [Person]
->              -> CompiledSplice n
-> peopleSplice getPeople = mapPromises personSplice getPeople
+>              -> C.Splice n
+> peopleSplice getPeople = C.mapPromises personSplice getPeople
 > 
-> allPeopleSplice :: CompiledSplice (StateT [Person] IO)
+> allPeopleSplice :: C.Splice (StateT [Person] IO)
 > allPeopleSplice = peopleSplice get
 > 
 > personListTest :: FilePath
 >                -> IO ByteString
 > personListTest baseDir = do
 >     hs <- load baseDir [ ("people", allPeopleSplice) ]
->     let runtime = fromJust $ lookupCompiledTemplate "people" hs
+>     let runtime = fromJust $ C.lookupCompiledTemplate "people" hs
 >     builder <- evalStateT runtime
 >                  [ Person "John" "Doe" 42
 >                  , Person "Jane" "Smith" 21

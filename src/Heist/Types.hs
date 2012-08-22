@@ -8,11 +8,7 @@
 
 {-|
 
-This module contains the core Heist data types.  HeistT intentionally
-does not expose any of its functionality via MonadState or MonadReader
-functions.  We define passthrough instances for the most common types of
-monads.  These instances allow the user to use HeistT in a monad stack
-without needing calls to `lift`.
+This module contains the core Heist data types.  
 
 Edward Kmett wrote most of the HeistT code and associated instances,
 liberating us from the unused writer portion of RWST.
@@ -50,9 +46,10 @@ tr :: Show a => String -> a -> a
 tr s x = trace (s++show x) x
 
 ------------------------------------------------------------------------------
--- | A 'Template' is a forest of XML nodes.  Here we deviate from the "single
--- root node" constraint of well-formed XML because we want to allow templates
--- to contain fragments of a document that may not have a single root.
+-- | A 'Template' is a forest of XML nodes.  Here we deviate from the \"single
+-- root node\" constraint of well-formed XML because we want to allow
+-- templates to contain fragments of a document that may not have a single
+-- root.
 type Template = [X.Node]
 
 
@@ -74,6 +71,7 @@ data DocumentFile = DocumentFile
 
 
 ------------------------------------------------------------------------------
+-- | Monad used for runtime splice execution.
 newtype RuntimeSplice m a = RuntimeSplice {
       unRT :: StateT HeterogeneousEnvironment m a
     } deriving ( Applicative
@@ -95,6 +93,7 @@ instance (Monad m, Monoid a) => Monoid (RuntimeSplice m a) where
 
 
 ------------------------------------------------------------------------------
+-- | Opaque type representing pieces of output from compiled splices.
 data Chunk m = Pure !Builder
                -- ^ output known at load time
              | RuntimeHtml !(RuntimeSplice m Builder)
@@ -104,48 +103,49 @@ data Chunk m = Pure !Builder
 
 
 ------------------------------------------------------------------------------
-instance Show (Chunk m) where
-    show (Pure a)          = T.unpack $ T.concat
-        ["Pure \"", decodeUtf8 $ toByteString a, "\""]
-    show (RuntimeHtml _)   = "RuntimeHtml <m>"
-    show (RuntimeAction _) = "RuntimeAction <m>"
+--instance Show (Chunk m) where
+--    show (Pure a)          = T.unpack $ T.concat
+--        ["Pure \"", decodeUtf8 $ toByteString a, "\""]
+--    show (RuntimeHtml _)   = "RuntimeHtml <m>"
+--    show (RuntimeAction _) = "RuntimeAction <m>"
 
-
-type CompiledSplice m = HeistT m IO (DList (Chunk m))
 
 ------------------------------------------------------------------------------
 -- | Holds all the state information needed for template processing.  You will
--- build a @HeistState@ using any of Heist's @HeistState -> HeistState@
--- \"filter\" functions.  Then you use the resulting @HeistState@ in calls to
--- @renderTemplate@.
+-- build a @HeistState@ using 'initHeist' and any of Heist's @HeistState ->
+-- HeistState@ \"filter\" functions.  Then you use the resulting @HeistState@
+-- in calls to 'renderTemplate'.
 --
 -- m is the runtime monad
 data HeistState m = HeistState {
     -- | A mapping of splice names to splice actions
-      _spliceMap        :: HashMap Text (HeistT m m Template)
+      _spliceMap           :: HashMap Text (HeistT m m Template)
     -- | A mapping of template names to templates
-    , _templateMap      :: HashMap TPath DocumentFile
+    , _templateMap         :: HashMap TPath DocumentFile
 
     -- | A mapping of splice names to splice actions
-    , _compiledSpliceMap   :: HashMap Text (CompiledSplice m)
+    , _compiledSpliceMap   :: HashMap Text (HeistT m IO (DList (Chunk m)))
     -- | A mapping of template names to templates
     , _compiledTemplateMap :: HashMap TPath (m Builder)
 
     -- | A flag to control splice recursion
-    , _recurse          :: Bool
+    , _recurse             :: Bool
     -- | The path to the template currently being processed.
-    , _curContext       :: TPath
+    , _curContext          :: TPath
     -- | A counter keeping track of the current recursion depth to prevent
     -- infinite loops.
-    , _recursionDepth   :: Int
+    , _recursionDepth      :: Int
     -- | The doctypes encountered during template processing.
-    , _doctypes         :: [X.DocType]
+    , _doctypes            :: [X.DocType]
     -- | The full path to the current template's file on disk.
-    , _curTemplateFile  :: Maybe FilePath
+    , _curTemplateFile     :: Maybe FilePath
     -- | A key generator used to produce new unique Promises.
-    , _keygen           :: HE.KeyGen
+    , _keygen              :: HE.KeyGen
 
-    , _preprocessingMode :: Bool
+    -- | Flag indicating whether we're in preprocessing mode.  During
+    -- preprocessing, errors should stop execution and be reported.  During
+    -- template rendering, it's better to skip the errors and render the page.
+    , _preprocessingMode   :: Bool
 }
 
 
@@ -159,11 +159,14 @@ instance (Typeable1 m) => Typeable (HeistState m) where
 
 
 ------------------------------------------------------------------------------
--- | HeistT is the monad transformer used for 'Splice' processing.  HeistT
--- provides \"passthrough\" instances for many of the monads you might use in
--- the inner monad.
+-- | HeistT is the monad transformer used for splice processing.  HeistT
+-- intentionally does not expose any of its functionality via MonadState or
+-- MonadReader functions.  We define passthrough instances for the most common
+-- types of monads.  These instances allow the user to use HeistT in a monad
+-- stack without needing calls to `lift`.
 --
 -- n is the runtime monad (the first parameter passed to HeistState)
+--
 -- m is the monad being run now
 newtype HeistT n m a = HeistT {
     runHeistT :: X.Node

@@ -1,6 +1,38 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Heist where
+{-|
+
+This module defines the core data types used by Heist.  In practice you will
+also want to import one or both of 'Heist.Compiled' or 'Heist.Interpreted' to
+get functions needed for writing splices.
+
+-}
+
+module Heist
+  ( Template
+  , TPath
+  , defaultStaticSplices
+  , loadTemplates
+  , initHeist
+  , MIMEType
+  , DocumentFile(..)
+  , RuntimeSplice
+  , Chunk
+  , HeistState
+  , templateNames
+  , compiledTemplateNames
+  , spliceNames
+  , HeistT
+  , evalHeistT
+  , getParamNode
+  , localParamNode
+  , getsTS
+  , getTS
+  , putTS
+  , modifyTS
+  , restoreTS
+  , localTS
+  ) where
 
 import           Control.Error
 import           Control.Exception (SomeException)
@@ -23,7 +55,7 @@ import           Heist.Types
 
 
 ------------------------------------------------------------------------------
--- | The default set of static splices.  All the splices that used to be
+-- | The built-in set of static splices.  All the splices that used to be
 -- enabled by default are included here.  You don't need to include them
 -- anywhere else.
 defaultStaticSplices :: MonadIO m => [(Text, (I.Splice m))]
@@ -54,12 +86,13 @@ loadTemplates dir = do
 -- templates and all of your splices and it constructs and returns a
 -- HeistState.
 --
--- We don't provide functions to bind compiled splices because it doesn't make
--- any sense unless you re-compile all templates with the new splices.  If you
--- add any old-style runtime heist splices after calling this function, they
--- will still work fine.  If you add any templates later, then those templates
--- will be available for interpreted rendering, but not for compiled
--- rendering.
+-- We don't provide functions to add either type of loadtime splices to your
+-- HeistState after initHeist because it doesn't make any sense unless you
+-- re-initialize all templates with the new splices.  If you add any old-style
+-- runtime heist splices after calling this function, they will still work
+-- fine if you use Heist.Interpreted.renderTemplate.  If you add any templates
+-- later, then those templates will be available for interpreted rendering,
+-- but not for compiled rendering.
 --
 -- In the past you could add templates to your HeistState after initialization
 -- using its Monoid instance.  Due to implementation details, this is no
