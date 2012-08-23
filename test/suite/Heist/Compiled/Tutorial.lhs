@@ -103,7 +103,7 @@ Here's a function demonstrating all of this in action.
 >                    -> IO ByteString
 > runWithStateSplice baseDir = do
 >     hs <- load baseDir [ ("div", stateSplice) ]
->     let runtime = fromJust $ C.lookupCompiledTemplate "index" hs
+>     let runtime = fromJust $ C.renderCompiledTemplate "index" hs
 >     builder <- evalStateT runtime 2
 >     return $ toByteString builder
 
@@ -145,7 +145,7 @@ structure with a compiled splice.
 >                -> IO ByteString
 > personListTest baseDir = do
 >     hs <- load baseDir [ ("people", allPeopleSplice) ]
->     let runtime = fromJust $ C.lookupCompiledTemplate "people" hs
+>     let runtime = fromJust $ C.renderCompiledTemplate "people" hs
 >     builder <- evalStateT runtime
 >                  [ Person "John" "Doe" 42
 >                  , Person "Jane" "Smith" 21

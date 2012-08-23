@@ -14,13 +14,11 @@ module Heist.Interpreted.Splices.Cache
   , cacheImplCompiled 
   , mkCacheTag
   , clearCacheTagState
-  , initHeistWithCacheTag 
   ) where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Concurrent
-import           Control.Error
 import           Control.Monad
 import           Control.Monad.Trans
 import           Data.IORef
@@ -40,7 +38,6 @@ import           Text.XmlHtml hiding (Node)
 import qualified Heist.Compiled.Internal as C
 import           Heist.Interpreted.Internal
 import           Heist.Types
-import           Heist
 
 
 ------------------------------------------------------------------------------
@@ -187,28 +184,4 @@ setupSplice setref = do
     node <- getParamNode
     return $ [setAttribute "id" i node]
 
-
-------------------------------------------------------------------------------
--- | This function is the easiest way to set up your HeistState with a cache
--- tag.  It sets up all the necessary splices properly.  If you need to do
--- configure the cache tag differently than how this function does it, you
--- will still probably want to pattern your approach after this function's
--- implementation.
-initHeistWithCacheTag :: MonadIO n
-                      => [(Text, Splice n)]
-                      -- ^ Runtime splices
-                      -> [(Text, Splice IO)]
-                      -- ^ Static loadtime splices
-                      -> [(Text, C.Splice n)]
-                      -- ^ Dynamic loadtime splices
-                      -> HashMap TPath DocumentFile
-                      -> EitherT [String] IO (HeistState n, CacheTagState)
-initHeistWithCacheTag rSplices sSplices dSplices rawTemplates = do
-    (ss, cts) <- liftIO mkCacheTag
-    let tag = "cache"
-    hs <- initHeist ((tag, cacheImpl cts) : rSplices)
-                    ((tag, ss) : sSplices)
-                    ((tag, cacheImplCompiled cts) : dSplices)
-                    rawTemplates
-    return (hs, cts)
 

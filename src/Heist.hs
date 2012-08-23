@@ -14,6 +14,7 @@ module Heist
   , defaultStaticSplices
   , loadTemplates
   , initHeist
+  , initHeistWithCacheTag
   , MIMEType
   , DocumentFile(..)
   , RuntimeSplice
@@ -21,10 +22,13 @@ module Heist
   , HeistState
   , templateNames
   , compiledTemplateNames
+  , hasTemplate
   , spliceNames
   , HeistT
   , evalHeistT
   , getParamNode
+  , getContext
+  , getTemplateFilePath
   , localParamNode
   , getsTS
   , getTS
@@ -32,6 +36,8 @@ module Heist
   , modifyTS
   , restoreTS
   , localTS
+  , getDoc
+  , getXMLDoc
   ) where
 
 import           Control.Error
@@ -143,4 +149,28 @@ preprocess (tpath, docFile) = do
   where
     die = error "Preprocess didn't succeed!  This should never happen."
 
+
+------------------------------------------------------------------------------
+-- | This function is the easiest way to set up your HeistState with a cache
+-- tag.  It sets up all the necessary splices properly.  If you need to do
+-- configure the cache tag differently than how this function does it, you
+-- will still probably want to pattern your approach after this function's
+-- implementation.
+initHeistWithCacheTag :: MonadIO n
+                      => [(Text, I.Splice n)]
+                      -- ^ Runtime splices
+                      -> [(Text, I.Splice IO)]
+                      -- ^ Static loadtime splices
+                      -> [(Text, C.Splice n)]
+                      -- ^ Dynamic loadtime splices
+                      -> HashMap TPath DocumentFile
+                      -> EitherT [String] IO (HeistState n, CacheTagState)
+initHeistWithCacheTag rSplices sSplices dSplices rawTemplates = do
+    (ss, cts) <- liftIO mkCacheTag
+    let tag = "cache"
+    hs <- initHeist ((tag, cacheImpl cts) : rSplices)
+                    ((tag, ss) : sSplices)
+                    ((tag, cacheImplCompiled cts) : dSplices)
+                    rawTemplates
+    return (hs, cts)
 

@@ -45,8 +45,8 @@ addDoctype dt = do
 
 ------------------------------------------------------------------------------
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
-bindSplice :: Text              -- ^ tag name
-           -> Splice n          -- ^ splice action
+bindSplice :: Text            -- ^ tag name
+           -> Splice n        -- ^ splice action
            -> HeistState n    -- ^ source state
            -> HeistState n
 bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}

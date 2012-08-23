@@ -34,8 +34,6 @@ import           Data.HeterogeneousEnvironment   (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment as HE
 import           Data.Monoid
 import           Data.Text (Text)
-import qualified Data.Text                       as T
-import           Data.Text.Encoding
 import           Data.Typeable
 import           Prelude hiding (catch)
 import qualified Text.XmlHtml as X
@@ -165,9 +163,13 @@ instance (Typeable1 m) => Typeable (HeistState m) where
 -- types of monads.  These instances allow the user to use HeistT in a monad
 -- stack without needing calls to `lift`.
 --
--- n is the runtime monad (the first parameter passed to HeistState)
+-- @n@ is the runtime monad (the parameter to HeistState).
 --
--- m is the monad being run now
+-- @m@ is the monad being run now.  In this case, \"now\" is a variable
+-- concept.  The type @HeistT n n@ means that \"now\" is runtime.  The type
+-- @HeistT n IO@ means that \"now\" is @IO@, and more importantly it is NOT
+-- runtime. In Heist, the rule of thumb is that @IO@ means load time and @n@
+-- means runtime.
 newtype HeistT n m a = HeistT {
     runHeistT :: X.Node
               -> HeistState n
