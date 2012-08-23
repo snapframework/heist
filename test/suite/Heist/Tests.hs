@@ -6,7 +6,6 @@ module Heist.Tests
   , testTemplate
   , testTemplateEval
   , quickRender
-  , isLeft
   ) where
 
 
@@ -102,10 +101,5 @@ loadErrorsTest = do
         ,"templates-bad/bind-missing-attr.tpl: must supply \"tag\" attribute in <bind>"
         ,"templates-bad/apply-template-not-found.tpl: apply tag cannot find template \"/page\""
         ]
-
-
-isLeft :: Either a b -> Bool
-isLeft (Left _) = True
-isLeft (Right _) = False
 
 

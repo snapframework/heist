@@ -172,6 +172,10 @@ renderNoNameTest = do
            ) ets
 
 
+doctype = B.concat
+    [ "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" "
+    , "'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>" ]
+
 ------------------------------------------------------------------------------
 doctypeTest :: H.Assertion
 doctypeTest = do
@@ -184,8 +188,14 @@ doctypeTest = do
   where
     fromRight (Right x) = x
     fromRight (Left  s) = error s
-    indexRes = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n&#10;<html>\n<div id='pre_{att}_post'>\n/index\n</div>\n</html>\n"
-    iocRes = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n<wrapper>\n\nInversion of control content\n\n</wrapper>\n\n"
+    indexRes = B.concat
+        [doctype
+        ,"\n&#10;<html>\n<div id='pre_{att}_post'>\n/index\n</div>\n</html>\n"
+        ]
+    iocRes = B.concat
+        [doctype
+        ,"\n<wrapper>\n\nInversion of control content\n\n</wrapper>\n\n"
+        ]
 
 ------------------------------------------------------------------------------
 attrSubstTest :: H.Assertion
@@ -225,8 +235,10 @@ bindAttrTest = do
 
 ------------------------------------------------------------------------------
 markdownHtmlExpected :: ByteString
-markdownHtmlExpected = "<div class=\'markdown\'><p>This <em>is</em> a test.</p></div>"
-
+markdownHtmlExpected = B.concat
+    [ doctype
+    , "<div class='markdown'><p>This <em>is</em> a test.</p></div>"
+    ]
 
 ------------------------------------------------------------------------------
 -- | Markdown test on a file
@@ -241,9 +253,12 @@ jsonValueTest = do
     renderTest "json_snippet" jsonExpected2
 
   where
-    jsonExpected1 = B.concat [ "<i>&lt;b&gt;ok&lt;/b&gt;</i><i>1</i>"
+    jsonExpected1 = B.concat [ doctype
+                             , "<i>&lt;b&gt;ok&lt;/b&gt;</i><i>1</i>"
                              , "<i></i><i>false</i><i>foo</i>" ]
-    jsonExpected2 = "<i><b>ok</b></i><i>1</i><i></i><i>false</i><i>foo</i>"
+    jsonExpected2 = B.concat
+        [doctype, "<i><b>ok</b></i><i>1</i><i></i><i>false</i><i>foo</i>"]
+
 
 
 ------------------------------------------------------------------------------
@@ -251,7 +266,9 @@ jsonObjectTest :: H.Assertion
 jsonObjectTest = do
     renderTest "json_object" jsonExpected
   where
-    jsonExpected = B.concat [ "<i>1</i><i><b>ok</b></i>12quuxquux1<b>ok</b>" ]
+    jsonExpected = B.concat
+        [ doctype
+        , "<i>1</i><i><b>ok</b></i>12quuxquux1<b>ok</b>" ]
 
 
 ------------------------------------------------------------------------------
@@ -289,19 +306,34 @@ renderTest templateName expectedResult = do
 ------------------------------------------------------------------------------
 -- | Expansion of a bound name inside a title-tag
 titleExpansion :: H.Assertion
-titleExpansion = renderTest "title_expansion" "<title>foo</title>"
+titleExpansion = renderTest "title_expansion" expected
+  where
+    expected = B.concat
+        [ doctype
+        , "<title>foo</title>"
+        ]
 
 
 ------------------------------------------------------------------------------
 -- | Expansion of a bound name inside a textarea-tag
 textareaExpansion :: H.Assertion
-textareaExpansion = renderTest "textarea_expansion" "<textarea>foo</textarea>"
+textareaExpansion = renderTest "textarea_expansion" expected
+  where
+    expected = B.concat
+        [ doctype
+        , "<textarea>foo</textarea>"
+        ]
 
 
 ------------------------------------------------------------------------------
 -- | Expansion of a bound name inside a div-tag
 divExpansion :: H.Assertion
-divExpansion = renderTest "div_expansion" "<div>foo</div>"
+divExpansion = renderTest "div_expansion" expected
+  where
+    expected = B.concat
+        [ doctype
+        , "<div>foo</div>"
+        ]
 
 
 ------------------------------------------------------------------------------
@@ -326,7 +358,11 @@ markdownTextTest = do
                          hs
     H.assertEqual "Markdown text" markdownHtmlExpected 
       (B.filter (/= '\n') $ toByteString $
-        X.render (X.HtmlDocument X.UTF8 Nothing result))
+        X.render (X.HtmlDocument X.UTF8 (Just doctype) result))
+  where
+    doctype = X.DocType "html" (X.Public "-//W3C//DTD XHTML 1.0 Strict//EN"
+                                       "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd")
+                        X.NoInternalSubset
 
 
 ------------------------------------------------------------------------------

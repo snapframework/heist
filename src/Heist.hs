@@ -141,11 +141,10 @@ preprocess :: (TPath, DocumentFile)
            -> HeistT IO IO (Either String (TPath, DocumentFile))
 preprocess (tpath, docFile) = do
     let tname = tpathName tpath
-    !emres <- try $ I.evalTemplate tname
-              :: HeistT IO IO (Either SomeException (Maybe Template))
-    let f doc = (tpath, docFile { dfDoc = (dfDoc docFile)
-                { X.docContent = doc } })
-    return $! either (Left . show) (Right . maybe die f) emres
+    !emdoc <- try $ I.evalWithDoctypes tname
+              :: HeistT IO IO (Either SomeException (Maybe X.Document))
+    let f doc = (tpath, docFile { dfDoc = doc })
+    return $! either (Left . show) (Right . maybe die f) emdoc
   where
     die = error "Preprocess didn't succeed!  This should never happen."
 
