@@ -23,7 +23,7 @@ import           Data.Text (Text)
 import           Heist
 import qualified Heist.Compiled.Internal as C
 import qualified Heist.Interpreted.Internal as I
-import           Heist.Interpreted.Splices.Cache
+import           Heist.Splices.Cache
 
 
 ------------------------------------------------------------------------------

@@ -57,7 +57,7 @@ import qualified Text.XmlHtml                    as X
 import           Heist.Common
 import qualified Heist.Compiled.Internal as C
 import qualified Heist.Interpreted.Internal as I
-import           Heist.Interpreted.Splices
+import           Heist.Splices
 import           Heist.Types
 
 

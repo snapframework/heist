@@ -1,4 +1,4 @@
-module Heist.Interpreted.Splices.Html where
+module Heist.Splices.Html where
 
 ------------------------------------------------------------------------------
 import           Data.Maybe

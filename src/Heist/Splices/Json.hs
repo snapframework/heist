@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Heist.Interpreted.Splices.Json (
+module Heist.Splices.Json (
   bindJson
 ) where
 

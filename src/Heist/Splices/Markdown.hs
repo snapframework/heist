@@ -10,7 +10,7 @@ and converted to HTML.
 
 This splice requires that the \"pandoc\" executable is in your path.
 -}
-module Heist.Interpreted.Splices.Markdown where
+module Heist.Splices.Markdown where
 
 ------------------------------------------------------------------------------
 import           Data.ByteString (ByteString)

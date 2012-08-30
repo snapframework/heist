@@ -8,7 +8,7 @@
 -- of seconds, minutes, hours, days, and weeks.  If the ttl string is invalid
 -- or the ttl attribute is not specified, the cache is never refreshed unless
 -- explicitly cleared with clearCacheTagState.
-module Heist.Interpreted.Splices.Cache
+module Heist.Splices.Cache
   ( CacheTagState
   , cacheImpl
   , cacheImplCompiled 

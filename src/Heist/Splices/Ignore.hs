@@ -1,4 +1,4 @@
-module Heist.Interpreted.Splices.Ignore where
+module Heist.Splices.Ignore where
 
 ------------------------------------------------------------------------------
 import           Data.Text (Text)

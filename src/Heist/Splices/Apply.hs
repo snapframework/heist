@@ -1,4 +1,4 @@
-module Heist.Interpreted.Splices.Apply where
+module Heist.Splices.Apply where
 
 ------------------------------------------------------------------------------
 import           Data.Maybe

@@ -1,4 +1,4 @@
-module Heist.Interpreted.Splices.Bind where
+module Heist.Splices.Bind where
 
 ------------------------------------------------------------------------------
 import           Data.Text (Text)
@@ -8,7 +8,7 @@ import qualified Text.XmlHtml as X
 ------------------------------------------------------------------------------
 import           Heist.Common
 import           Heist.Interpreted.Internal
-import           Heist.Interpreted.Splices.Apply
+import           Heist.Splices.Apply
 import           Heist.Types
 
 -- | Default name for the bind splice.

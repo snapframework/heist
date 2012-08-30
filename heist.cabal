@@ -5,6 +5,8 @@ description:
     Heist is a powerful template system that supports both HTML5 and XML.
     Some of Heist's features are:
     .
+    * Designer-friendly HTML5 (or XML) syntax
+    .
     * Enforces near-perfect separation of business logic and view
     .
     * Powerful abstraction primitives allowing you to eliminate repetition
@@ -109,15 +111,15 @@ Library
     Heist,
     Heist.Compiled,
     Heist.Interpreted,
-    Heist.Interpreted.Splices,
-    Heist.Interpreted.Splices.Apply,
-    Heist.Interpreted.Splices.Bind,
-    Heist.Interpreted.Splices.BindStrict,
-    Heist.Interpreted.Splices.Cache,
-    Heist.Interpreted.Splices.Html,
-    Heist.Interpreted.Splices.Ignore,
-    Heist.Interpreted.Splices.Json,
-    Heist.Interpreted.Splices.Markdown,
+    Heist.Splices,
+    Heist.Splices.Apply,
+    Heist.Splices.Bind,
+    Heist.Splices.BindStrict,
+    Heist.Splices.Cache,
+    Heist.Splices.Html,
+    Heist.Splices.Ignore,
+    Heist.Splices.Json,
+    Heist.Splices.Markdown,
     Heist.TemplateDirectory
 
   other-modules:

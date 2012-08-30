@@ -2,18 +2,12 @@ module Heist.Compiled.Tests
   ( tests
   ) where
 
-import           Blaze.ByteString.Builder
-import           Control.Monad.State
-import           Data.Maybe
-import           Data.Text (Text)
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
 import qualified Test.HUnit as H
 
 
 ------------------------------------------------------------------------------
-import           Heist.Compiled
-import           Heist.TestCommon
 import           Heist.Compiled.Tutorial
 
 -- NOTE: We can't test compiled templates on the templates directory as it

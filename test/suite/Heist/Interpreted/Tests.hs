@@ -36,10 +36,10 @@ import           Test.QuickCheck.Monadic
 import           Heist
 import           Heist.Common
 import           Heist.Interpreted.Internal
-import           Heist.Interpreted.Splices.Apply
-import           Heist.Interpreted.Splices.Ignore
-import           Heist.Interpreted.Splices.Json
-import           Heist.Interpreted.Splices.Markdown
+import           Heist.Splices.Apply
+import           Heist.Splices.Ignore
+import           Heist.Splices.Json
+import           Heist.Splices.Markdown
 import           Heist.TestCommon
 import           Heist.Types
 import qualified Text.XmlHtml        as X
