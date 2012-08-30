@@ -63,7 +63,7 @@ computation in the RuntimeSplice monad transformer that is parameterized by
 to a real example.
 
 > stateSplice :: C.Splice (StateT Int IO)
-> stateSplice = C.yieldRuntimeText $ do
+> stateSplice = return $ C.yieldRuntimeText $ do
 >     val <- lift get
 >     return $ pack $ show (val+1)
 
@@ -76,7 +76,7 @@ print statements that clarify the details of which monad is executed when.
 > stateSplice2 = do
 >     -- :: C.Splice (StateT Int IO)
 >     lift $ putStrLn "This executed at load time"
->     res <- C.yieldRuntimeText $ do
+>     let res = C.yieldRuntimeText $ do
 >         -- :: RuntimeSplice (StateT Int IO) a
 >         lift $ lift $ putStrLn "This executed at run/render time"
 >         val <- lift get
@@ -94,7 +94,7 @@ directory with compiled splices.
 >      -> [(Text, C.Splice n)]
 >      -> IO (HeistState n)
 > load baseDir splices = do
->     tmap <- runEitherT $ initHeist [] [] splices =<< loadTemplates baseDir
+>     tmap <- runEitherT $ initHeist [] [] splices [] =<< loadTemplates baseDir
 >     either (error . concat) return tmap
 
 Here's a function demonstrating all of this in action.
@@ -104,7 +104,7 @@ Here's a function demonstrating all of this in action.
 > runWithStateSplice baseDir = do
 >     hs <- load baseDir [ ("div", stateSplice) ]
 >     let runtime = fromJust $ C.renderCompiledTemplate "index" hs
->     builder <- evalStateT runtime 2
+>     builder <- evalStateT (fst runtime) 2
 >     return $ toByteString builder
 
 First this function loads the templates with the above compiled splice.  You
@@ -146,7 +146,7 @@ structure with a compiled splice.
 > personListTest baseDir = do
 >     hs <- load baseDir [ ("people", allPeopleSplice) ]
 >     let runtime = fromJust $ C.renderCompiledTemplate "people" hs
->     builder <- evalStateT runtime
+>     builder <- evalStateT (fst runtime)
 >                  [ Person "John" "Doe" 42
 >                  , Person "Jane" "Smith" 21
 >                  ]

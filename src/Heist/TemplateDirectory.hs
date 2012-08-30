@@ -34,6 +34,7 @@ data TemplateDirectory n
         [(Text, I.Splice n)]
         [(Text, I.Splice IO)]
         [(Text, C.Splice n)]
+        [(Text, AttrSplice n)]
         (MVar (HeistState n))
         CacheTagState
 
@@ -46,14 +47,15 @@ newTemplateDirectory :: MonadIO n
                      -> [(Text, I.Splice n)]
                      -> [(Text, I.Splice IO)]
                      -> [(Text, C.Splice n)]
+                     -> [(Text, AttrSplice n)]
                      -> EitherT [String] IO (TemplateDirectory n)
-newTemplateDirectory dir a b c = do
+newTemplateDirectory dir a b c d = do
     (ss, cts) <- liftIO mkCacheTag
     let a' = ("cache", cacheImpl cts) : a
         b' = ("cache", ss) : b
-    hs <- loadTemplates dir >>= initHeist a' b' c
+    hs <- loadTemplates dir >>= initHeist a' b' c d
     tsMVar <- liftIO $ newMVar hs
-    return $ TemplateDirectory dir a' b' c tsMVar cts
+    return $ TemplateDirectory dir a' b' c d tsMVar cts
 
 
 ------------------------------------------------------------------------------
@@ -64,10 +66,11 @@ newTemplateDirectory' :: MonadIO n
                       -> [(Text, I.Splice n)]
                       -> [(Text, I.Splice IO)]
                       -> [(Text, C.Splice n)]
+                      -> [(Text, AttrSplice n)]
                       -> IO (TemplateDirectory n)
-newTemplateDirectory' dir rSplices sSplices dSplices = do
+newTemplateDirectory' dir rSplices sSplices dSplices aSplices = do
     res <- runEitherT $ 
-        newTemplateDirectory dir rSplices sSplices dSplices
+        newTemplateDirectory dir rSplices sSplices dSplices aSplices
     either (error . concat) return res
 
 
@@ -76,7 +79,7 @@ newTemplateDirectory' dir rSplices sSplices dSplices = do
 getDirectoryTS :: (MonadIO n)
                => TemplateDirectory n
                -> n (HeistState n)
-getDirectoryTS (TemplateDirectory _ _ _ _ tsMVar _) =
+getDirectoryTS (TemplateDirectory _ _ _ _ _ tsMVar _) =
     liftIO $ readMVar $ tsMVar
 
 
@@ -85,8 +88,8 @@ getDirectoryTS (TemplateDirectory _ _ _ _ tsMVar _) =
 reloadTemplateDirectory :: (MonadIO n)
                         => TemplateDirectory n
                         -> n (Either String ())
-reloadTemplateDirectory (TemplateDirectory p a b c tsMVar _) = liftIO $ do
-    ehs <- runEitherT $ loadTemplates p >>= initHeist a b c
+reloadTemplateDirectory (TemplateDirectory p a b c d tsMVar _) = liftIO $ do
+    ehs <- runEitherT $ loadTemplates p >>= initHeist a b c d
     leftPass ehs $ \hs -> modifyMVar_ tsMVar (const $ return hs)
 
 

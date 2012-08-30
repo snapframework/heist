@@ -121,7 +121,7 @@ cacheImplCompiled (CTS mv) = do
         ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
 
     compiled <- C.runNodeList $ childNodes tree
-    C.yieldRuntime $ do
+    return $ C.yieldRuntime $ do
         mp <- liftIO $ readMVar mv
         cur <- liftIO getCurrentTime
         let mbn = H.lookup i mp

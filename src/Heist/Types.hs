@@ -108,6 +108,9 @@ data Chunk m = Pure !Builder
 --    show (RuntimeAction _) = "RuntimeAction <m>"
 
 
+type AttrSplice m = Text -> m [(Text, Text)]
+
+
 ------------------------------------------------------------------------------
 -- | Holds all the state information needed for template processing.  You will
 -- build a @HeistState@ using 'initHeist' and any of Heist's @HeistState ->
@@ -124,7 +127,9 @@ data HeistState m = HeistState {
     -- | A mapping of splice names to splice actions
     , _compiledSpliceMap   :: HashMap Text (HeistT m IO (DList (Chunk m)))
     -- | A mapping of template names to templates
-    , _compiledTemplateMap :: HashMap TPath (m Builder)
+    , _compiledTemplateMap :: HashMap TPath (m Builder, MIMEType)
+
+    , _attrSpliceMap       :: HashMap Text (AttrSplice m)
 
     -- | A flag to control splice recursion
     , _recurse             :: Bool

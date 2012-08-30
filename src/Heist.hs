@@ -17,6 +17,7 @@ module Heist
   , initHeistWithCacheTag
   , MIMEType
   , DocumentFile(..)
+  , AttrSplice
   , RuntimeSplice
   , Chunk
   , HeistState
@@ -111,12 +112,14 @@ initHeist :: Monad n
           -- ^ Static loadtime splices
           -> [(Text, C.Splice n)]
           -- ^ Dynamic loadtime splices
+          -> [(Text, AttrSplice n)]
+          -- ^ Attribute splices
           -> HashMap TPath DocumentFile
           -> EitherT [String] IO (HeistState n)
-initHeist rSplices sSplices dSplices rawTemplates = do
+initHeist rSplices sSplices dSplices aSplices rawTemplates = do
     keyGen <- lift HE.newKeyGen
     let empty = HeistState Map.empty Map.empty Map.empty Map.empty
-                           True [] 0 [] Nothing keyGen False
+                           Map.empty True [] 0 [] Nothing keyGen False
         hs0 = empty { _spliceMap = Map.fromList defaultStaticSplices
                                   `mappend` Map.fromList sSplices
                     , _templateMap = rawTemplates
@@ -128,6 +131,7 @@ initHeist rSplices sSplices dSplices rawTemplates = do
         hs1 = empty { _spliceMap = Map.fromList rSplices
                     , _templateMap = tmap
                     , _compiledSpliceMap = Map.fromList dSplices
+                    , _attrSpliceMap = Map.fromList aSplices
                     }
 
     if not (null bad)
@@ -162,14 +166,16 @@ initHeistWithCacheTag :: MonadIO n
                       -- ^ Static loadtime splices
                       -> [(Text, C.Splice n)]
                       -- ^ Dynamic loadtime splices
+                      -> [(Text, AttrSplice n)]
+                      -- ^ Attribute splices
                       -> HashMap TPath DocumentFile
                       -> EitherT [String] IO (HeistState n, CacheTagState)
-initHeistWithCacheTag rSplices sSplices dSplices rawTemplates = do
+initHeistWithCacheTag rSplices sSplices dSplices aSplices rawTemplates = do
     (ss, cts) <- liftIO mkCacheTag
     let tag = "cache"
     hs <- initHeist ((tag, cacheImpl cts) : rSplices)
                     ((tag, ss) : sSplices)
                     ((tag, cacheImplCompiled cts) : dSplices)
-                    rawTemplates
+                    aSplices rawTemplates
     return (hs, cts)
 

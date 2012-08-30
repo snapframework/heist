@@ -18,7 +18,6 @@ import qualified Data.DList                      as DL
 import qualified Data.HashMap.Strict             as H
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.Maybe
-import           Data.String
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
@@ -61,7 +60,7 @@ mapPromises :: Monad n
 mapPromises f getList = do
     singlePromise <- newEmptyPromise
     runSingle <- f singlePromise
-    yieldRuntime $ do
+    return $ yieldRuntime $ do
         list <- lift getList
         htmls <- forM list $ \item ->
             putPromise singlePromise item >> runSingle
@@ -86,7 +85,7 @@ promiseChildrenWith :: (Monad n)
 promiseChildrenWith splices prom =
     localTS (bindSplices splices') promiseChildren
   where
-    fieldSplice p f = yieldRuntime $ liftM f $ getPromise p
+    fieldSplice p f = return $ yieldRuntime $ liftM f $ getPromise p
     splices' = map (second (fieldSplice prom)) splices
 
 
@@ -126,18 +125,11 @@ promiseChildrenWithNodes =
     
 
 ------------------------------------------------------------------------------
--- | Helper function for creating DList splices.
-yieldChunk :: Monad m => a -> m (DList a)
-yieldChunk = return . DL.singleton
-{-# INLINE yieldChunk #-}
-
-
-------------------------------------------------------------------------------
 -- | Yields a pure Builder known at load time.  You should use this and
 -- 'yieldPureText' as much as possible to maximize the parts of your page that
 -- can be compiled to static ByteStrings.
-yieldPure :: Builder -> Splice n
-yieldPure = yieldChunk . Pure
+yieldPure :: Builder -> DList (Chunk m)
+yieldPure = DL.singleton . Pure
 {-# INLINE yieldPure #-}
 
 
@@ -151,21 +143,21 @@ pureTextChunk = Pure . fromByteString . T.encodeUtf8
 ------------------------------------------------------------------------------
 -- | A convenience wrapper around yieldPure for working with Text.  Roughly
 -- equivalent to 'textSplice' from Heist.Interpreted.
-yieldPureText :: Text -> Splice n
-yieldPureText = yieldChunk . pureTextChunk
+yieldPureText :: Text -> DList (Chunk m)
+yieldPureText = DL.singleton . pureTextChunk
 {-# INLINE yieldPureText #-}
 
 
 ------------------------------------------------------------------------------
 -- | Yields a runtime action that returns a builder.
-yieldRuntime :: RuntimeSplice n Builder -> Splice n
-yieldRuntime = yieldChunk . RuntimeHtml
+yieldRuntime :: RuntimeSplice m Builder -> DList (Chunk m)
+yieldRuntime = DL.singleton . RuntimeHtml
 {-# INLINE yieldRuntime #-}
 
 
 ------------------------------------------------------------------------------
 -- | Convenience wrapper around yieldRuntime allowing you to work with Text.
-yieldRuntimeText :: Monad n => RuntimeSplice n Text -> Splice n
+yieldRuntimeText :: Monad m => RuntimeSplice m Text -> DList (Chunk m)
 yieldRuntimeText = yieldRuntime .  liftM (fromByteString . T.encodeUtf8)
 {-# INLINE yieldRuntimeText #-}
 
@@ -173,30 +165,23 @@ yieldRuntimeText = yieldRuntime .  liftM (fromByteString . T.encodeUtf8)
 ------------------------------------------------------------------------------
 -- | Yields a runtime action that returns no value and is only needed for its
 -- side effect.
-yieldRuntimeEffect :: RuntimeSplice n () -> Splice n
-yieldRuntimeEffect = yieldChunk . RuntimeAction
+yieldRuntimeEffect :: Monad m => RuntimeSplice m () -> DList (Chunk m)
+yieldRuntimeEffect = DL.singleton . RuntimeAction
 {-# INLINE yieldRuntimeEffect #-}
 
 
 ------------------------------------------------------------------------------
 -- | This lets you turn a plain runtime monad function returning a Builder
 -- into a compiled splice.
-yieldLater :: (Monad n) => n Builder -> Splice n
+yieldLater :: Monad m => m Builder -> DList (Chunk m)
 yieldLater = yieldRuntime . RuntimeSplice . lift
 {-# INLINE yieldLater #-}
 
 
 ------------------------------------------------------------------------------
--- | Yields the promised Builder.
-yieldPromise :: (Monad n) => Promise Builder -> Splice n
-yieldPromise p = yieldRuntime $ getPromise p
-{-# INLINE yieldPromise #-}
-
-
-------------------------------------------------------------------------------
 -- | Returns a computation that performs load-time splice processing on the
 -- supplied list of nodes.
-runNodeList :: [X.Node] -> Splice n
+runNodeList :: Monad n => [X.Node] -> Splice n
 runNodeList = mapSplices runNode
 
 
@@ -214,7 +199,8 @@ runSplice node hs splice = do
 
 ------------------------------------------------------------------------------
 -- | Runs a DocumentFile with the appropriate template context set.
-runDocumentFile :: TPath
+runDocumentFile :: Monad n
+                => TPath
                 -> DocumentFile
                 -> Splice n
 runDocumentFile tpath df = do
@@ -250,7 +236,7 @@ compileTemplates hs = do
 
     runOne tmap (tpath, df) = do
         mHtml <- compileTemplate hs tpath df
-        return $! H.insert tpath mHtml tmap
+        return $! H.insert tpath (mHtml, mimeType $ dfDoc df) tmap
 
 
 ------------------------------------------------------------------------------
@@ -315,11 +301,11 @@ lookupSplice nm = getsTS (H.lookup nm . _compiledSpliceMap)
 -- | Runs a single node.  If there is no splice referenced anywhere in the
 -- subtree, then it is rendered as a pure chunk, otherwise it is compiled to
 -- a runtime computation.
-runNode :: X.Node -> Splice n
+runNode :: Monad n => X.Node -> Splice n
 runNode node = localParamNode (const node) $ do
     isStatic <- subtreeIsStatic node
     if isStatic
-      then yieldPure $! X.renderHtmlFragment X.UTF8 [node]
+      then return $ yieldPure $! X.renderHtmlFragment X.UTF8 [node]
       else compileNode node
 
 
@@ -329,6 +315,10 @@ runNode node = localParamNode (const node) $ do
 subtreeIsStatic :: X.Node -> HeistT n IO Bool
 subtreeIsStatic (X.Element nm attrs ch) = do
     isNodeDynamic <- liftM isJust $ lookupSplice nm
+    attrSplices <- getsTS _attrSpliceMap
+    let hasSubstitutions (k,v) = hasAttributeSubstitutions k ||
+                                 hasAttributeSubstitutions v ||
+                                 H.member k attrSplices
     if isNodeDynamic
       then return False
       else do
@@ -338,9 +328,6 @@ subtreeIsStatic (X.Element nm attrs ch) = do
             else do
                 staticSubtrees <- mapM subtreeIsStatic ch
                 return $ and staticSubtrees
-  where
-    hasSubstitutions (k,v) = hasAttributeSubstitutions k ||
-                             hasAttributeSubstitutions v
 
 subtreeIsStatic _ = return True
 
@@ -359,7 +346,7 @@ hasAttributeSubstitutions txt = all isLiteral ast
 ------------------------------------------------------------------------------
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
 -- generate html at runtime. Leaves the writer monad state untouched.
-compileNode :: X.Node -> Splice n
+compileNode :: Monad n => X.Node -> Splice n
 compileNode (X.Element nm attrs ch) =
     -- Is this node a splice, or does it merely contain splices?
     lookupSplice nm >>= fromMaybe compileStaticElement
@@ -369,7 +356,6 @@ compileNode (X.Element nm attrs ch) =
     -- If the tag is not a splice, but it contains dynamic children
     compileStaticElement = do
         -- Parse the attributes: we have Left for static and Right for runtime
-        -- TODO: decide: do we also want substitution in the key?
         compiledAttrs <- mapM parseAtt attrs
 
         childHtml <- runNodeList ch
@@ -383,27 +369,59 @@ compileNode (X.Element nm attrs ch) =
 compileNode _ = error "impossible"
 
 
+attrToChunk :: Text -> DList (Chunk n) -> DList (Chunk n)
+attrToChunk k v = do
+    DL.concat
+        [ DL.singleton $ pureTextChunk $ T.concat [" ", k, "=\""]
+        , v, DL.singleton $ pureTextChunk "\"" ]
+    
+
+attrToBuilder :: (Text, Text) -> Builder
+attrToBuilder (k,v)
+  | T.null v  = mconcat
+    [ fromByteString $ T.encodeUtf8 " "
+    , fromByteString $ T.encodeUtf8 k
+    ]
+  | otherwise = mconcat
+    [ fromByteString $ T.encodeUtf8 " "
+    , fromByteString $ T.encodeUtf8 k
+    , fromByteString $ T.encodeUtf8 "=\""
+    , fromByteString $ T.encodeUtf8 v
+    , fromByteString $ T.encodeUtf8 "\""
+    ]
+
+
 ------------------------------------------------------------------------------
 -- | If this function returns a 'Nothing', there are no dynamic splices in the
 -- attribute text, and you can just spit out the text value statically.
 -- Otherwise, the splice has to be resolved at runtime.
-parseAtt :: (Text, Text) -> HeistT n IO (DList (Chunk n))
+parseAtt :: Monad n => (Text, Text) -> HeistT n IO (DList (Chunk n))
 parseAtt (k,v) = do
-    let ast = case AP.feed (AP.parse attParser v) "" of
-                (AP.Done _ res) -> res
-                (AP.Fail _ _ _) -> []
-                (AP.Partial _ ) -> []
-    chunks <- mapM cvt ast
-    let value = DL.concat chunks
-    return $ DL.concat [ DL.singleton $ pureTextChunk $ T.concat [" ", k, "=\""]
-                       , value, DL.singleton $ pureTextChunk "\"" ]
+    mas <- getsTS (H.lookup k . _attrSpliceMap)
+    maybe doInline (return . doAttrSplice) mas
+
   where
-    cvt (Literal x) = yieldPureText x
-    cvt (Escaped c) = yieldPureText $ T.singleton c
+    cvt (Literal x) = return $ yieldPureText x
+    cvt (Escaped c) = return $ yieldPureText $ T.singleton c
     cvt (Ident x) =
         localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
 
+    -- Handles inline parsing of $() splice syntax in attributes
+    doInline = do
+        let ast = case AP.feed (AP.parse attParser v) "" of
+                    (AP.Done _ res) -> res
+                    (AP.Fail _ _ _) -> []
+                    (AP.Partial _ ) -> []
+        chunks <- mapM cvt ast
+        let value = DL.concat chunks
+        return $ attrToChunk k value
 
+    -- Handles attribute splices
+    doAttrSplice splice = DL.singleton $ RuntimeHtml $ lift $ do
+        res <- splice v
+        return $ mconcat $ map attrToBuilder res
+
+    
 ------------------------------------------------------------------------------
 getAttributeSplice :: Text -> HeistT n IO (DList (Chunk n))
 getAttributeSplice name =
@@ -454,63 +472,63 @@ newEmptyPromise = do
 {-# INLINE newEmptyPromise #-}
 
 
-------------------------------------------------------------------------------
--- | Creates an empty promise with some error checking to help with debugging.
-newEmptyPromiseWithError :: (Monad n)
-                         => String -> HeistT n IO (Promise a)
-newEmptyPromiseWithError from = do
-    keygen <- getsTS _keygen
-    prom   <- liftM Promise $ liftIO $ HE.makeKey keygen
-    yieldRuntimeEffect $ putPromise prom
-                       $ error
-                       $ "deferenced empty promise created at" ++ from
-    return prom
-{-# INLINE newEmptyPromiseWithError #-}
-
-
-------------------------------------------------------------------------------
--- | Creates a promise for a future runtime computation.
-promise :: (Monad n) => n a -> HeistT n IO (Promise a)
-promise act = runtimeSplicePromise (lift act)
-{-# INLINE promise #-}
-
-
-------------------------------------------------------------------------------
--- | Turns a RuntimeSplice computation into a promise.
-runtimeSplicePromise :: (Monad n)
-                     => RuntimeSplice n a
-                     -> HeistT n IO (Promise a)
-runtimeSplicePromise act = do
-    prom <- newEmptyPromiseWithError "runtimeSplicePromise"
-
-    let m = do
-        x <- act
-        putPromise prom x
-        return ()
-
-    yieldRuntimeEffect m
-    return prom
-{-# INLINE runtimeSplicePromise #-}
-
-
-------------------------------------------------------------------------------
--- | Sets up a runtime transformation on a 'Promise'.
-withPromise :: (Monad n)
-            => Promise a
-            -> (a -> n b)
-            -> HeistT n IO (Promise b)
-withPromise promA f = do
-    promB <- newEmptyPromiseWithError "withPromise"
-
-    let m = do
-        a <- getPromise promA
-        b <- lift $ f a
-        putPromise promB b
-        return ()
-
-    yieldRuntimeEffect m
-    return promB
-{-# INLINE withPromise #-}
+-- ------------------------------------------------------------------------------
+-- -- | Creates an empty promise with some error checking to help with debugging.
+-- newEmptyPromiseWithError :: (Monad n)
+--                          => String -> HeistT n IO (Promise a)
+-- newEmptyPromiseWithError from = do
+--     keygen <- getsTS _keygen
+--     prom   <- liftM Promise $ liftIO $ HE.makeKey keygen
+--     yieldRuntimeEffect $ putPromise prom
+--                        $ error
+--                        $ "deferenced empty promise created at" ++ from
+--     return prom
+-- {-# INLINE newEmptyPromiseWithError #-}
+-- 
+-- 
+-- ------------------------------------------------------------------------------
+-- -- | Creates a promise for a future runtime computation.
+-- promise :: (Monad n) => n a -> HeistT n IO (Promise a)
+-- promise act = runtimeSplicePromise (lift act)
+-- {-# INLINE promise #-}
+-- 
+-- 
+-- ------------------------------------------------------------------------------
+-- -- | Turns a RuntimeSplice computation into a promise.
+-- runtimeSplicePromise :: (Monad n)
+--                      => RuntimeSplice n a
+--                      -> HeistT n IO (Promise a)
+-- runtimeSplicePromise act = do
+--     prom <- newEmptyPromiseWithError "runtimeSplicePromise"
+-- 
+--     let m = do
+--         x <- act
+--         putPromise prom x
+--         return ()
+-- 
+--     yieldRuntimeEffect m
+--     return prom
+-- {-# INLINE runtimeSplicePromise #-}
+-- 
+-- 
+-- ------------------------------------------------------------------------------
+-- -- | Sets up a runtime transformation on a 'Promise'.
+-- withPromise :: (Monad n)
+--             => Promise a
+--             -> (a -> n b)
+--             -> HeistT n IO (Promise b)
+-- withPromise promA f = do
+--     promB <- newEmptyPromiseWithError "withPromise"
+-- 
+--     let m = do
+--         a <- getPromise promA
+--         b <- lift $ f a
+--         putPromise promB b
+--         return ()
+-- 
+--     yieldRuntimeEffect m
+--     return promB
+-- {-# INLINE withPromise #-}
 
 
 ------------------------------------------------------------------------------
@@ -542,7 +560,9 @@ addSplices ss = modifyTS (bindSplices ss)
 ------------------------------------------------------------------------------
 -- | Looks up a compiled template and returns a runtime monad computation that
 -- constructs a builder.
-renderCompiledTemplate :: ByteString -> HeistState n -> Maybe (n Builder)
+renderCompiledTemplate :: ByteString
+                       -> HeistState n
+                       -> Maybe (n Builder, MIMEType)
 renderCompiledTemplate nm hs =
     fmap fst $ lookupTemplate nm hs _compiledTemplateMap
 

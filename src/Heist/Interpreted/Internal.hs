@@ -10,10 +10,10 @@ module Heist.Interpreted.Internal where
 import           Blaze.ByteString.Builder
 import           Control.Arrow hiding (loop)
 import           Control.Monad
+import           Control.Monad.Trans
 import qualified Data.Attoparsec.Text as AP
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import           Data.List
 import qualified Data.HashMap.Strict as Map
 import           Data.Maybe
@@ -178,7 +178,7 @@ stopRecursion = modifyTS (\st -> st { _recurse = False })
 -- | Performs splice processing on a single node.
 runNode :: Monad n => X.Node -> Splice n
 runNode (X.Element nm at ch) = do
-    newAtts <- mapM attSubst at
+    newAtts <- (return . concat) =<< mapM runAttrSplice at
     let n = X.Element nm newAtts ch
     s <- liftM (lookupSplice nm) getTS
     maybe (runKids newAtts) (recurseSplice n) s
@@ -187,6 +187,15 @@ runNode (X.Element nm at ch) = do
         newKids <- runNodeList ch
         return [X.Element nm newAtts newKids]
 runNode n                    = return [n]
+
+
+------------------------------------------------------------------------------
+-- | Runs the attribute splice if it exists, otherwise it does inline $()
+-- substitution.
+runAttrSplice :: (Monad n) => (Text, Text) -> HeistT n n [(Text, Text)]
+runAttrSplice a@(k,v) = do
+    splice <- getsTS (Map.lookup k . _attrSpliceMap)
+    maybe (liftM (:[]) $ attSubst a) (lift . ($v)) splice
 
 
 ------------------------------------------------------------------------------
@@ -376,20 +385,6 @@ callTemplateWithText :: Monad n
 callTemplateWithText name params = do
     modifyTS $ bindStrings params
     liftM (maybe [] id) $ evalTemplate name
-
-
-------------------------------------------------------------------------------
--- Gives the MIME type for a 'X.Document'
-mimeType :: X.Document -> ByteString
-mimeType d = case d of
-    (X.HtmlDocument e _ _) -> "text/html;charset=" `BC.append` enc e
-    (X.XmlDocument  e _ _) -> "text/xml;charset="  `BC.append` enc e
-  where
-    enc X.UTF8    = "utf-8"
-    -- Should not include byte order designation for UTF-16 since
-    -- rendering will include a byte order mark. (RFC 2781, Sec. 3.3)
-    enc X.UTF16BE = "utf-16"
-    enc X.UTF16LE = "utf-16"
 
 
 ------------------------------------------------------------------------------

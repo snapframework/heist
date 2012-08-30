@@ -1,20 +1,13 @@
 module Heist.Tests
   ( tests
-  , loadT
-  , loadTS
-  , loadEmpty
-  , testTemplate
-  , testTemplateEval
-  , quickRender
   ) where
 
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
-import           Control.Error
 import           Control.Monad.State
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.HashMap.Strict as Map
+import qualified Data.ByteString.Char8 as B
+import           Data.Maybe
 import           Data.Text (Text)
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
@@ -22,75 +15,22 @@ import qualified Test.HUnit as H
 
 
 ------------------------------------------------------------------------------
-import           Heist
-import qualified Heist.Compiled.Internal as C
-import           Heist.Interpreted.Internal
-import           Heist.Types
-import qualified Text.XmlHtml        as X
+import           Heist.TestCommon
+import qualified Heist.Compiled as C
+import qualified Heist.Interpreted as I
 
 
 tests :: [Test]
-tests = [ testCase     "loadErrors"           loadErrorsTest
+tests = [ testCase     "loadErrors"            loadErrorsTest
+        , testCase     "attrsplice/autocheck"  attrSpliceTest
         ]
-
-
-------------------------------------------------------------------------------
-loadT :: FilePath
-      -> [(Text, Splice IO)]
-      -> [(Text, Splice IO)]
-      -> [(Text, C.Splice IO)]
-      -> IO (Either [String] (HeistState IO))
-loadT baseDir r s d = runEitherT $ do
-    ts <- loadTemplates baseDir
-    initHeist r s d ts
-
-
-------------------------------------------------------------------------------
-loadTS :: FilePath -> IO (HeistState IO)
-loadTS baseDir = do
-    etm <- runEitherT $
-        loadTemplates baseDir >>= initHeist [] [] []
-    either (error . concat) return etm
-
-
-loadEmpty :: [(Text, Splice IO)]
-          -> [(Text, Splice IO)]
-          -> [(Text, C.Splice IO)]
-          -> IO (HeistState IO)
-loadEmpty a b c = do
-    res <- runEitherT $ initHeist a b c Map.empty
-    either (error . concat) return res
-
-
-testTemplate :: FilePath -> ByteString -> IO ByteString
-testTemplate tdir tname = do
-    ts <- loadTS tdir
-    Just (resDoc, _) <- renderTemplate ts tname
-    return $ toByteString resDoc
-
-
-testTemplateEval :: ByteString -> IO (Maybe Template)
-testTemplateEval tname = do
-    ts <- loadTS "templates"
-    md <- evalHeistT (evalWithDoctypes tname) (X.TextNode "") ts
-    return $ fmap X.docContent md
-
-
-------------------------------------------------------------------------------
--- | Reloads the templates from disk and renders the specified
--- template.  (Old convenience code.)
-quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
-quickRender baseDir name = do
-    ts  <- loadTS baseDir
-    res <- renderTemplate ts name
-    return (fmap (toByteString . fst) res)
 
 
 ------------------------------------------------------------------------------
 -- | Tests that load fails correctly on errors.
 loadErrorsTest :: H.Assertion
 loadErrorsTest = do
-    ets <- loadT "templates-bad" [] [] []
+    ets <- loadIO "templates-bad" [] [] [] []
     either (H.assertEqual "load errors test" expected)
            (const $ H.assertFailure "No failure when loading templates-bad")
            ets
@@ -101,5 +41,37 @@ loadErrorsTest = do
         ,"templates-bad/bind-missing-attr.tpl: must supply \"tag\" attribute in <bind>"
         ,"templates-bad/apply-template-not-found.tpl: apply tag cannot find template \"/page\""
         ]
+
+
+attrSplice :: Text -> StateT Text IO [(Text, Text)]
+attrSplice v = do
+    val <- get
+    let checked = if v == val
+                    then [("checked","")]
+                    else []
+    return $ ("name", v) : checked
+
+attrSpliceTest :: IO ()
+attrSpliceTest = do
+    ehs <- loadT "templates" [] [] [] [("autocheck", attrSplice)]
+    let hs = either (error . show) id ehs
+        runtime = fromJust $ C.renderCompiledTemplate "attr_splice" hs
+
+    mres <- evalStateT (I.renderTemplate hs "attr_splice") "foo"
+    H.assertEqual "interpreted foo" expected1
+      (toByteString $ fst $ fromJust mres)
+    mres2 <- evalStateT (I.renderTemplate hs "attr_splice") "bar"
+    H.assertEqual "interpreted bar" expected2
+      (toByteString $ fst $ fromJust mres2)
+
+    builder <- evalStateT (fst runtime) "foo"
+    H.assertEqual "compiled foo" expected1
+      (toByteString builder)
+    builder2 <- evalStateT (fst runtime) "bar"
+    H.assertEqual "compiled bar" expected2
+      (toByteString builder2)
+  where
+    expected1 = doctype `B.append` "\n<input type='checkbox' name='foo' checked />\n<input type='checkbox' name='bar' />\n"
+    expected2 = doctype `B.append` "\n<input type='checkbox' name='foo' />\n<input type='checkbox' name='bar' checked />\n"
 
 

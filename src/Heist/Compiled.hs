@@ -21,7 +21,7 @@ module Heist.Compiled
   , promiseChildrenWithText
   , promiseChildrenWithNodes
 
-  -- * Other kinds of Splice construction
+  -- * Constructing Chunks
   -- $yieldOverview
   , yieldPure
   , yieldPureText
@@ -29,16 +29,11 @@ module Heist.Compiled
   , yieldRuntimeText
   , yieldRuntimeEffect
   , yieldLater
-  , yieldPromise
   , addSplices
 
   -- * Lower level promise functions
   , Promise
-  , promise
   , newEmptyPromise
-  , newEmptyPromiseWithError
-  , runtimeSplicePromise
-  , withPromise
 
   -- * RuntimeSplice functions
   , getPromise
@@ -59,5 +54,5 @@ import Heist.Compiled.Internal
 -- $yieldOverview
 -- The internals of the Chunk data type are deliberately not exported because
 -- we want to hide the underlying implementation as much as possible.  The
--- @yield...@ functions give you the ability to construct Splices from
--- different types of input.
+-- @yield...@ functions give you lower lever construction of Chunks and DLists
+-- of Chunks.
