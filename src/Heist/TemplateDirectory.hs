@@ -10,7 +10,8 @@ module Heist.TemplateDirectory
     , newTemplateDirectory
     , newTemplateDirectory'
 
-    , getDirectoryTS
+    , getDirectoryHS
+    , getDirectoryCTS
     , reloadTemplateDirectory
     ) where
 
@@ -36,7 +37,7 @@ data TemplateDirectory n
         [(Text, C.Splice n)]
         [(Text, AttrSplice n)]
         (MVar (HeistState n))
-        CacheTagState
+        (MVar CacheTagState)
 
 
 ------------------------------------------------------------------------------
@@ -50,12 +51,10 @@ newTemplateDirectory :: MonadIO n
                      -> [(Text, AttrSplice n)]
                      -> EitherT [String] IO (TemplateDirectory n)
 newTemplateDirectory dir a b c d = do
-    (ss, cts) <- liftIO mkCacheTag
-    let a' = ("cache", cacheImpl cts) : a
-        b' = ("cache", ss) : b
-    hs <- loadTemplates dir >>= initHeist a' b' c d
+    (hs,cts) <- loadTemplates dir >>= initHeistWithCacheTag a b c d
     tsMVar <- liftIO $ newMVar hs
-    return $ TemplateDirectory dir a' b' c d tsMVar cts
+    ctsMVar <- liftIO $ newMVar cts
+    return $ TemplateDirectory dir a b c d tsMVar ctsMVar
 
 
 ------------------------------------------------------------------------------
@@ -76,21 +75,29 @@ newTemplateDirectory' dir rSplices sSplices dSplices aSplices = do
 
 ------------------------------------------------------------------------------
 -- | Gets the 'HeistState' from a TemplateDirectory.
-getDirectoryTS :: (MonadIO n)
+getDirectoryHS :: (MonadIO n)
                => TemplateDirectory n
-               -> n (HeistState n)
-getDirectoryTS (TemplateDirectory _ _ _ _ _ tsMVar _) =
+               -> IO (HeistState n)
+getDirectoryHS (TemplateDirectory _ _ _ _ _ tsMVar _) =
     liftIO $ readMVar $ tsMVar
+
+
+------------------------------------------------------------------------------
+-- | Clears the TemplateDirectory's cache tag state.
+getDirectoryCTS :: TemplateDirectory n -> IO CacheTagState
+getDirectoryCTS (TemplateDirectory _ _ _ _ _ _ ctsMVar) = readMVar ctsMVar
 
 
 ------------------------------------------------------------------------------
 -- | Clears cached content and reloads templates from disk.
 reloadTemplateDirectory :: (MonadIO n)
                         => TemplateDirectory n
-                        -> n (Either String ())
-reloadTemplateDirectory (TemplateDirectory p a b c d tsMVar _) = liftIO $ do
-    ehs <- runEitherT $ loadTemplates p >>= initHeist a b c d
-    leftPass ehs $ \hs -> modifyMVar_ tsMVar (const $ return hs)
+                        -> IO (Either String ())
+reloadTemplateDirectory (TemplateDirectory p a b c d tsMVar ctsMVar) = do
+    ehs <- runEitherT $ loadTemplates p >>= initHeistWithCacheTag a b c d
+    leftPass ehs $ \(hs,cts) -> do
+        modifyMVar_ tsMVar (const $ return hs)
+        modifyMVar_ ctsMVar (const $ return cts)
 
 
 ------------------------------------------------------------------------------

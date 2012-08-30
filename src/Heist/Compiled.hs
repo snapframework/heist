@@ -13,7 +13,7 @@ module Heist.Compiled
   (
   -- * High level compiled splice API
     Splice
-  , renderCompiledTemplate
+  , renderTemplate
   , mapPromises
   , promiseChildren
   , promiseChildrenWith

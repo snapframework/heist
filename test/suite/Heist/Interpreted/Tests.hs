@@ -137,7 +137,7 @@ loadTest = do
     ets <- loadIO "templates" [] [] [] []
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertEqual "loadTest size" 30 $ Map.size tm
+                      H.assertEqual "loadTest size" 31 $ Map.size tm
            ) ets
 
 

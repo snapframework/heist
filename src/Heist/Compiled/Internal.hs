@@ -565,10 +565,10 @@ addSplices ss = modifyTS (bindSplices ss)
 ------------------------------------------------------------------------------
 -- | Looks up a compiled template and returns a runtime monad computation that
 -- constructs a builder.
-renderCompiledTemplate :: ByteString
-                       -> HeistState n
-                       -> Maybe (n Builder, MIMEType)
-renderCompiledTemplate nm hs =
+renderTemplate :: HeistState n
+               -> ByteString
+               -> Maybe (n Builder, MIMEType)
+renderTemplate hs nm =
     fmap fst $ lookupTemplate nm hs _compiledTemplateMap
 
 

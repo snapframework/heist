@@ -63,14 +63,14 @@ clearCacheTagState (CTS cacheMVar) =
 parseTTL :: Text -> Int
 parseTTL s = value * multiplier
   where
-    value = either (const 0) fst $ decimal s
-    multiplier = case T.last s of
-        's' -> 1
-        'm' -> 60
-        'h' -> 3600
-        'd' -> 86400
-        'w' -> 604800
-        _   -> 0
+    (value,rest) = either (const (0,"s")) id $ decimal s
+    multiplier = case T.take 1 rest of
+        "s" -> 1
+        "m" -> 60
+        "h" -> 3600
+        "d" -> 86400
+        "w" -> 604800
+        _   -> 1
 
 
 ------------------------------------------------------------------------------
