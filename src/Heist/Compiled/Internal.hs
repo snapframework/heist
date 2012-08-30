@@ -360,12 +360,17 @@ compileNode (X.Element nm attrs ch) =
 
         childHtml <- runNodeList ch
 
-        return $ DL.concat [ DL.singleton $ pureTextChunk tag0
-                           , DL.concat compiledAttrs
-                           , DL.singleton $ pureTextChunk ">"
-                           , childHtml
-                           , DL.singleton $ pureTextChunk end
-                           ]
+        return $ if null (DL.toList childHtml)
+          then DL.concat [ DL.singleton $ pureTextChunk tag0
+                         , DL.concat compiledAttrs
+                         , DL.singleton $ pureTextChunk " />"
+                         ]
+          else DL.concat [ DL.singleton $ pureTextChunk tag0
+                         , DL.concat compiledAttrs
+                         , DL.singleton $ pureTextChunk ">"
+                         , childHtml
+                         , DL.singleton $ pureTextChunk end
+                         ]
 compileNode _ = error "impossible"
 
 

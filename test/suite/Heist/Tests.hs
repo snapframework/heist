@@ -65,13 +65,15 @@ attrSpliceTest = do
       (toByteString $ fst $ fromJust mres2)
 
     builder <- evalStateT (fst runtime) "foo"
-    H.assertEqual "compiled foo" expected1
+    H.assertEqual "compiled foo" expected3
       (toByteString builder)
     builder2 <- evalStateT (fst runtime) "bar"
-    H.assertEqual "compiled bar" expected2
+    H.assertEqual "compiled bar" expected4
       (toByteString builder2)
   where
     expected1 = doctype `B.append` "\n<input type='checkbox' name='foo' checked />\n<input type='checkbox' name='bar' />\n"
     expected2 = doctype `B.append` "\n<input type='checkbox' name='foo' />\n<input type='checkbox' name='bar' checked />\n"
+    expected3 = "<input type=\"checkbox\" name=\"foo\" checked />&#10;<input type=\"checkbox\" name=\"bar\" />&#10;"
+    expected4 = "<input type=\"checkbox\" name=\"foo\" />&#10;<input type=\"checkbox\" name=\"bar\" checked />&#10;"
 
 
