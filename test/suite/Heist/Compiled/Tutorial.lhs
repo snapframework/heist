@@ -1,12 +1,12 @@
 Introduction to Compiled Heist
 ==============================
 
-Heist is essentially an interpreter.  It loads your templates and "runs" them
-whenever a page is served.  This is relatively inefficient since a lot of
-document transformations happen every time the template is requested.
-Compiled Heist does most of your splice processing up front at load time.
-Dynamic information can still be rendered at runtime, but it is faster than
-the fully interpreted approach that Heist started with.
+Before version 0.9, Heist has essentially been an interpreter.  It loads your
+templates and "runs" them whenever a page is served.  This is relatively
+inefficient since a lot of document transformations happen every time the
+template is requested.  Compiled Heist does most of your splice processing up
+front at load time.  Dynamic information can still be rendered at runtime, but
+it is faster than the fully interpreted approach that Heist started with.
 
 Before we continue it should be mentioned that you are reading real live
 literate Haskell code from our test suite.  All the code you see here is
@@ -19,7 +19,7 @@ buildbot.  So first we need to get some boilerplate and imports out of the way.
 > import qualified Heist.Compiled as C
 > import           Heist.Compiled.TutorialImports
 
-As a review, Heist splices are defined like this.
+As a review, normal (interpreted) Heist splices are defined like this.
 
 < type Splice m = HeistT m m [Node]
 
@@ -29,10 +29,10 @@ twice right now.  We'll get to that later.  The splice's return value is a
 list of nodes that is substituted back into the document wherever the spliced
 node was.  
 
-Splice proccessing involves traversing the DOM, which is inefficient.
-Compiled Heist is designed so that all the DOM traversals happen once at load
-time in the IO monad.  This is the "compile" phase.  The type signature for
-compiled splices is this.
+This kind of splice proccessing involves traversing the DOM, which is
+inefficient.  Compiled Heist is designed so that all the DOM traversals happen
+once at load time in the IO monad.  This is the "compile" phase.  The type
+signature for compiled splices is this.
 
 < type Splice n = HeistT n IO (DList (Chunk n))
 
@@ -43,24 +43,23 @@ parameter is the monad that we're actually running in now.
 
 But the key point of the compiled splice type signature is the return value.
 They return a DList of Chunks.  DList is a list that supports efficient
-insertion to both the front and back of the list.  The Chunk type defined like
-this.
+insertion to both the front and back of the list.  The Chunk type is not
+exposed publicly, but there are three ways to construct a Chunk.
 
-< data Chunk m = Pure !Text
-<                -- ^ output known at load time
-<              | RuntimeHtml !(RuntimeSplice m Text)
-<                -- ^ output computed at run time
-<              | RuntimeAction !(RuntimeSplice m ())
-<                -- ^ runtime action used only for its side-effect
+< yieldPure :: Builder -> DList (Chunk m)
+< yieldRuntime :: RuntimeSplice m Builder -> DList (Chunk m)
+< yieldRuntimeEffect :: Monad m => RuntimeSplice m () -> DList (Chunk m)
 
-If your splice output can be calculated at load time, then you will use the
-`Pure` constructor.  When you do this, Heist can concatenate all adjacent Pure
-chunks into a single precalculated ByteString that can be rendered very
-efficiently.  If your template needs a value that has to be calculated at
-runtime, then you should use the RuntimeHtml constructor and supply a
-computation in the RuntimeSplice monad transformer that is parameterized by
-`m` which we saw above is the runtime monad.  With that background, let's get
-to a real example.
+If your splice output can be calculated at load time, then you will use
+`yieldPure` or one of its variants.  When you do this, Heist can concatenate
+all adjacent pure chunks into a single precalculated ByteString that can be
+rendered very efficiently.  If your template needs a value that has to be
+calculated at runtime, then you should use the `yieldRuntime` constructor and
+supply a computation in the RuntimeSplice monad transformer that is
+parameterized by `m` which we saw above is the runtime monad.  Occasionally
+you might want to run a runtime side effect that doesn't actually insert any
+data into your template.  The `yieldRuntimeEffect` function gives you that
+capability.  With that background, let's get to a real example.
 
 > stateSplice :: C.Splice (StateT Int IO)
 > stateSplice = return $ C.yieldRuntimeText $ do
@@ -77,10 +76,10 @@ print statements that clarify the details of which monad is executed when.
 >     -- :: C.Splice (StateT Int IO)
 >     lift $ putStrLn "This executed at load time"
 >     let res = C.yieldRuntimeText $ do
->         -- :: RuntimeSplice (StateT Int IO) a
->         lift $ lift $ putStrLn "This executed at run/render time"
->         val <- lift get
->         return $ pack $ show (val+1)
+>             -- :: RuntimeSplice (StateT Int IO) a
+>             lift $ lift $ putStrLn "This executed at run/render time"
+>             val <- lift get
+>             return $ pack $ show (val+1)
 >     lift $ putStrLn "This also executed at load time"
 >     return res
 

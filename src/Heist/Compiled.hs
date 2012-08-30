@@ -24,10 +24,10 @@ module Heist.Compiled
   -- * Constructing Chunks
   -- $yieldOverview
   , yieldPure
-  , yieldPureText
   , yieldRuntime
-  , yieldRuntimeText
   , yieldRuntimeEffect
+  , yieldPureText
+  , yieldRuntimeText
   , yieldLater
   , addSplices
 

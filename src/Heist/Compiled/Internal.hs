@@ -125,6 +125,13 @@ promiseChildrenWithNodes =
     
 
 ------------------------------------------------------------------------------
+-- | Yields pure text known at load time.
+pureTextChunk :: Text -> Chunk n
+pureTextChunk = Pure . fromByteString . T.encodeUtf8
+{-# INLINE pureTextChunk #-}
+
+
+------------------------------------------------------------------------------
 -- | Yields a pure Builder known at load time.  You should use this and
 -- 'yieldPureText' as much as possible to maximize the parts of your page that
 -- can be compiled to static ByteStrings.
@@ -134,10 +141,18 @@ yieldPure = DL.singleton . Pure
 
 
 ------------------------------------------------------------------------------
--- | Yields pure text known at load time.
-pureTextChunk :: Text -> Chunk n
-pureTextChunk = Pure . fromByteString . T.encodeUtf8
-{-# INLINE pureTextChunk #-}
+-- | Yields a runtime action that returns a builder.
+yieldRuntime :: RuntimeSplice m Builder -> DList (Chunk m)
+yieldRuntime = DL.singleton . RuntimeHtml
+{-# INLINE yieldRuntime #-}
+
+
+------------------------------------------------------------------------------
+-- | Yields a runtime action that returns no value and is only needed for its
+-- side effect.
+yieldRuntimeEffect :: Monad m => RuntimeSplice m () -> DList (Chunk m)
+yieldRuntimeEffect = DL.singleton . RuntimeAction
+{-# INLINE yieldRuntimeEffect #-}
 
 
 ------------------------------------------------------------------------------
@@ -149,25 +164,10 @@ yieldPureText = DL.singleton . pureTextChunk
 
 
 ------------------------------------------------------------------------------
--- | Yields a runtime action that returns a builder.
-yieldRuntime :: RuntimeSplice m Builder -> DList (Chunk m)
-yieldRuntime = DL.singleton . RuntimeHtml
-{-# INLINE yieldRuntime #-}
-
-
-------------------------------------------------------------------------------
 -- | Convenience wrapper around yieldRuntime allowing you to work with Text.
 yieldRuntimeText :: Monad m => RuntimeSplice m Text -> DList (Chunk m)
 yieldRuntimeText = yieldRuntime .  liftM (fromByteString . T.encodeUtf8)
 {-# INLINE yieldRuntimeText #-}
-
-
-------------------------------------------------------------------------------
--- | Yields a runtime action that returns no value and is only needed for its
--- side effect.
-yieldRuntimeEffect :: Monad m => RuntimeSplice m () -> DList (Chunk m)
-yieldRuntimeEffect = DL.singleton . RuntimeAction
-{-# INLINE yieldRuntimeEffect #-}
 
 
 ------------------------------------------------------------------------------
