@@ -84,7 +84,7 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
         let result   = buildResult bind
 
         spliceResult <- run $ do
-            hs <- loadEmpty defaultStaticSplices [] [] []
+            hs <- loadEmpty defaultLoadTimeSplices [] [] []
             evalHeistT (runNodeList template)
                        (X.TextNode "") hs
 
@@ -193,7 +193,7 @@ attrSubstTest = do
     check ts out2
 
   where
-    splices = defaultStaticSplices ++
+    splices = defaultLoadTimeSplices ++
         [("foo", return [X.TextNode "meaning_of_everything"])]
         
     check ts expected = do
@@ -599,7 +599,7 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 ------------------------------------------------------------------------------
 calcResult :: Apply -> IO [X.Node]
 calcResult apply@(Apply name _ callee _ _) = do
-    hs <- loadEmpty defaultStaticSplices [] [] []
+    hs <- loadEmpty defaultLoadTimeSplices [] [] []
     let hs' = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
                            (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
                                          Nothing)) hs

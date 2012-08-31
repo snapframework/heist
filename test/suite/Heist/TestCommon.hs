@@ -31,9 +31,9 @@ loadT :: Monad m
       -> [(Text, C.Splice m)]
       -> [(Text, AttrSplice m)]
       -> IO (Either [String] (HeistState m))
-loadT baseDir r s d a = runEitherT $ do
+loadT baseDir a b c d = runEitherT $ do
     ts <- loadTemplates baseDir
-    initHeist r s d a ts
+    initHeist a (defaultLoadTimeSplices ++ b) c d ts
 
 
 ------------------------------------------------------------------------------
@@ -43,16 +43,16 @@ loadIO :: FilePath
        -> [(Text, C.Splice IO)]
        -> [(Text, AttrSplice IO)]
        -> IO (Either [String] (HeistState IO))
-loadIO baseDir r s d a = runEitherT $ do
+loadIO baseDir a b c d = runEitherT $ do
     ts <- loadTemplates baseDir
-    initHeist r s d a ts
+    initHeist a (defaultLoadTimeSplices ++ b) c d ts
 
 
 ------------------------------------------------------------------------------
 loadHS :: FilePath -> IO (HeistState IO)
 loadHS baseDir = do
     etm <- runEitherT $
-        loadTemplates baseDir >>= initHeist [] [] [] []
+        loadTemplates baseDir >>= initHeist [] defaultLoadTimeSplices [] []
     either (error . concat) return etm
 
 
@@ -62,7 +62,7 @@ loadEmpty :: [(Text, Splice IO)]
           -> [(Text, AttrSplice IO)]
           -> IO (HeistState IO)
 loadEmpty a b c d = do
-    res <- runEitherT $ initHeist a b c d Map.empty
+    res <- runEitherT $ initHeist a (defaultLoadTimeSplices ++ b) c d Map.empty
     either (error . concat) return res
 
 

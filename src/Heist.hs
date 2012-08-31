@@ -11,7 +11,8 @@ get functions needed for writing splices.
 module Heist
   ( Template
   , TPath
-  , defaultStaticSplices
+  , HeistConfig(..)
+  , defaultLoadTimeSplices
   , loadTemplates
   , initHeist
   , initHeistWithCacheTag
@@ -61,12 +62,42 @@ import           Heist.Splices
 import           Heist.Types
 
 
+data HeistConfig m = HeistConfig
+    { hcInterpretedSplices :: [(Text, I.Splice m)]
+    -- ^ Interpreted splices are the splices that Heist has always had.  They
+    -- return a list of nodes and are processed at runtime.
+    , hcLoadTimeSplices    :: [(Text, I.Splice IO)]
+    -- ^ Load time splices are like interpreted splices because they return a
+    -- list of nodes.  But they are like compiled splices because they are
+    -- processed once at load time.  All of Heist's built-in splices should be
+    -- used as load time splices.
+    , hcCompiledSplices    :: [(Text, C.Splice m)]
+    -- ^ Compiled splices return a DList of Chunks and are processed at load
+    -- time to generate a runtime monad action that will be used to render the
+    -- template.
+    , hcAttributeSplices   :: [(Text, AttrSplice m)]
+    -- ^ Attribute splices are bound to attribute names and return a list of
+    -- attributes.
+    , hcTemplates          :: HashMap TPath DocumentFile
+    }
+
+
+instance Monoid (HeistConfig m) where
+    mempty = HeistConfig [] [] [] [] Map.empty
+    mappend (HeistConfig a b c d e) (HeistConfig a' b' c' d' e') =
+        HeistConfig (a `mappend` a')
+                    (b `mappend` b')
+                    (c `mappend` c')
+                    (d `mappend` d')
+                    (e `mappend` e')
+
+
 ------------------------------------------------------------------------------
 -- | The built-in set of static splices.  All the splices that used to be
--- enabled by default are included here.  You don't need to include them
--- anywhere else.
-defaultStaticSplices :: MonadIO m => [(Text, (I.Splice m))]
-defaultStaticSplices =
+-- enabled by default are included here.  To get the normal Heist behavior you
+-- should include these in the hcLoadTimeSplices list in your HeistConfig.
+defaultLoadTimeSplices :: MonadIO m => [(Text, (I.Splice m))]
+defaultLoadTimeSplices =
     [ (applyTag, applyImpl)
     , (bindTag, bindImpl)
     , (ignoreTag, ignoreImpl)
@@ -120,8 +151,7 @@ initHeist rSplices sSplices dSplices aSplices rawTemplates = do
     keyGen <- lift HE.newKeyGen
     let empty = HeistState Map.empty Map.empty Map.empty Map.empty
                            Map.empty True [] 0 [] Nothing keyGen False
-        hs0 = empty { _spliceMap = Map.fromList defaultStaticSplices
-                                  `mappend` Map.fromList sSplices
+        hs0 = empty { _spliceMap = Map.fromList sSplices
                     , _templateMap = rawTemplates
                     , _preprocessingMode = True }
     tPairs <- lift $ evalHeistT
