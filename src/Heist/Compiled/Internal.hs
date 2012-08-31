@@ -83,7 +83,7 @@ promiseChildrenWith :: (Monad n)
                     -> Promise a
                     -> HeistT n IO (RuntimeSplice n Builder)
 promiseChildrenWith splices prom =
-    localTS (bindSplices splices') promiseChildren
+    localHS (bindSplices splices') promiseChildren
   where
     fieldSplice p f = return $ yieldRuntime $ liftM f $ getPromise p
     splices' = map (second (fieldSplice prom)) splices
@@ -204,7 +204,7 @@ runDocumentFile :: Monad n
                 -> DocumentFile
                 -> Splice n
 runDocumentFile tpath df = do
-    modifyTS (setCurTemplateFile curPath .  setCurContext tpath)
+    modifyHS (setCurTemplateFile curPath .  setCurContext tpath)
     runNodeList nodes
   where
     curPath     = dfFile df
@@ -294,7 +294,7 @@ codeGen = compileConsolidated . consolidate . DL.toList
 ------------------------------------------------------------------------------
 -- | Looks up a splice in the compiled splice map.
 lookupSplice :: Text -> HeistT n IO (Maybe (Splice n))
-lookupSplice nm = getsTS (H.lookup nm . _compiledSpliceMap)
+lookupSplice nm = getsHS (H.lookup nm . _compiledSpliceMap)
 
 
 ------------------------------------------------------------------------------
@@ -315,7 +315,7 @@ runNode node = localParamNode (const node) $ do
 subtreeIsStatic :: X.Node -> HeistT n IO Bool
 subtreeIsStatic (X.Element nm attrs ch) = do
     isNodeDynamic <- liftM isJust $ lookupSplice nm
-    attrSplices <- getsTS _attrSpliceMap
+    attrSplices <- getsHS _attrSpliceMap
     let hasSubstitutions (k,v) = hasAttributeSubstitutions k ||
                                  hasAttributeSubstitutions v ||
                                  H.member k attrSplices
@@ -402,7 +402,7 @@ attrToBuilder (k,v)
 -- Otherwise, the splice has to be resolved at runtime.
 parseAtt :: Monad n => (Text, Text) -> HeistT n IO (DList (Chunk n))
 parseAtt (k,v) = do
-    mas <- getsTS (H.lookup k . _attrSpliceMap)
+    mas <- getsHS (H.lookup k . _attrSpliceMap)
     maybe doInline (return . doAttrSplice) mas
 
   where
@@ -471,7 +471,7 @@ adjustPromise (Promise k) f = modify (HE.adjust f k)
 -- | Creates an empty promise.
 newEmptyPromise :: HeistT n IO (Promise a)
 newEmptyPromise = do
-    keygen <- getsTS _keygen
+    keygen <- getsHS _keygen
     key    <- liftIO $ HE.makeKey keygen
     return $! Promise key
 {-# INLINE newEmptyPromise #-}
@@ -482,7 +482,7 @@ newEmptyPromise = do
 -- newEmptyPromiseWithError :: (Monad n)
 --                          => String -> HeistT n IO (Promise a)
 -- newEmptyPromiseWithError from = do
---     keygen <- getsTS _keygen
+--     keygen <- getsHS _keygen
 --     prom   <- liftM Promise $ liftIO $ HE.makeKey keygen
 --     yieldRuntimeEffect $ putPromise prom
 --                        $ error
@@ -559,7 +559,7 @@ bindSplices ss ts = foldr (uncurry bindSplice) ts ss
 -- useful because it allows compiled splices to bind other compiled splices
 -- during load-time splice processing.
 addSplices :: Monad m => [(Text, Splice n)] -> HeistT n m ()
-addSplices ss = modifyTS (bindSplices ss)
+addSplices ss = modifyHS (bindSplices ss)
 
 
 ------------------------------------------------------------------------------

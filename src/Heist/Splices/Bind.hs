@@ -34,7 +34,7 @@ bindImpl = do
           (X.getAttribute bindAttr node)
     return []
   where
-    add node nm = modifyTS $ bindSplice nm $ do
+    add node nm = modifyHS $ bindSplice nm $ do
         caller <- getParamNode
         ctx <- getContext
         rawApply (X.childNodes node) ctx (X.childNodes caller)

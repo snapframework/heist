@@ -374,10 +374,10 @@ ignoreTest = do
 
 lookupTemplateTest :: IO ()
 lookupTemplateTest = do
-    hs <- loadTS "templates"
+    hs <- loadHS "templates"
     let k = do
-            modifyTS (\st -> st { _curContext = ["foo"] })
-            getsTS $ (\hs' -> lookupTemplate "/user/menu" hs' _templateMap)
+            modifyHS (\st -> st { _curContext = ["foo"] })
+            getsHS $ (\hs' -> lookupTemplate "/user/menu" hs' _templateMap)
     res <- runHeistT k (X.TextNode "") hs
     H.assertBool "lookup context test" $ isJust $ fst res
 

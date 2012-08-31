@@ -49,8 +49,8 @@ loadIO baseDir r s d a = runEitherT $ do
 
 
 ------------------------------------------------------------------------------
-loadTS :: FilePath -> IO (HeistState IO)
-loadTS baseDir = do
+loadHS :: FilePath -> IO (HeistState IO)
+loadHS baseDir = do
     etm <- runEitherT $
         loadTemplates baseDir >>= initHeist [] [] [] []
     either (error . concat) return etm
@@ -68,14 +68,14 @@ loadEmpty a b c d = do
 
 testTemplate :: FilePath -> ByteString -> IO ByteString
 testTemplate tdir tname = do
-    ts <- loadTS tdir
+    ts <- loadHS tdir
     Just (resDoc, _) <- renderTemplate ts tname
     return $ toByteString resDoc
 
 
 testTemplateEval :: ByteString -> IO (Maybe Template)
 testTemplateEval tname = do
-    ts <- loadTS "templates"
+    ts <- loadHS "templates"
     md <- evalHeistT (evalWithDoctypes tname) (X.TextNode "") ts
     return $ fmap X.docContent md
 
@@ -85,7 +85,7 @@ testTemplateEval tname = do
 -- template.  (Old convenience code.)
 quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
 quickRender baseDir name = do
-    ts  <- loadTS baseDir
+    ts  <- loadHS baseDir
     res <- renderTemplate ts name
     return (fmap (toByteString . fst) res)
 

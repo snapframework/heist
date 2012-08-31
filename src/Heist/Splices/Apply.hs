@@ -33,15 +33,15 @@ rawApply :: (Monad n)
          -> [X.Node]
          -> Splice n
 rawApply calledNodes newContext paramNodes = do
-    st <- getTS  -- Can't use localTS here because the modifier is not pure
+    st <- getHS  -- Can't use localHS here because the modifier is not pure
     processedParams <- runNodeList paramNodes
-    modifyTS (bindSplice "content" (return processedParams) .
+    modifyHS (bindSplice "content" (return processedParams) .
               setCurContext newContext)
 
     if _recursionDepth st < mAX_RECURSION_DEPTH
         then do modRecursionDepth (+1)
                 result <- runNodeList calledNodes
-                restoreTS st
+                restoreHS st
                 return result
         else return [] `orError` err
   where
@@ -55,7 +55,7 @@ rawApply calledNodes newContext paramNodes = do
 -- <apply> tag.
 applyNodes :: Monad n => Template -> Text -> Splice n
 applyNodes nodes template = do
-    st <- getTS
+    st <- getHS
     maybe (return [] `orError` err)
           (\(t,ctx) -> do
               addDoctype $ maybeToList $ X.docType $ dfDoc t

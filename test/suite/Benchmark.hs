@@ -25,7 +25,7 @@ main :: IO ()
 main = do
     args <- getArgs
     let page = head args
-    hs <- loadTS "test/snap-website"
+    hs <- loadHS "test/snap-website"
     let action = fromJust $ C.renderCompiledTemplate
             (encodeUtf8 $ T.pack page) hs
     out <- action

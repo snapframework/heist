@@ -30,7 +30,7 @@ bindStrictImpl = do
     return []
 
   where
-    add cs nm = modifyTS $ bindSplice nm $ do
+    add cs nm = modifyHS $ bindSplice nm $ do
         caller <- getParamNode
         ctx <- getContext
         rawApply cs ctx (X.childNodes caller)

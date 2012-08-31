@@ -175,7 +175,7 @@ mapSplices f vs = liftM mconcat $ mapM f vs
 ------------------------------------------------------------------------------
 -- | Gets the current context
 getContext :: Monad m => HeistT n m TPath
-getContext = getsTS _curContext
+getContext = getsHS _curContext
 
 
 ------------------------------------------------------------------------------
@@ -188,7 +188,7 @@ getContext = getsTS _curContext
 -- while a user request is being processed.
 orError :: Monad m => HeistT n m b -> String -> HeistT n m b
 orError silent msg = do
-    hs <- getTS
+    hs <- getHS
     if _preprocessingMode hs
       then error $ (fromMaybe "" $ _curTemplateFile hs) ++
                    ": " ++ msg
@@ -200,7 +200,7 @@ orError silent msg = do
 -- processed.  Returns Nothing if the template is not associated with a file
 -- on disk or if there is no template being processed.
 getTemplateFilePath :: Monad m => HeistT n m (Maybe FilePath)
-getTemplateFilePath = getsTS _curTemplateFile
+getTemplateFilePath = getsHS _curTemplateFile
 
 
 ------------------------------------------------------------------------------

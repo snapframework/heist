@@ -393,66 +393,66 @@ localParamNode f m = HeistT $ \r s -> runHeistT m (f r) s
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'gets'.
-getsTS :: Monad m => (HeistState n -> r) -> HeistT n m r
-getsTS f = HeistT $ \_ s -> return (f s, s)
-{-# INLINE getsTS #-}
+getsHS :: Monad m => (HeistState n -> r) -> HeistT n m r
+getsHS f = HeistT $ \_ s -> return (f s, s)
+{-# INLINE getsHS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'get'.
-getTS :: Monad m => HeistT n m (HeistState n)
-getTS = HeistT $ \_ s -> return (s, s)
-{-# INLINE getTS #-}
+getHS :: Monad m => HeistT n m (HeistState n)
+getHS = HeistT $ \_ s -> return (s, s)
+{-# INLINE getHS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'put'.
-putTS :: Monad m => HeistState n -> HeistT n m ()
-putTS s = HeistT $ \_ _ -> return ((), s)
-{-# INLINE putTS #-}
+putHS :: Monad m => HeistState n -> HeistT n m ()
+putHS s = HeistT $ \_ _ -> return ((), s)
+{-# INLINE putHS #-}
 
 
 ------------------------------------------------------------------------------
 -- | HeistT's 'modify'.
-modifyTS :: Monad m
+modifyHS :: Monad m
          => (HeistState n -> HeistState n)
          -> HeistT n m ()
-modifyTS f = HeistT $ \_ s -> return ((), f s)
-{-# INLINE modifyTS #-}
+modifyHS f = HeistT $ \_ s -> return ((), f s)
+{-# INLINE modifyHS #-}
 
 
 ------------------------------------------------------------------------------
--- | Restores the HeistState.  This function is almost like putTS except it
+-- | Restores the HeistState.  This function is almost like putHS except it
 -- preserves the current doctypes.  You should use this function instead of
--- @putTS@ to restore an old state.  This was needed because doctypes needs to
+-- @putHS@ to restore an old state.  This was needed because doctypes needs to
 -- be in a "global scope" as opposed to the template call "local scope" of
 -- state items such as recursionDepth, curContext, and spliceMap.
-restoreTS :: Monad m => HeistState n -> HeistT n m ()
-restoreTS old = modifyTS (\cur -> old { _doctypes = _doctypes cur })
-{-# INLINE restoreTS #-}
+restoreHS :: Monad m => HeistState n -> HeistT n m ()
+restoreHS old = modifyHS (\cur -> old { _doctypes = _doctypes cur })
+{-# INLINE restoreHS #-}
 
 
 ------------------------------------------------------------------------------
 -- | Abstracts the common pattern of running a HeistT computation with
 -- a modified heist state.
-localTS :: Monad m
+localHS :: Monad m
         => (HeistState n -> HeistState n)
         -> HeistT n m a
         -> HeistT n m a
-localTS f k = do
-    ts <- getTS
-    putTS $ f ts
+localHS f k = do
+    ts <- getHS
+    putHS $ f ts
     res <- k
-    restoreTS ts
+    restoreHS ts
     return res
-{-# INLINE localTS #-}
+{-# INLINE localHS #-}
 
 
 ------------------------------------------------------------------------------
 -- | Modifies the recursion depth.
 modRecursionDepth :: Monad m => (Int -> Int) -> HeistT n m ()
 modRecursionDepth f =
-    modifyTS (\st -> st { _recursionDepth = f (_recursionDepth st) })
+    modifyHS (\st -> st { _recursionDepth = f (_recursionDepth st) })
 
 
 ------------------------------------------------------------------------------

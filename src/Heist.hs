@@ -31,12 +31,12 @@ module Heist
   , getContext
   , getTemplateFilePath
   , localParamNode
-  , getsTS
-  , getTS
-  , putTS
-  , modifyTS
-  , restoreTS
-  , localTS
+  , getsHS
+  , getHS
+  , putHS
+  , modifyHS
+  , restoreHS
+  , localHS
   , getDoc
   , getXMLDoc
   ) where

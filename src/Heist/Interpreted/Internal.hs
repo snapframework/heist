@@ -35,7 +35,7 @@ type Splice n = HeistT n n Template
 -- | Mappends a doctype to the state.
 addDoctype :: Monad m => [X.DocType] -> HeistT n m ()
 addDoctype dt = do
-    modifyTS (\s -> s { _doctypes = _doctypes s `mappend` dt })
+    modifyHS (\s -> s { _doctypes = _doctypes s `mappend` dt })
 
 
 ------------------------------------------------------------------------------
@@ -85,7 +85,7 @@ runChildrenWith :: (Monad n)
                 -- ^ List of splices to bind before running the param nodes.
                 -> Splice n
                 -- ^ Returns the passed in view.
-runChildrenWith splices = localTS (bindSplices splices) runChildren
+runChildrenWith splices = localHS (bindSplices splices) runChildren
 
 
 ------------------------------------------------------------------------------
@@ -171,7 +171,7 @@ addXMLTemplate n t mfp st =
 -- scan @L@ for splices and run them.  If @foo@ calls @stopRecursion@, @L@
 -- will be included in the output verbatim without running any splices.
 stopRecursion :: Monad m => HeistT n m ()
-stopRecursion = modifyTS (\st -> st { _recurse = False })
+stopRecursion = modifyHS (\st -> st { _recurse = False })
 
 
 ------------------------------------------------------------------------------
@@ -180,7 +180,7 @@ runNode :: Monad n => X.Node -> Splice n
 runNode (X.Element nm at ch) = do
     newAtts <- (return . concat) =<< mapM runAttrSplice at
     let n = X.Element nm newAtts ch
-    s <- liftM (lookupSplice nm) getTS
+    s <- liftM (lookupSplice nm) getHS
     maybe (runKids newAtts) (recurseSplice n) s
   where
     runKids newAtts = do
@@ -194,7 +194,7 @@ runNode n                    = return [n]
 -- substitution.
 runAttrSplice :: (Monad n) => (Text, Text) -> HeistT n n [(Text, Text)]
 runAttrSplice a@(k,v) = do
-    splice <- getsTS (Map.lookup k . _attrSpliceMap)
+    splice <- getsHS (Map.lookup k . _attrSpliceMap)
     maybe (liftM (:[]) $ attSubst a) (lift . ($v)) splice
 
 
@@ -225,7 +225,7 @@ parseAtt bs = do
         localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
 
     renderEscaped c = do
-        hs <- getTS
+        hs <- getHS
         if _preprocessingMode hs
           then return $ T.snoc "\\" c
           else return $ T.singleton c
@@ -255,7 +255,7 @@ parseAtt bs = do
 -- it's \"more intuitive\".
 getAttributeSplice :: Monad n => Text -> HeistT n n Text
 getAttributeSplice name = do
-    hs <- getTS
+    hs <- getHS
     let noSplice = if _preprocessingMode hs
                      then return $ T.concat ["${", name, "}"]
                      else return ""
@@ -281,11 +281,11 @@ mAX_RECURSION_DEPTH = 50
 recurseSplice :: Monad n => X.Node -> Splice n -> Splice n
 recurseSplice node splice = do
     result <- localParamNode (const node) splice
-    ts' <- getTS
+    ts' <- getHS
     if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
         then do modRecursionDepth (+1)
                 res <- runNodeList result
-                restoreTS ts'
+                restoreHS ts'
                 return res
         else return result
 
@@ -297,10 +297,10 @@ lookupAndRun :: Monad m
              -> ((DocumentFile, TPath) -> HeistT n m (Maybe a))
              -> HeistT n m (Maybe a)
 lookupAndRun name k = do
-    ts <- getTS
+    ts <- getHS
     let mt = lookupTemplate name ts _templateMap
     let curPath = join $ fmap (dfFile . fst) mt
-    modifyTS (setCurTemplateFile curPath)
+    modifyHS (setCurTemplateFile curPath)
     maybe (return Nothing) k mt
 
 
@@ -310,7 +310,7 @@ evalTemplate :: Monad n
              => ByteString
              -> HeistT n n (Maybe Template)
 evalTemplate name = lookupAndRun name
-    (\(t,ctx) -> localTS (\ts -> ts {_curContext = ctx})
+    (\(t,ctx) -> localHS (\ts -> ts {_curContext = ctx})
                          (liftM Just $ runNodeList $ X.docContent $ dfDoc t))
 
 
@@ -319,7 +319,7 @@ evalTemplate name = lookupAndRun name
 -- value.
 fixDocType :: Monad m => X.Document -> HeistT n m X.Document
 fixDocType d = do
-    dts <- getsTS _doctypes
+    dts <- getsHS _doctypes
     return $ d { X.docType = listToMaybe dts }
 
 
@@ -331,11 +331,11 @@ evalWithDoctypes :: Monad n
                  -> HeistT n n (Maybe X.Document)
 evalWithDoctypes name = lookupAndRun name $ \(t,ctx) -> do
     addDoctype $ maybeToList $ X.docType $ dfDoc t
-    ts <- getTS
+    ts <- getHS
     let nodes = X.docContent $ dfDoc t
-    putTS (ts {_curContext = ctx})
+    putHS (ts {_curContext = ctx})
     newNodes <- runNodeList nodes
-    restoreTS ts
+    restoreHS ts
     newDoc   <- fixDocType $ (dfDoc t) { X.docContent = newNodes }
     return (Just newDoc)
 
@@ -370,7 +370,7 @@ callTemplate :: Monad n
                                    -- (name,value) parameter pairs
              -> HeistT n n Template
 callTemplate name params = do
-    modifyTS $ bindSplices params
+    modifyHS $ bindSplices params
     liftM (maybe [] id) $ evalTemplate name
 
 
@@ -383,7 +383,7 @@ callTemplateWithText :: Monad n
                                        -- (name,value) parameter pairs
                      -> HeistT n n Template
 callTemplateWithText name params = do
-    modifyTS $ bindStrings params
+    modifyHS $ bindStrings params
     liftM (maybe [] id) $ evalTemplate name
 
 
