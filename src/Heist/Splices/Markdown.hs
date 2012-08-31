@@ -151,13 +151,13 @@ readProcessWithExitCode' cmd args input = do
     errM <- newEmptyMVar
 
     -- fork off a thread to start consuming stdout
-    forkIO $ do
+    _ <- forkIO $ do
         out <- B.hGetContents outh
         putMVar outM out
         putMVar outMVar ()
 
     -- fork off a thread to start consuming stderr
-    forkIO $ do
+    _ <- forkIO $ do
         err  <- B.hGetContents errh
         putMVar errM err
         putMVar outMVar ()

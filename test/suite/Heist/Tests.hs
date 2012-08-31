@@ -9,7 +9,6 @@ import           Blaze.ByteString.Builder
 import           Control.Monad.State
 import qualified Data.ByteString.Char8 as B
 import           Data.Maybe
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
@@ -18,7 +17,8 @@ import qualified Test.HUnit as H
 
 ------------------------------------------------------------------------------
 import qualified Heist.Compiled as C
-import           Heist.Compiled.Tutorial
+import           Heist.Tutorial.AttributeSplices
+import           Heist.Tutorial.CompiledSplices
 import qualified Heist.Interpreted as I
 import           Heist.Splices.Cache
 import           Heist.Splices.Html
@@ -51,17 +51,9 @@ loadErrorsTest = do
         ]
 
 
-attrSplice :: Text -> StateT Text IO [(Text, Text)]
-attrSplice v = do
-    val <- get
-    let checked = if v == val
-                    then [("checked","")]
-                    else []
-    return $ ("name", v) : checked
-
 attrSpliceTest :: IO ()
 attrSpliceTest = do
-    ehs <- loadT "templates" [] [] [] [("autocheck", attrSplice)]
+    ehs <- loadT "templates" [] [] [] [("autocheck", autocheckedSplice)]
     let hs = either (error . show) id ehs
         runtime = fromJust $ C.renderTemplate hs "attr_splice"
 
@@ -79,10 +71,10 @@ attrSpliceTest = do
     H.assertEqual "compiled bar" expected4
       (toByteString builder2)
   where
-    expected1 = doctype `B.append` "\n<input type='checkbox' name='foo' checked />\n<input type='checkbox' name='bar' />\n"
-    expected2 = doctype `B.append` "\n<input type='checkbox' name='foo' />\n<input type='checkbox' name='bar' checked />\n"
-    expected3 = "<input type=\"checkbox\" name=\"foo\" checked />&#10;<input type=\"checkbox\" name=\"bar\" />&#10;"
-    expected4 = "<input type=\"checkbox\" name=\"foo\" />&#10;<input type=\"checkbox\" name=\"bar\" checked />&#10;"
+    expected1 = doctype `B.append` "\n<input type='checkbox' value='foo' checked />\n<input type='checkbox' value='bar' />\n"
+    expected2 = doctype `B.append` "\n<input type='checkbox' value='foo' />\n<input type='checkbox' value='bar' checked />\n"
+    expected3 = "<input type=\"checkbox\" value=\"foo\" checked />&#10;<input type=\"checkbox\" value=\"bar\" />&#10;"
+    expected4 = "<input type=\"checkbox\" value=\"foo\" />&#10;<input type=\"checkbox\" value=\"bar\" checked />&#10;"
 
 fooSplice :: I.Splice (StateT Int IO)
 fooSplice = do

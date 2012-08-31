@@ -8,7 +8,7 @@ import qualified Test.HUnit as H
 
 
 ------------------------------------------------------------------------------
-import           Heist.Compiled.Tutorial
+import           Heist.Tutorial.CompiledSplices
 
 -- NOTE: We can't test compiled templates on the templates directory as it
 -- stands today because that directory contains some error conditions such as

@@ -14,10 +14,10 @@ compiled into our test suite and the results automatically checked by our
 buildbot.  So first we need to get some boilerplate and imports out of the way.
 
 > {-# LANGUAGE NoMonomorphismRestriction #-}
-> module Heist.Compiled.Tutorial where
+> module Heist.Tutorial.CompiledSplices where
 > import           Heist
 > import qualified Heist.Compiled as C
-> import           Heist.Compiled.TutorialImports
+> import           Heist.Tutorial.Imports
 
 As a review, normal (interpreted) Heist splices are defined like this.
 

@@ -1,4 +1,4 @@
-module Heist.Compiled.TutorialImports
+module Heist.Tutorial.Imports
   ( module Blaze.ByteString.Builder
   , module Control.Monad
   , module Control.Monad.Trans
