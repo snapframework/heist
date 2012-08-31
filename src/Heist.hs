@@ -137,31 +137,23 @@ loadTemplates dir = do
 -- longer possible.  All of your templates must be known when you call this
 -- function.
 initHeist :: Monad n
-          => [(Text, I.Splice n)]
-          -- ^ Runtime splices
-          -> [(Text, I.Splice IO)]
-          -- ^ Static loadtime splices
-          -> [(Text, C.Splice n)]
-          -- ^ Dynamic loadtime splices
-          -> [(Text, AttrSplice n)]
-          -- ^ Attribute splices
-          -> HashMap TPath DocumentFile
+          => HeistConfig n
           -> EitherT [String] IO (HeistState n)
-initHeist rSplices sSplices dSplices aSplices rawTemplates = do
+initHeist (HeistConfig i lt c a rawTemplates) = do
     keyGen <- lift HE.newKeyGen
     let empty = HeistState Map.empty Map.empty Map.empty Map.empty
                            Map.empty True [] 0 [] Nothing keyGen False
-        hs0 = empty { _spliceMap = Map.fromList sSplices
+        hs0 = empty { _spliceMap = Map.fromList lt
                     , _templateMap = rawTemplates
                     , _preprocessingMode = True }
     tPairs <- lift $ evalHeistT
         (mapM preprocess $ Map.toList rawTemplates) (X.TextNode "") hs0
     let bad = lefts tPairs
         tmap = Map.fromList $ rights tPairs
-        hs1 = empty { _spliceMap = Map.fromList rSplices
+        hs1 = empty { _spliceMap = Map.fromList i
                     , _templateMap = tmap
-                    , _compiledSpliceMap = Map.fromList dSplices
-                    , _attrSpliceMap = Map.fromList aSplices
+                    , _compiledSpliceMap = Map.fromList c
+                    , _attrSpliceMap = Map.fromList a
                     }
 
     if not (null bad)
@@ -190,22 +182,15 @@ preprocess (tpath, docFile) = do
 -- will still probably want to pattern your approach after this function's
 -- implementation.
 initHeistWithCacheTag :: MonadIO n
-                      => [(Text, I.Splice n)]
-                      -- ^ Runtime splices
-                      -> [(Text, I.Splice IO)]
-                      -- ^ Static loadtime splices
-                      -> [(Text, C.Splice n)]
-                      -- ^ Dynamic loadtime splices
-                      -> [(Text, AttrSplice n)]
-                      -- ^ Attribute splices
-                      -> HashMap TPath DocumentFile
+                      => HeistConfig n
                       -> EitherT [String] IO (HeistState n, CacheTagState)
-initHeistWithCacheTag rSplices sSplices dSplices aSplices rawTemplates = do
+initHeistWithCacheTag (HeistConfig i lt c a rawTemplates) = do
     (ss, cts) <- liftIO mkCacheTag
     let tag = "cache"
-    hs <- initHeist ((tag, cacheImpl cts) : rSplices)
-                    ((tag, ss) : sSplices)
-                    ((tag, cacheImplCompiled cts) : dSplices)
-                    aSplices rawTemplates
+        hc' = HeistConfig ((tag, cacheImpl cts) : i)
+                          ((tag, ss) : lt)
+                          ((tag, cacheImplCompiled cts) : c)
+                          a rawTemplates
+    hs <- initHeist hc'
     return (hs, cts)
 

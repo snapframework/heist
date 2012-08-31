@@ -93,8 +93,10 @@ directory with compiled splices.
 >      -> [(Text, C.Splice n)]
 >      -> IO (HeistState n)
 > load baseDir splices = do
->     tmap <- runEitherT $ initHeist [] defaultLoadTimeSplices splices [] =<<
->                          loadTemplates baseDir
+>     tmap <- runEitherT $ do
+>         templates <- loadTemplates baseDir
+>         let hc = HeistConfig [] defaultLoadTimeSplices splices [] templates
+>         initHeist hc
 >     either (error . concat) return tmap
 
 Here's a function demonstrating all of this in action.

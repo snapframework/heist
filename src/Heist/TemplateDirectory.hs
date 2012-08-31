@@ -20,10 +20,7 @@ import           Control.Concurrent
 import           Control.Error
 import           Control.Monad
 import           Control.Monad.Trans
-import           Data.Text (Text)
 import           Heist
-import qualified Heist.Compiled.Internal as C
-import qualified Heist.Interpreted.Internal as I
 import           Heist.Splices.Cache
 
 
@@ -32,10 +29,7 @@ import           Heist.Splices.Cache
 data TemplateDirectory n
     = TemplateDirectory
         FilePath
-        [(Text, I.Splice n)]
-        [(Text, I.Splice IO)]
-        [(Text, C.Splice n)]
-        [(Text, AttrSplice n)]
+        (HeistConfig n)
         (MVar (HeistState n))
         (MVar CacheTagState)
 
@@ -45,16 +39,15 @@ data TemplateDirectory n
 -- error handling.
 newTemplateDirectory :: MonadIO n
                      => FilePath
-                     -> [(Text, I.Splice n)]
-                     -> [(Text, I.Splice IO)]
-                     -> [(Text, C.Splice n)]
-                     -> [(Text, AttrSplice n)]
+                     -> HeistConfig n
                      -> EitherT [String] IO (TemplateDirectory n)
-newTemplateDirectory dir a b c d = do
-    (hs,cts) <- loadTemplates dir >>= initHeistWithCacheTag a b c d
+newTemplateDirectory dir hc = do
+    templates <- loadTemplates dir
+    let hc' = hc { hcTemplates = templates }
+    (hs,cts) <- initHeistWithCacheTag hc'
     tsMVar <- liftIO $ newMVar hs
     ctsMVar <- liftIO $ newMVar cts
-    return $ TemplateDirectory dir a b c d tsMVar ctsMVar
+    return $ TemplateDirectory dir hc' tsMVar ctsMVar
 
 
 ------------------------------------------------------------------------------
@@ -62,14 +55,10 @@ newTemplateDirectory dir a b c d = do
 -- function on error.
 newTemplateDirectory' :: MonadIO n
                       => FilePath
-                      -> [(Text, I.Splice n)]
-                      -> [(Text, I.Splice IO)]
-                      -> [(Text, C.Splice n)]
-                      -> [(Text, AttrSplice n)]
+                      -> HeistConfig n
                       -> IO (TemplateDirectory n)
-newTemplateDirectory' dir rSplices sSplices dSplices aSplices = do
-    res <- runEitherT $ 
-        newTemplateDirectory dir rSplices sSplices dSplices aSplices
+newTemplateDirectory' dir hc = do
+    res <- runEitherT $ newTemplateDirectory dir hc
     either (error . concat) return res
 
 
@@ -78,14 +67,14 @@ newTemplateDirectory' dir rSplices sSplices dSplices aSplices = do
 getDirectoryHS :: (MonadIO n)
                => TemplateDirectory n
                -> IO (HeistState n)
-getDirectoryHS (TemplateDirectory _ _ _ _ _ tsMVar _) =
+getDirectoryHS (TemplateDirectory _ _ tsMVar _) =
     liftIO $ readMVar $ tsMVar
 
 
 ------------------------------------------------------------------------------
 -- | Clears the TemplateDirectory's cache tag state.
 getDirectoryCTS :: TemplateDirectory n -> IO CacheTagState
-getDirectoryCTS (TemplateDirectory _ _ _ _ _ _ ctsMVar) = readMVar ctsMVar
+getDirectoryCTS (TemplateDirectory _ _ _ ctsMVar) = readMVar ctsMVar
 
 
 ------------------------------------------------------------------------------
@@ -93,8 +82,10 @@ getDirectoryCTS (TemplateDirectory _ _ _ _ _ _ ctsMVar) = readMVar ctsMVar
 reloadTemplateDirectory :: (MonadIO n)
                         => TemplateDirectory n
                         -> IO (Either String ())
-reloadTemplateDirectory (TemplateDirectory p a b c d tsMVar ctsMVar) = do
-    ehs <- runEitherT $ loadTemplates p >>= initHeistWithCacheTag a b c d
+reloadTemplateDirectory (TemplateDirectory p hc tsMVar ctsMVar) = do
+    ehs <- runEitherT $ do
+        templates <- loadTemplates p
+        initHeistWithCacheTag (hc { hcTemplates = templates })
     leftPass ehs $ \(hs,cts) -> do
         modifyMVar_ tsMVar (const $ return hs)
         modifyMVar_ ctsMVar (const $ return cts)

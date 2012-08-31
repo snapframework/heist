@@ -9,6 +9,7 @@ import           Blaze.ByteString.Builder
 import           Control.Monad.State
 import qualified Data.ByteString.Char8 as B
 import           Data.Maybe
+import           Data.Monoid
 import qualified Data.Text as T
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
@@ -16,6 +17,7 @@ import qualified Test.HUnit as H
 
 
 ------------------------------------------------------------------------------
+import           Heist
 import qualified Heist.Compiled as C
 import           Heist.Tutorial.AttributeSplices
 import           Heist.Tutorial.CompiledSplices
@@ -86,15 +88,15 @@ tdirCacheTest :: IO ()
 tdirCacheTest = do
     let rSplices = [ ("foosplice", fooSplice) ]
         dSplices = [ ("foosplice", stateSplice) ]
-    td <- newTemplateDirectory' "templates"
-            rSplices [] dSplices []
+        hc = HeistConfig rSplices [] dSplices [] mempty
+    td <- newTemplateDirectory' "templates" hc
+            
     [a,b,c,d] <- evalStateT (testInterpreted td) 5
     H.assertBool "interpreted doesn't cache" $ a == b
     H.assertBool "interpreted doesn't clear" $ b /= c
     H.assertBool "interpreted doesn't reload" $ c /= d
 
-    td' <- newTemplateDirectory' "templates"
-            rSplices [] dSplices []
+    td' <- newTemplateDirectory' "templates" hc
     [e,f,g,h] <- evalStateT (testCompiled td') 5
     H.assertBool "compiled doesn't cache" $ e == f
     H.assertBool "compiled doesn't clear" $ f /= g
