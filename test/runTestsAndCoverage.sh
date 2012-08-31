@@ -25,9 +25,11 @@ mkdir -p $DIR
 
 EXCLUDES='Main
 Heist.Compiled.Tests
-Heist.Compiled.Tutorial
-Heist.Compiled.TutorialImports
 Heist.Interpreted.Tests
+Heist.Tutorial.AttributeSplices
+Heist.Tutorial.CompiledSplices
+Heist.Tutorial.Imports
+Heist.TestCommon
 Heist.Tests'
 
 EXCL=""
