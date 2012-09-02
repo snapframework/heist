@@ -417,25 +417,3 @@ renderWithArgs :: Monad n
 renderWithArgs args ts = renderTemplate (bindStrings args ts)
 
 
-------------------------------------------------------------------------------
--- Template loading
-------------------------------------------------------------------------------
-
-
-------------------------------------------------------------------------------
--- | Adds a path prefix to all the templates in the 'HeistState'.  If you
--- want to add multiple levels of directories, separate them with slashes as
--- in "foo/bar".  Using an empty string as a path prefix will leave the
--- 'HeistState' unchanged.
-addTemplatePathPrefix :: ByteString -> HeistState n -> HeistState n
-addTemplatePathPrefix dir ts
-  | B.null dir = ts
-  | otherwise  = ts { _templateMap = Map.fromList $
-                                     map (\(x,y) -> (f x, y)) $
-                                     Map.toList $
-                                     _templateMap ts
-                    }
-  where
-    f ps = ps++splitTemplatePath dir
-
-

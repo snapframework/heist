@@ -71,7 +71,6 @@ module Heist.Interpreted
   -- * HeistState Functions
   , addTemplate
   , addXMLTemplate
-  , addTemplatePathPrefix
   , lookupSplice
   , bindSplice
   , bindSplices

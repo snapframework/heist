@@ -14,6 +14,7 @@ module Heist
   , HeistConfig(..)
   , defaultLoadTimeSplices
   , loadTemplates
+  , addTemplatePathPrefix
   , initHeist
   , initHeistWithCacheTag
   , MIMEType
@@ -46,6 +47,8 @@ import           Control.Error
 import           Control.Exception (SomeException)
 import           Control.Monad.CatchIO
 import           Control.Monad.Trans
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import qualified Data.Foldable as F
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.HashMap.Strict (HashMap)
@@ -117,6 +120,23 @@ loadTemplates dir = do
     case errs of
         [] -> right $ Map.fromList $ rights tlist
         _  -> left errs
+
+
+------------------------------------------------------------------------------
+-- | Adds a path prefix to all the templates in the 'HeistState'.  If you
+-- want to add multiple levels of directories, separate them with slashes as
+-- in "foo/bar".  Using an empty string as a path prefix will leave the
+-- 'HeistState' unchanged.
+addTemplatePathPrefix :: ByteString
+                      -> HashMap TPath DocumentFile
+                      -> HashMap TPath DocumentFile
+addTemplatePathPrefix dir ts
+  | B.null dir = ts
+  | otherwise  = Map.fromList $
+                 map (\(x,y) -> (f x, y)) $
+                 Map.toList ts
+  where
+    f ps = ps++splitTemplatePath dir
 
 
 ------------------------------------------------------------------------------
