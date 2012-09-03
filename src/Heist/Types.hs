@@ -10,7 +10,7 @@
 
 This module contains the core Heist data types.  
 
-Edward Kmett wrote most of the HeistT code and associated instances,
+Edward Kmett wrote most of the HeistT monad code and associated instances,
 liberating us from the unused writer portion of RWST.
 
 -}
@@ -46,8 +46,7 @@ tr s x = trace (s++show x) x
 ------------------------------------------------------------------------------
 -- | A 'Template' is a forest of XML nodes.  Here we deviate from the \"single
 -- root node\" constraint of well-formed XML because we want to allow
--- templates to contain fragments of a document that may not have a single
--- root.
+-- templates to contain document fragments that may not have a single root.
 type Template = [X.Node]
 
 
@@ -62,6 +61,8 @@ type MIMEType = ByteString
 type TPath = [ByteString]
 
 
+------------------------------------------------------------------------------
+-- | Holds data about templates read from disk.
 data DocumentFile = DocumentFile
     { dfDoc  :: X.Document
     , dfFile :: Maybe FilePath
@@ -101,13 +102,9 @@ data Chunk m = Pure !Builder
 
 
 ------------------------------------------------------------------------------
---instance Show (Chunk m) where
---    show (Pure a)          = T.unpack $ T.concat
---        ["Pure \"", decodeUtf8 $ toByteString a, "\""]
---    show (RuntimeHtml _)   = "RuntimeHtml <m>"
---    show (RuntimeAction _) = "RuntimeAction <m>"
-
-
+-- | Type alias for attribute splices.  The function parameter is the value of
+-- the bound attribute splice.  The return value is a list of attribute
+-- key/value pairs that get substituted in the place of the bound attribute.
 type AttrSplice m = Text -> m [(Text, Text)]
 
 

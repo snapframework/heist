@@ -3,20 +3,28 @@
 {-|
 
 This module defines the core data types used by Heist.  In practice you will
-also want to import one or both of 'Heist.Compiled' or 'Heist.Interpreted' to
+also want to import one or both of "Heist.Compiled" or "Heist.Interpreted" to
 get functions needed for writing splices.
+
+The Heist template system allows you to build custom HTML and XML based markup
+languages.  With Heist you can define your own domain-specific tags
+implemented with Haskell and use them in your templates.
 
 -}
 
 module Heist
-  ( Template
-  , TPath
-  , HeistConfig(..)
-  , defaultLoadTimeSplices
-  , loadTemplates
+  (
+  -- * Primary Heist initialization functions
+    loadTemplates
   , addTemplatePathPrefix
   , initHeist
   , initHeistWithCacheTag
+  , defaultLoadTimeSplices
+
+  -- * Core Heist data types
+  , Template
+  , TPath
+  , HeistConfig(..)
   , MIMEType
   , DocumentFile(..)
   , AttrSplice
@@ -82,6 +90,7 @@ data HeistConfig m = HeistConfig
     -- ^ Attribute splices are bound to attribute names and return a list of
     -- attributes.
     , hcTemplates          :: HashMap TPath DocumentFile
+    -- ^ Templates returned from the 'loadTemplates' function.
     }
 
 
@@ -123,10 +132,10 @@ loadTemplates dir = do
 
 
 ------------------------------------------------------------------------------
--- | Adds a path prefix to all the templates in the 'HeistState'.  If you
--- want to add multiple levels of directories, separate them with slashes as
--- in "foo/bar".  Using an empty string as a path prefix will leave the
--- 'HeistState' unchanged.
+-- | Adds a path prefix to a templates in a map returned by loadTemplates.  If
+-- you want to add multiple levels of directories, separate them with slashes
+-- as in "foo/bar".  Using an empty string as a path prefix will leave the
+-- map unchanged.
 addTemplatePathPrefix :: ByteString
                       -> HashMap TPath DocumentFile
                       -> HashMap TPath DocumentFile
@@ -196,9 +205,9 @@ preprocess (tpath, docFile) = do
 
 
 ------------------------------------------------------------------------------
--- | This function is the easiest way to set up your HeistState with a cache
--- tag.  It sets up all the necessary splices properly.  If you need to do
--- configure the cache tag differently than how this function does it, you
+-- | Wrapper around initHeist that also sets up a cache tag.  It sets up both
+-- compiled and interpreted versions of the cache tag splices.  If you need to
+-- do configure the cache tag differently than how this function does it, you
 -- will still probably want to pattern your approach after this function's
 -- implementation.
 initHeistWithCacheTag :: MonadIO n

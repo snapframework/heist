@@ -7,6 +7,9 @@ produce a runtime computation that generates a ByteString Builder.  This
 preserves the ability to write splices that access runtime information from
 the HTTP request, database, etc.
 
+If you import both this module and "Heist.Interpreted" in the same file, then
+you will need to import them qualified.
+
 -}
 
 module Heist.Compiled
