@@ -154,3 +154,55 @@ structure with a compiled splice.
 >                  ]
 >     return $ toByteString builder
 
+
+Disadvantages of Compiled Heist
+===============================
+
+Complied Heist is faster than the original interpreted approach, but as with
+most things in computing there is a tradeoff.  Compiled Heist is strictly less
+powerful than interpreted Heist.  There are two things that compiled Heist
+loses: the ability to bind new splices on the fly at runtime and splice
+recursion/composability.
+
+The first point follows immediately from the definition of compiled Heist.
+When you decide to do all your splice DOM traversals once at load time you're
+unavoidably limited to only those splices that you defined at load time.  But
+this seems to be a good pattern to use in general because debugging your
+splices will be easier if you don't have to consider the possibility that
+the handler that binds them didn't run.
+
+The loss of recursion/composability happens because of the change in the type
+signature of splices.  Interpreted splices are a essentially function `[Node]
+-> m [Node]`.  This means that the output of one splice can be the input of
+another splice (including itself).  Compiled splices are a function `[Node] ->
+IO (DList (Chunk m))`.  Therefore, once a splice processes some nodes, the
+output is no longer something that can be passed into other splices.  
+
+This composability turns out to be a very powerful feature.  Head merging is
+one feature that can't be done without it.  Head merging allows you to put
+<head> tags anyhere in any template and have them all merged into a single
+<head> tag at the top of your HTML document.  This is useful because it allows
+you to keep concerns localized.  For instance, you can have a template
+represent a small piece of functionality that uses a less common javascript or
+CSS file.  Instead of having to depend on that resource being included in the
+top-level <head> tag, you can include it in a <head> tag right where you're
+using it.  Then it will only be included on your pages when you are using the
+markup that needs it.
+
+Our implementation of head merging uses a splice bound to the <html> tag.
+This splice removes all the <head> nodes from its children, combines them, and
+inserts them as its first child.  This won't work unless the <html> splice
+first runs all its children to make sure all <apply> and <bind> tags have
+happened first.  And that is impossible to do with compiled splices.
+
+To get around this problem we added the concept of load time splices.  Load
+time splices are just interpreted splices that are completely executed at load
+time.  If interpreted splices have type `[Node] -> m [Node]` where m is the
+runtime monad, then load time splices have type `[Node] -> IO [Node]`, where
+IO is the monad being executed at load time.  Load time splices give you the
+power and composability of interpreted splices as long as they are performing
+transformations that don't require runtime data.  All of the built-in splices
+that we ship with Heist work as load time splices.  So you can still have head
+merging by including our html splice in the load time splice list in your
+HeistConfig.
+
