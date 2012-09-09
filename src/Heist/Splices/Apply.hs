@@ -71,38 +71,38 @@ applyAttr = "template"
 ------------------------------------------------------------------------------
 
 
---rawApply :: (Monad n)
---         => Text
---         -> [X.Node]
---         -> TPath
---         -> [X.Node]
---         -> Splice n
---rawApply paramTag calledNodes newContext paramNodes = do
---    hs <- getHS  -- Can't use localHS here because the modifier is not pure
---    processedParams <- runNodeList paramNodes
---
---    -- apply should do a bottom-up traversal, so we run the called nodes
---    -- before doing <content/> substitution.
---    modifyHS (setCurContext newContext)
---
---    let process = concatMap (treeMap processedParams)
---    if _recursionDepth hs < mAX_RECURSION_DEPTH
---      then do modRecursionDepth (+1)
---              res <- runNodeList calledNodes
---              restoreHS hs
---              return $! process res
---      else do restoreHS hs
---              (return []) `orError` err
---  where
---    err = "template recursion exceeded max depth, "++
---          "you probably have infinite splice recursion!"
---    treeMap :: [X.Node] -> X.Node -> [X.Node]
---    treeMap ns (X.Element nm _ cs)
---      | nm == paramTag = ns
---      | otherwise = [n { X.elementChildren = cs' }]
---      where
---        !cs' = concatMap (treeMap ns) cs
---    treeMap _ n = [n]
+rawApply :: (Monad n)
+         => Text
+         -> [X.Node]
+         -> TPath
+         -> [X.Node]
+         -> Splice n
+rawApply paramTag calledNodes newContext paramNodes = do
+    hs <- getHS  -- Can't use localHS here because the modifier is not pure
+    processedParams <- runNodeList paramNodes
+
+    -- apply should do a bottom-up traversal, so we run the called nodes
+    -- before doing <content/> substitution.
+    modifyHS (setCurContext newContext)
+
+    let process = concatMap (treeMap processedParams)
+    if _recursionDepth hs < mAX_RECURSION_DEPTH
+      then do modRecursionDepth (+1)
+              res <- runNodeList calledNodes
+              restoreHS hs
+              return $! process res
+      else do restoreHS hs
+              (return []) `orError` err
+  where
+    err = "template recursion exceeded max depth, "++
+          "you probably have infinite splice recursion!"
+    treeMap :: [X.Node] -> X.Node -> [X.Node]
+    treeMap ns n@(X.Element nm _ cs)
+      | nm == paramTag = ns
+      | otherwise = [n { X.elementChildren = cs' }]
+      where
+        !cs' = concatMap (treeMap ns) cs
+    treeMap _ n = [n]
 
 
 

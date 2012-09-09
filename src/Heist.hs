@@ -53,19 +53,16 @@ module Heist
   , orError
   ) where
 
-import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Exception (SomeException)
 import           Control.Monad.CatchIO
 import           Control.Monad.Trans
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as CB
 import qualified Data.Foldable as F
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
-import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                       (Text)
 import           System.Directory.Tree

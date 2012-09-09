@@ -22,13 +22,11 @@ import           Blaze.ByteString.Builder
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
-import qualified Data.ByteString as B
 import           Data.IORef
 import qualified Data.HashMap.Strict as H
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as Set
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Read
@@ -39,7 +37,6 @@ import           Text.XmlHtml
 
 
 ------------------------------------------------------------------------------
-import           Heist.Common
 import qualified Heist.Compiled.Internal as C
 import           Heist.Interpreted.Internal
 import           Heist.Types
@@ -85,8 +82,6 @@ parseTTL s = value * multiplier
 cacheImpl :: (MonadIO n) => CacheTagState -> Splice n
 cacheImpl (CTS mv) = do
     tree <- getParamNode
-    fp <- getTemplateFilePath
-    ctx <- getContext
     let err = error $ unwords ["cacheImpl is bound to a tag"
                               ,"that didn't get an id attribute."
                               ," This should never happen."]
@@ -122,8 +117,6 @@ cacheImpl (CTS mv) = do
 cacheImplCompiled :: (MonadIO n) => CacheTagState -> C.Splice n
 cacheImplCompiled (CTS mv) = do
     tree <- getParamNode
-    fp <- getTemplateFilePath
-    ctx <- getContext
     let err = error $ unwords ["cacheImplCompiled is bound to a tag"
                               ,"that didn't get an id attribute."
                               ," This should never happen."]
@@ -196,15 +189,7 @@ setupSplice setref = do
     i <- liftIO $ getId setref
     node <- getParamNode
 
-    cf <- getsHS _curTemplateFile
---    liftIO $ print cf
---    when (cf == (Just "snaplets/heist/snap-website/faq.tpl")) $ do
---        liftIO $ putStrLn "======= Before ======="
---        liftIO $ B.putStrLn $ toByteString $ renderHtmlFragment UTF8 $ childNodes node
     newChildren <- runNodeList $ childNodes node
---    when (cf == (Just "snaplets/heist/snap-website/faq.tpl")) $ do
---        liftIO $ putStrLn "======= After ======="
---        liftIO $ B.putStrLn $ toByteString $ renderHtmlFragment UTF8 newChildren
     stopRecursion
     return $ [setAttribute "id" i $ node { elementChildren = newChildren }]
 
