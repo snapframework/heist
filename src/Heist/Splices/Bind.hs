@@ -1,6 +1,7 @@
 module Heist.Splices.Bind where
 
 ------------------------------------------------------------------------------
+import           Control.Monad.Trans
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Text.XmlHtml as X
@@ -24,7 +25,7 @@ bindAttr = "tag"
 
 ------------------------------------------------------------------------------
 -- | Implementation of the bind splice.
-bindImpl :: Monad n => Splice n
+bindImpl :: MonadIO n => Splice n
 bindImpl = do
     node <- getParamNode
     let err = "must supply \"" ++ T.unpack bindAttr ++
@@ -37,5 +38,5 @@ bindImpl = do
     add node nm = modifyHS $ bindSplice nm $ do
         caller <- getParamNode
         ctx <- getContext
-        rawApply (X.childNodes node) ctx (X.childNodes caller)
+        rawApply "bind-content" (X.childNodes node) ctx (X.childNodes caller)
 

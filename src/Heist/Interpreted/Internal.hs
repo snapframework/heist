@@ -280,13 +280,23 @@ mAX_RECURSION_DEPTH = 50
 recurseSplice :: Monad n => X.Node -> Splice n -> Splice n
 recurseSplice node splice = do
     result <- localParamNode (const node) splice
-    ts' <- getHS
-    if _recurse ts' && _recursionDepth ts' < mAX_RECURSION_DEPTH
-        then do modRecursionDepth (+1)
-                res <- runNodeList result
-                restoreHS ts'
-                return res
+    hs <- getHS
+    let nm = T.unpack $ X.elementTag node
+    if _recurse hs
+        then if _recursionDepth hs < mAX_RECURSION_DEPTH
+               then do modRecursionDepth (+1)
+                       res <- runNodeList result
+                       restoreHS hs
+                       return res
+               else return result `orError` err
         else return result
+  where
+    err = unwords
+        ["Recursion limit reached in node"
+        ,"<"++(T.unpack $ X.elementTag node)++">.  You"
+        ,"probably have infinite splice recursion!"
+        ]
+               
 
 
 ------------------------------------------------------------------------------

@@ -4,6 +4,6 @@
 </head>
 <body>
 <apply template="nav"/>
-<content/>
+<apply-content/>
 </body>
 </html>

@@ -6,13 +6,15 @@ import           Control.Error
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.HashMap.Strict as Map
+import           Data.Maybe
 import           Data.Text (Text)
 
 
 ------------------------------------------------------------------------------
 import           Heist
-import qualified Heist.Compiled.Internal as C
-import           Heist.Interpreted.Internal
+import qualified Heist.Compiled as C
+import qualified Heist.Interpreted as I
+import qualified Heist.Interpreted.Internal as I
 import qualified Text.XmlHtml        as X
 
 
@@ -26,8 +28,8 @@ doctype = B.concat
 
 loadT :: Monad m
       => FilePath
-      -> [(Text, Splice m)]
-      -> [(Text, Splice IO)]
+      -> [(Text, I.Splice m)]
+      -> [(Text, I.Splice IO)]
       -> [(Text, C.Splice m)]
       -> [(Text, AttrSplice m)]
       -> IO (Either [String] (HeistState m))
@@ -39,8 +41,8 @@ loadT baseDir a b c d = runEitherT $ do
 
 ------------------------------------------------------------------------------
 loadIO :: FilePath
-       -> [(Text, Splice IO)]
-       -> [(Text, Splice IO)]
+       -> [(Text, I.Splice IO)]
+       -> [(Text, I.Splice IO)]
        -> [(Text, C.Splice IO)]
        -> [(Text, AttrSplice IO)]
        -> IO (Either [String] (HeistState IO))
@@ -60,8 +62,8 @@ loadHS baseDir = do
     either (error . concat) return etm
 
 
-loadEmpty :: [(Text, Splice IO)]
-          -> [(Text, Splice IO)]
+loadEmpty :: [(Text, I.Splice IO)]
+          -> [(Text, I.Splice IO)]
           -> [(Text, C.Splice IO)]
           -> [(Text, AttrSplice IO)]
           -> IO (HeistState IO)
@@ -74,14 +76,14 @@ loadEmpty a b c d = do
 testTemplate :: FilePath -> ByteString -> IO ByteString
 testTemplate tdir tname = do
     ts <- loadHS tdir
-    Just (resDoc, _) <- renderTemplate ts tname
+    Just (resDoc, _) <- I.renderTemplate ts tname
     return $ toByteString resDoc
 
 
 testTemplateEval :: ByteString -> IO (Maybe Template)
 testTemplateEval tname = do
     ts <- loadHS "templates"
-    md <- evalHeistT (evalWithDoctypes tname) (X.TextNode "") ts
+    md <- evalHeistT (I.evalWithDoctypes tname) (X.TextNode "") ts
     return $ fmap X.docContent md
 
 
@@ -91,7 +93,14 @@ testTemplateEval tname = do
 quickRender :: FilePath -> ByteString -> IO (Maybe ByteString)
 quickRender baseDir name = do
     ts  <- loadHS baseDir
-    res <- renderTemplate ts name
+    res <- I.renderTemplate ts name
     return (fmap (toByteString . fst) res)
 
+cRender hs name = do
+    builder <- fst $ fromJust $ C.renderTemplate hs name
+    B.putStrLn $ toByteString builder
+
+iRender hs name = do
+    builder <- I.renderTemplate hs name
+    B.putStrLn $ toByteString $ fst $ fromJust builder
 

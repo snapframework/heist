@@ -151,6 +151,7 @@ Library
     mtl                       >= 2.0   && < 2.2,
     process                   >= 1.1   && < 1.2,
     random                    >= 1.0   && < 1.1,
+    system-uuid,
     text                      >= 0.10  && < 0.12,
     time                      >= 1.1   && < 1.5,
     transformers              >= 0.2   && < 0.4,

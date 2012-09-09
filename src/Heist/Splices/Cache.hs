@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | The \"cache\" splice ensures that its contents are cached and only
 -- evaluated periodically.  The cached contents are returned every time the
 -- splice is referenced.
@@ -21,20 +22,24 @@ import           Blaze.ByteString.Builder
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
+import qualified Data.ByteString as B
 import           Data.IORef
 import qualified Data.HashMap.Strict as H
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as Set
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Read
 import           Data.Time.Clock
+import           Data.Word
 import           System.Random
-import           Text.XmlHtml hiding (Node)
+import           Text.XmlHtml
 
 
 ------------------------------------------------------------------------------
+import           Heist.Common
 import qualified Heist.Compiled.Internal as C
 import           Heist.Interpreted.Internal
 import           Heist.Types
@@ -48,7 +53,7 @@ cacheTagName = "cache"
 ------------------------------------------------------------------------------
 -- | State for storing cache tag information
 newtype CacheTagState =
-    CTS (MVar (HashMap Text (UTCTime, Template, Builder)))
+    CTS (MVar (HashMap Text (UTCTime, Maybe Template, Maybe Builder)))
 
 
 ------------------------------------------------------------------------------
@@ -80,6 +85,8 @@ parseTTL s = value * multiplier
 cacheImpl :: (MonadIO n) => CacheTagState -> Splice n
 cacheImpl (CTS mv) = do
     tree <- getParamNode
+    fp <- getTemplateFilePath
+    ctx <- getContext
     let err = error $ unwords ["cacheImpl is bound to a tag"
                               ,"that didn't get an id attribute."
                               ," This should never happen."]
@@ -87,24 +94,25 @@ cacheImpl (CTS mv) = do
         ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
     mp <- liftIO $ readMVar mv
 
-    (mp',ns) <- do
+    ns <- do
         cur <- liftIO getCurrentTime
         let mbn = H.lookup i mp
             reload builder = do
                 nodes' <- runNodeList $ childNodes tree
-                return $! ( H.insert i (cur,nodes',builder) mp
-                          , nodes')
+                let newMap = H.insert i (cur,Just nodes',builder) mp
+                liftIO $ modifyMVar_ mv (const $ return newMap)
+                return $! nodes'
         case mbn of
-            Nothing -> reload mempty
+            Nothing -> do
+                reload Nothing
             (Just (lastUpdate,n,builder)) -> do
-                if ttl > 0 && tagName tree == Just cacheTagName &&
-                   diffUTCTime cur lastUpdate > fromIntegral ttl
+                if (ttl > 0 && tagName tree == Just cacheTagName &&
+                   diffUTCTime cur lastUpdate > fromIntegral ttl) ||
+                   isNothing n
                   then reload builder
                   else do
                       stopRecursion
-                      return $! (mp,n)
-
-    liftIO $ modifyMVar_ mv (const $ return mp')
+                      return $! fromJust n
 
     return ns
 
@@ -114,6 +122,8 @@ cacheImpl (CTS mv) = do
 cacheImplCompiled :: (MonadIO n) => CacheTagState -> C.Splice n
 cacheImplCompiled (CTS mv) = do
     tree <- getParamNode
+    fp <- getTemplateFilePath
+    ctx <- getContext
     let err = error $ unwords ["cacheImplCompiled is bound to a tag"
                               ,"that didn't get an id attribute."
                               ," This should never happen."]
@@ -127,15 +137,18 @@ cacheImplCompiled (CTS mv) = do
         let mbn = H.lookup i mp
             reload nodes = do
                 out <- C.codeGen compiled
-                return $! (H.insert i (cur,nodes,out) mp, out)
-        (mp',builder) <- case mbn of
-            Nothing -> reload []
+                let newMap = H.insert i (cur,nodes,Just out) mp
+                liftIO $ modifyMVar_ mv (const $ return newMap)
+                return $! out
+        builder <- case mbn of
+            Nothing -> do
+                reload Nothing
             (Just (lastUpdate,n,builder)) -> do
-                if ttl > 0 && tagName tree == Just cacheTagName &&
-                   diffUTCTime cur lastUpdate > fromIntegral ttl
+                if (ttl > 0 && tagName tree == Just cacheTagName &&
+                   diffUTCTime cur lastUpdate > fromIntegral ttl) ||
+                   isNothing builder
                   then reload n
-                  else return $! (mp, builder)
-        liftIO $ modifyMVar_ mv (const $ return mp')
+                  else return $! fromJust builder
         return builder
 
 
@@ -146,7 +159,7 @@ cacheImplCompiled (CTS mv) = do
 -- it with the 'clearCacheTagState' function.
 --
 -- This function returns a splice and a CacheTagState.  The splice is of type
--- @Splice IO@ because it has to be bound as load time preprocessing splice.
+-- @Splice IO@ because it has to be bound as a load time preprocessing splice.
 -- Haskell's type system won't allow you to screw up and pass this splice as
 -- the wrong argument to initHeist.
 mkCacheTag :: IO (Splice IO, CacheTagState)
@@ -159,7 +172,7 @@ mkCacheTag = do
 
 ------------------------------------------------------------------------------
 -- | Explicit type signature to avoid the Show polymorphism problem.
-generateId :: IO Int
+generateId :: IO Word
 generateId = getStdRandom random
 
 
@@ -168,11 +181,11 @@ generateId = getStdRandom random
 getId :: IORef (Set.HashSet Text) -> IO Text
 getId setref = do
     i <- liftM (T.pack . show) generateId
-    st <- readIORef setref
-    if Set.member i st
+    _set <- readIORef setref
+    if Set.member i _set
       then getId setref
       else do
-          writeIORef setref $ Set.insert i st
+          writeIORef setref $ Set.insert i _set
           return $ T.append "cache-id-" i
 
 
@@ -182,6 +195,17 @@ setupSplice :: IORef (Set.HashSet Text) -> Splice IO
 setupSplice setref = do
     i <- liftIO $ getId setref
     node <- getParamNode
-    return $ [setAttribute "id" i node]
+
+    cf <- getsHS _curTemplateFile
+--    liftIO $ print cf
+--    when (cf == (Just "snaplets/heist/snap-website/faq.tpl")) $ do
+--        liftIO $ putStrLn "======= Before ======="
+--        liftIO $ B.putStrLn $ toByteString $ renderHtmlFragment UTF8 $ childNodes node
+    newChildren <- runNodeList $ childNodes node
+--    when (cf == (Just "snaplets/heist/snap-website/faq.tpl")) $ do
+--        liftIO $ putStrLn "======= After ======="
+--        liftIO $ B.putStrLn $ toByteString $ renderHtmlFragment UTF8 newChildren
+    stopRecursion
+    return $ [setAttribute "id" i $ node { elementChildren = newChildren }]
 
 

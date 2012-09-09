@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-|
 
@@ -49,18 +50,22 @@ module Heist
   , localHS
   , getDoc
   , getXMLDoc
+  , orError
   ) where
 
+import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Exception (SomeException)
 import           Control.Monad.CatchIO
 import           Control.Monad.Trans
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as CB
 import qualified Data.Foldable as F
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Text                       (Text)
 import           System.Directory.Tree
@@ -114,6 +119,7 @@ defaultLoadTimeSplices =
     , (bindTag, bindImpl)
     , (ignoreTag, ignoreImpl)
     , (markdownTag, markdownSplice)
+    , ("content", deprecatedContentCheck) -- To be removed in later versions
     ]
 
 
@@ -184,7 +190,6 @@ initHeist (HeistConfig i lt c a rawTemplates) = do
                     , _compiledSpliceMap = Map.fromList c
                     , _attrSpliceMap = Map.fromList a
                     }
-
     if not (null bad)
       then left bad
       else lift $ C.compileTemplates hs1
@@ -195,11 +200,11 @@ initHeist (HeistConfig i lt c a rawTemplates) = do
 preprocess :: (TPath, DocumentFile)
            -> HeistT IO IO (Either String (TPath, DocumentFile))
 preprocess (tpath, docFile) = do
-    let tname = tpathName tpath
-    !emdoc <- try $ I.evalWithDoctypes tname
-              :: HeistT IO IO (Either SomeException (Maybe X.Document))
-    let f doc = (tpath, docFile { dfDoc = doc })
-    return $! either (Left . show) (Right . maybe die f) emdoc
+        let tname = tpathName tpath
+        !emdoc <- try $ I.evalWithDoctypes tname
+                  :: HeistT IO IO (Either SomeException (Maybe X.Document))
+        let f doc = (tpath, docFile { dfDoc = doc })
+        return $! either (Left . show) (Right . maybe die f) emdoc
   where
     die = error "Preprocess didn't succeed!  This should never happen."
 

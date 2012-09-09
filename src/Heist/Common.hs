@@ -27,6 +27,23 @@ import qualified Text.XmlHtml as X
 
 
 ------------------------------------------------------------------------------
+-- | If Heist is running in fail fast mode, then this function will throw an
+-- exception with the second argument as the error message.  Otherwise, the
+-- first argument will be executed to represent silent failure.
+--
+-- This behavior allows us to fail quickly if an error crops up during
+-- load-time splice processing or degrade more gracefully if the error occurs
+-- while a user request is being processed.
+orError :: Monad m => HeistT n m b -> String -> HeistT n m b
+orError silent msg = do
+    hs <- getHS
+    if _preprocessingMode hs
+      then error $ (fromMaybe "" $ _curTemplateFile hs) ++
+                   ": " ++ msg
+      else silent
+
+
+------------------------------------------------------------------------------
 -- | Function for showing a TPath.
 showTPath :: TPath -> String
 showTPath = BC.unpack . (`BC.append` ".tpl") . tpathName
@@ -176,23 +193,6 @@ mapSplices f vs = liftM mconcat $ mapM f vs
 -- | Gets the current context
 getContext :: Monad m => HeistT n m TPath
 getContext = getsHS _curContext
-
-
-------------------------------------------------------------------------------
--- | If Heist is running in fail fast mode, then this function will throw an
--- exception with the second argument as the error message.  Otherwise, the
--- first argument will be executed to represent silent failure.
---
--- This behavior allows us to fail quickly if an error crops up during
--- load-time splice processing or degrade more gracefully if the error occurs
--- while a user request is being processed.
-orError :: Monad m => HeistT n m b -> String -> HeistT n m b
-orError silent msg = do
-    hs <- getHS
-    if _preprocessingMode hs
-      then error $ (fromMaybe "" $ _curTemplateFile hs) ++
-                   ": " ++ msg
-      else silent
 
 
 ------------------------------------------------------------------------------

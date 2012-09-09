@@ -1,1 +1,1 @@
-<content />
+<apply-content />
