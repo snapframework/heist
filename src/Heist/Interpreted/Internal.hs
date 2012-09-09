@@ -281,7 +281,6 @@ recurseSplice :: Monad n => X.Node -> Splice n -> Splice n
 recurseSplice node splice = do
     result <- localParamNode (const node) splice
     hs <- getHS
-    let nm = T.unpack $ X.elementTag node
     if _recurse hs
         then if _recursionDepth hs < mAX_RECURSION_DEPTH
                then do modRecursionDepth (+1)
