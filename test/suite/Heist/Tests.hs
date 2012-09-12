@@ -48,9 +48,9 @@ loadErrorsTest = do
   where
     expected =
         ["templates-bad/bind-infinite-loop.tpl: template recursion exceeded max depth, you probably have infinite splice recursion!"
-        ,"templates-bad/apply-missing-attr.tpl: must supply \"template\" attribute in <apply>"
-        ,"templates-bad/bind-missing-attr.tpl: must supply \"tag\" attribute in <bind>"
         ,"templates-bad/apply-template-not-found.tpl: apply tag cannot find template \"/page\""
+        ,"templates-bad/bind-missing-attr.tpl: must supply \"tag\" attribute in <bind>"
+        ,"templates-bad/apply-missing-attr.tpl: must supply \"template\" attribute in <apply>"
         ]
 
 

@@ -317,9 +317,7 @@ textareaExpansion :: H.Assertion
 textareaExpansion = renderTest "textarea_expansion" expected
   where
     expected = B.concat
-        [ doctype
-        , "<textarea>foo</textarea>"
-        ]
+        [ "<textarea>foo</textarea>" ]
 
 
 ------------------------------------------------------------------------------
@@ -336,13 +334,15 @@ divExpansion = renderTest "div_expansion" expected
 ------------------------------------------------------------------------------
 -- | Handling of <content> and bound parameters in a bound tag.
 bindParam :: H.Assertion
-bindParam = renderTest "bind_param" "<li>Hi there world</li>"
+bindParam = renderTest "bind_param" $
+    B.concat [doctype, "<li>Hi there world</li>"]
 
 
 ------------------------------------------------------------------------------
 -- | Handling of <content> and bound parameters in a bound tag.
 attrSpliceContext :: H.Assertion
-attrSpliceContext = renderTest "attrsubtest2" "<a href='asdf'>link</a><a href='before$after'>foo</a>"
+attrSpliceContext = renderTest "attrsubtest2" $
+    B.append doctype "<a href='asdf'>link</a><a href='before$after'>foo</a>"
 
 
 ------------------------------------------------------------------------------

@@ -38,8 +38,7 @@ orError :: Monad m => HeistT n m b -> String -> HeistT n m b
 orError silent msg = do
     hs <- getHS
     if _preprocessingMode hs
-      then error $ (fromMaybe "" $ _curTemplateFile hs) ++
-                   ": " ++ msg
+      then error $ (maybe "" (++": ") $ _curTemplateFile hs) ++ msg
       else silent
 
 
@@ -55,6 +54,7 @@ tpathName = BC.intercalate "/" . reverse
 ------------------------------------------------------------------------------
 -- | Sets the current template file.
 setCurTemplateFile :: Maybe FilePath -> HeistState n -> HeistState n
+setCurTemplateFile Nothing ts = ts
 setCurTemplateFile fp ts = ts { _curTemplateFile = fp }
 
 

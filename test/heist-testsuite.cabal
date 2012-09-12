@@ -30,7 +30,6 @@ Executable testsuite
     mtl,
     process,
     random,
-    system-uuid,
     text,
     time,
     transformers,
