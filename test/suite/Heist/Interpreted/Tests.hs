@@ -137,7 +137,7 @@ loadTest = do
     ets <- loadIO "templates" [] [] [] []
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertEqual "loadTest size" 31 $ Map.size tm
+                      H.assertEqual "loadTest size" 35 $ Map.size tm
            ) ets
 
 
@@ -189,19 +189,29 @@ attrSubstTest :: H.Assertion
 attrSubstTest = do
     ets <- loadT "templates" [] [] [] []
     let ts = either (error "Error loading templates") id ets
-    check (bindSplices splices ts) out1
-    check ts out2
+    check "attr subst 1" (bindSplices splices ts) out1
+    check "attr subst 2" ts out2
 
   where
     splices = defaultLoadTimeSplices ++
         [("foo", return [X.TextNode "meaning_of_everything"])]
         
-    check ts expected = do
+    check str ts expected = do
         Just (resDoc, _) <- renderTemplate ts "attrs"
-        H.assertEqual "attr subst" expected $ toByteString $ resDoc
+        H.assertEqual str expected $ toByteString $ resDoc
 
-    out1 = "<mytag flag>Empty attribute</mytag>\n<mytag flag='abc${foo}'>No ident capture</mytag>\n<div id='pre_meaning_of_everything_post'></div>\n"
-    out2 = "<mytag flag>Empty attribute</mytag>\n<mytag flag='abc${foo}'>No ident capture</mytag>\n<div id='pre__post'></div>\n"
+    out1 = B.unlines
+        [doctype
+        ,"<mytag flag>Empty attribute</mytag>"
+        ,"<mytag flag='abc${foo}'>No ident capture</mytag>"
+        ,"<div id='pre_meaning_of_everything_post'></div>"
+        ]
+    out2 = B.unlines
+        [doctype
+        ,"<mytag flag>Empty attribute</mytag>"
+        ,"<mytag flag='abc${foo}'>No ident capture</mytag>"
+        ,"<div id='pre__post'></div>"
+        ]
 
 
 ------------------------------------------------------------------------------

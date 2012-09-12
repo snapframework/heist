@@ -34,4 +34,4 @@ bindStrictImpl = do
     add cs nm = modifyHS $ bindSplice nm $ do
         caller <- getParamNode
         ctx <- getContext
-        rawApply "bindstrict-content" cs ctx (X.childNodes caller)
+        rawApply "bindstrict-content" cs Nothing ctx (X.childNodes caller)

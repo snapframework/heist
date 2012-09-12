@@ -28,7 +28,7 @@ loadWithCache baseDir = do
         templates <- loadTemplates baseDir
         let hc = HeistConfig [] defaultLoadTimeSplices [] [] templates
         initHeistWithCacheTag hc
-    either (error . concat) (return . fst) etm
+    either (error . unlines) (return . fst) etm
 
 ------------------------------------------------------------------------------
 --applyComparison :: IO ()

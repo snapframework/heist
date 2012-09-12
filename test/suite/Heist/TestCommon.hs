@@ -96,11 +96,13 @@ quickRender baseDir name = do
     res <- I.renderTemplate ts name
     return (fmap (toByteString . fst) res)
 
+cRender :: HeistState IO -> ByteString -> IO ByteString
 cRender hs name = do
     builder <- fst $ fromJust $ C.renderTemplate hs name
-    B.putStrLn $ toByteString builder
+    return $ toByteString builder
 
+iRender :: HeistState IO -> ByteString -> IO ByteString
 iRender hs name = do
     builder <- I.renderTemplate hs name
-    B.putStrLn $ toByteString $ fst $ fromJust builder
+    return $ toByteString $ fst $ fromJust builder
 

@@ -33,6 +33,7 @@ tests = [ testCase     "loadErrors"            loadErrorsTest
         , testCase     "attrsplice/autocheck"  attrSpliceTest
         , testCase     "tdirCache"             tdirCacheTest
         , testCase     "headMerge"             headMergeTest
+        , testCase     "bindApplyInteraction"  bindApplyInteractionTest 
         ]
 
 
@@ -151,5 +152,32 @@ headMergeTest = do
       ,"<link href=\"index-link\" />&#10;"
       ,"</head>&#10;&#10;<body>\n\n<div>nav bar</div>\n\n\n\n"
       ,"<div>index page</div>\n\n</body>&#10;</html>&#10;&#10;"
+      ]
+
+
+bindApplyInteractionTest :: IO ()
+bindApplyInteractionTest = do
+    hs <- loadHS "templates"
+
+    cOut <- cRender hs "bind-apply-interaction/caller"
+    H.assertEqual "compiled failure" cExpected cOut
+
+    iOut <- iRender hs "bind-apply-interaction/caller"
+    H.assertEqual "interpreted failure" iExpected iOut
+  where
+    cExpected = B.intercalate "\n"
+      ["&#10;This is a test."
+      ,"===bind content===&#10;Another test line."
+      ,"apply content&#10;Last test line."
+      ,"&#10;"
+      ]
+    iExpected = B.unlines
+      [doctype
+      ,"&#10;This is a test."
+      ,"===bind content==="
+      ,"Another test line."
+      ,"apply content"
+      ,"Last test line."
+      ,""
       ]
 

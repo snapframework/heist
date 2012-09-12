@@ -38,5 +38,6 @@ bindImpl = do
     add node nm = modifyHS $ bindSplice nm $ do
         caller <- getParamNode
         ctx <- getContext
-        rawApply "bind-content" (X.childNodes node) ctx (X.childNodes caller)
+        rawApply "bind-content" (X.childNodes node)
+                 Nothing ctx (X.childNodes caller)
 
