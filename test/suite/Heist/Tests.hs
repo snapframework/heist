@@ -8,6 +8,7 @@ module Heist.Tests
 import           Blaze.ByteString.Builder
 import           Control.Monad.State
 import qualified Data.ByteString.Char8 as B
+import           Data.List
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
@@ -42,11 +43,11 @@ tests = [ testCase     "loadErrors"            loadErrorsTest
 loadErrorsTest :: H.Assertion
 loadErrorsTest = do
     ets <- loadIO "templates-bad" [] [] [] []
-    either (H.assertEqual "load errors test" expected)
+    either (H.assertEqual "load errors test" expected . sort)
            (const $ H.assertFailure "No failure when loading templates-bad")
            ets
   where
-    expected =
+    expected = sort
         ["templates-bad/bind-infinite-loop.tpl: template recursion exceeded max depth, you probably have infinite splice recursion!"
         ,"templates-bad/apply-template-not-found.tpl: apply tag cannot find template \"/page\""
         ,"templates-bad/bind-missing-attr.tpl: must supply \"tag\" attribute in <bind>"
