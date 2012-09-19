@@ -61,8 +61,6 @@ extra-source-files:
   test/suite/Heist/Interpreted/Tests.hs,
   test/suite/Heist/TestCommon.hs,
   test/suite/Heist/Tests.hs,
-  test/suite/Heist/Tutorial/.AttributeSplices.lhs.swp,
-  test/suite/Heist/Tutorial/.CompiledSplices.lhs.swp,
   test/suite/Heist/Tutorial/AttributeSplices.lhs,
   test/suite/Heist/Tutorial/CompiledSplices.lhs,
   test/suite/Heist/Tutorial/Imports.hs,
