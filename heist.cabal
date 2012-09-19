@@ -107,7 +107,6 @@ extra-source-files:
   test/templates-bad/apply-template-not-found.tpl,
   test/templates-bad/bind-infinite-loop.tpl,
   test/templates-bad/bind-missing-attr.tpl,
-  test/testsuite.tix,
   TODO
 
 
