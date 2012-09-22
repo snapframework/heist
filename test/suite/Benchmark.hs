@@ -7,7 +7,7 @@ module Main where
 import           Blaze.ByteString.Builder
 import           Criterion
 import           Criterion.Main
-import           Criterion.Measurement
+import           Criterion.Measurement hiding (getTime)
 import           Control.Concurrent
 import           Control.Error
 import           Control.Exception (evaluate)
@@ -15,7 +15,9 @@ import           Control.Monad
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import           Data.Text.Encoding
+import           Data.Time.Clock
 import           Data.Maybe
+import           System.Clock
 import           System.Environment
 
 import Heist
@@ -45,8 +47,13 @@ applyComparison dir = do
     B.writeFile (pageStr++".out.interpreted."++dir) $ toByteString out
 
     defaultMain
-       [ bench (pageStr++"-compiled") compiledAction
-       , bench (pageStr++"-interpreted") interpretedAction
+       [ bench (pageStr++"-compiled") (whnfIO compiledAction)
+       , bench (pageStr++"-interpreted") (whnfIO interpretedAction)
+       , bench "getCurrentTime"         (whnfIO getCurrentTime)
+       , bench "getTime Monotonic"      (whnfIO $ getTime Monotonic)
+       , bench "getTime Realtime"       (whnfIO $ getTime Realtime)
+       , bench "getTime ProcessCPUTime" (whnfIO $ getTime ProcessCPUTime)
+       , bench "getTime ThreadCPUTime"  (whnfIO $ getTime ThreadCPUTime)
        ]
 
 cmdLineTemplate :: String -> String -> IO ()
