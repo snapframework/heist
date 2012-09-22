@@ -156,15 +156,13 @@ cacheImplCompiled2 = do
     ref <- liftIO $ newIORef Nothing
     let reload curTime = do
             builder <- C.codeGen compiled
-            let !out = builder
---            let !out = toByteString $! builder
-            liftIO $ atomicModifyIORef ref (\_ -> (Just (curTime, out), ()))
+            let !out = fromByteString $! toByteString $! builder
+            liftIO $ writeIORef ref (Just (curTime, out))
             return $! out
     return $ C.yieldRuntime $ do
         mbn <- liftIO $ readIORef ref
         cur <- liftIO getCurrentTime
         case mbn of
---        liftM fromByteString $ case mbn of
             Nothing -> reload cur
             (Just (lastUpdate,bs)) -> do
                 if (ttl > 0 && diffUTCTime cur lastUpdate > fromIntegral ttl)
