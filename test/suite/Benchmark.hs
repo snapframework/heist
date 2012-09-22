@@ -49,11 +49,12 @@ applyComparison dir = do
        , bench (pageStr++"-interpreted") interpretedAction
        ]
 
-cmdLineTemplate :: IO ()
-cmdLineTemplate = do
-    args <- getArgs
-    let page = head args
-    hs <- loadHS "test/snap-website"
+cmdLineTemplate :: String -> String -> IO ()
+cmdLineTemplate dir page = do
+--    args <- getArgs
+--    let page = head args
+--    let dir = "test/snap-website"
+    hs <- loadHS dir
     let action = fst $ fromJust $ C.renderTemplate hs
             (encodeUtf8 $ T.pack page)
     out <- action

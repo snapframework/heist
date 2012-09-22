@@ -31,7 +31,7 @@ module Heist
   , AttrSplice
   , RuntimeSplice
   , Chunk
-  , HeistState
+  , HeistState(..)
   , templateNames
   , compiledTemplateNames
   , hasTemplate
@@ -220,7 +220,7 @@ initHeistWithCacheTag (HeistConfig i lt c a rawTemplates) = do
     let tag = "cache"
         hc' = HeistConfig ((tag, cacheImpl cts) : i)
                           ((tag, ss) : lt)
-                          ((tag, cacheImplCompiled cts) : c)
+                          ((tag, cacheImplCompiled2) : c)
                           a rawTemplates
     hs <- initHeist hc'
     return (hs, cts)

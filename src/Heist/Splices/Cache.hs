@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | The \"cache\" splice ensures that its contents are cached and only
 -- evaluated periodically.  The cached contents are returned every time the
@@ -12,7 +13,8 @@
 module Heist.Splices.Cache
   ( CacheTagState
   , cacheImpl
-  , cacheImplCompiled 
+  , cacheImplCompiled
+  , cacheImplCompiled2
   , mkCacheTag
   , clearCacheTagState
   ) where
@@ -143,6 +145,31 @@ cacheImplCompiled (CTS mv) = do
                   then reload n
                   else return $! fromJust builder
         return builder
+
+
+cacheImplCompiled2 :: (MonadIO n) => C.Splice n
+cacheImplCompiled2 = do
+    tree <- getParamNode
+    let ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
+
+    compiled <- C.runNodeList $ childNodes tree
+    ref <- liftIO $ newIORef Nothing
+    let reload curTime = do
+            builder <- C.codeGen compiled
+            let !out = builder
+--            let !out = toByteString $! builder
+            liftIO $ atomicModifyIORef ref (\_ -> (Just (curTime, out), ()))
+            return $! out
+    return $ C.yieldRuntime $ do
+        mbn <- liftIO $ readIORef ref
+        cur <- liftIO getCurrentTime
+        case mbn of
+--        liftM fromByteString $ case mbn of
+            Nothing -> reload cur
+            (Just (lastUpdate,bs)) -> do
+                if (ttl > 0 && diffUTCTime cur lastUpdate > fromIntegral ttl)
+                  then reload cur
+                  else return $! bs
 
 
 ------------------------------------------------------------------------------
