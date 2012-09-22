@@ -200,7 +200,7 @@ preprocess (tpath, docFile) = do
         let tname = tpathName tpath
         !emdoc <- try $ I.evalWithDoctypes tname
                   :: HeistT IO IO (Either SomeException (Maybe X.Document))
-        let f doc = (tpath, docFile { dfDoc = doc })
+        let f !doc = (tpath, docFile { dfDoc = doc })
         return $! either (Left . show) (Right . maybe die f) emdoc
   where
     die = error "Preprocess didn't succeed!  This should never happen."
@@ -220,7 +220,7 @@ initHeistWithCacheTag (HeistConfig i lt c a rawTemplates) = do
     let tag = "cache"
         hc' = HeistConfig ((tag, cacheImpl cts) : i)
                           ((tag, ss) : lt)
-                          ((tag, cacheImplCompiled2) : c)
+                          ((tag, cacheImplCompiled) : c)
                           a rawTemplates
     hs <- initHeist hc'
     return (hs, cts)

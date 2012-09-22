@@ -17,7 +17,6 @@ import qualified Data.Text as T
 import           Data.Text.Encoding
 import           Data.Time.Clock
 import           Data.Maybe
-import           System.Clock
 import           System.Environment
 
 import Heist
@@ -32,28 +31,58 @@ loadWithCache baseDir = do
         initHeistWithCacheTag hc
     either (error . unlines) (return . fst) etm
 
+main = do
+    let page = "faq"
+        pageStr = T.unpack $ decodeUtf8 page
+        dir = "snap-website"
+    hs <- loadWithCache dir
+    let !compiledTemplate = fst $! fromJust $! C.renderTemplate hs page
+        compiledAction = do
+            res <- compiledTemplate
+            return $! toByteString $! res
+    out <- compiledAction
+    B.writeFile (pageStr++".out.compiled."++dir) $ out
+    putStrLn "Templates loaded"
+    replicateM_ 10000 $ whnfIO compiledAction
+    putStrLn "done"
+
+justRender dir = do
+    let page = "faq"
+        pageStr = T.unpack $ decodeUtf8 page
+    hs <- loadWithCache dir
+    let !compiledTemplate = fst $! fromJust $! C.renderTemplate hs page
+        compiledAction = do
+            res <- compiledTemplate
+            return $! toByteString $! res
+    out <- compiledAction
+    B.writeFile (pageStr++".out.compiled."++dir) $ out
+
+    defaultMain
+       [ bench (pageStr++"-compiled (just render)") (whnfIO compiledAction)
+       ]
+
 ------------------------------------------------------------------------------
 --applyComparison :: IO ()
 applyComparison dir = do
     let page = "faq"
         pageStr = T.unpack $ decodeUtf8 page
     hs <- loadWithCache dir
-    let compiledAction = fst $ fromJust $ C.renderTemplate hs page
+    let compiledAction = do
+            res <- fst $ fromJust $ C.renderTemplate hs page
+            return $! toByteString $! res
     out <- compiledAction
-    B.writeFile (pageStr++".out.compiled."++dir) $ toByteString out
+    B.writeFile (pageStr++".out.compiled."++dir) $ out
 
-    let interpretedAction = I.renderTemplate hs page
+    let interpretedAction = do
+            res <- I.renderTemplate hs page
+            return $! toByteString $! fst $! fromJust res
     out2 <- interpretedAction
-    B.writeFile (pageStr++".out.interpreted."++dir) $ toByteString out
+    B.writeFile (pageStr++".out.interpreted."++dir) $ out
 
     defaultMain
        [ bench (pageStr++"-compiled") (whnfIO compiledAction)
        , bench (pageStr++"-interpreted") (whnfIO interpretedAction)
        , bench "getCurrentTime"         (whnfIO getCurrentTime)
-       , bench "getTime Monotonic"      (whnfIO $ getTime Monotonic)
-       , bench "getTime Realtime"       (whnfIO $ getTime Realtime)
-       , bench "getTime ProcessCPUTime" (whnfIO $ getTime ProcessCPUTime)
-       , bench "getTime ThreadCPUTime"  (whnfIO $ getTime ThreadCPUTime)
        ]
 
 cmdLineTemplate :: String -> String -> IO ()

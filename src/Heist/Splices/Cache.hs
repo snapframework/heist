@@ -14,7 +14,6 @@ module Heist.Splices.Cache
   ( CacheTagState
   , cacheImpl
   , cacheImplCompiled
-  , cacheImplCompiled2
   , mkCacheTag
   , clearCacheTagState
   ) where
@@ -28,7 +27,6 @@ import           Data.IORef
 import qualified Data.HashMap.Strict as H
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as Set
-import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Read
@@ -52,7 +50,7 @@ cacheTagName = "cache"
 ------------------------------------------------------------------------------
 -- | State for storing cache tag information
 newtype CacheTagState =
-    CTS (MVar (HashMap Text (UTCTime, Maybe Template, Maybe Builder)))
+    CTS (MVar (HashMap Text (UTCTime, Template)))
 
 
 ------------------------------------------------------------------------------
@@ -77,6 +75,11 @@ parseTTL s = value * multiplier
         _   -> 1
 
 
+getTTL :: Node -> NominalDiffTime
+getTTL tree = fromIntegral $ maybe 0 parseTTL $ getAttribute "ttl" tree
+{-# INLINE getTTL #-}
+
+
 ------------------------------------------------------------------------------
 -- | This is the splice that actually does the work.  You should bind it to
 -- the same tag name as you bound the splice returned by mkCacheTag otherwise
@@ -88,75 +91,42 @@ cacheImpl (CTS mv) = do
                               ,"that didn't get an id attribute."
                               ," This should never happen."]
     let i = maybe err id $ getAttribute "id" tree
-        ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
+        !ttl = getTTL tree
     mp <- liftIO $ readMVar mv
 
     ns <- do
         cur <- liftIO getCurrentTime
         let mbn = H.lookup i mp
-            reload builder = do
+            reload = do
                 nodes' <- runNodeList $ childNodes tree
-                let newMap = H.insert i (cur,Just nodes',builder) mp
+                let newMap = H.insert i (cur, nodes') mp
                 liftIO $ modifyMVar_ mv (const $ return newMap)
                 return $! nodes'
         case mbn of
-            Nothing -> do
-                reload Nothing
-            (Just (lastUpdate,n,builder)) -> do
-                if (ttl > 0 && tagName tree == Just cacheTagName &&
-                   diffUTCTime cur lastUpdate > fromIntegral ttl) ||
-                   isNothing n
-                  then reload builder
+            Nothing -> reload
+            (Just (lastUpdate,n)) -> do
+                if ttl > 0 && tagName tree == Just cacheTagName &&
+                   diffUTCTime cur lastUpdate > ttl
+                  then reload
                   else do
                       stopRecursion
-                      return $! fromJust n
+                      return $! n
 
     return ns
 
 
 ------------------------------------------------------------------------------
 -- | This is the compiled splice version of cacheImpl.
-cacheImplCompiled :: (MonadIO n) => CacheTagState -> C.Splice n
-cacheImplCompiled (CTS mv) = do
+cacheImplCompiled :: (MonadIO n) => C.Splice n
+cacheImplCompiled = do
     tree <- getParamNode
-    let err = error $ unwords ["cacheImplCompiled is bound to a tag"
-                              ,"that didn't get an id attribute."
-                              ," This should never happen."]
-    let i = maybe err id $ getAttribute "id" tree
-        ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
-
-    compiled <- C.runNodeList $ childNodes tree
-    return $ C.yieldRuntime $ do
-        mp <- liftIO $ readMVar mv
-        cur <- liftIO getCurrentTime
-        let mbn = H.lookup i mp
-            reload nodes = do
-                out <- C.codeGen compiled
-                let newMap = H.insert i (cur,nodes,Just out) mp
-                liftIO $ modifyMVar_ mv (const $ return newMap)
-                return $! out
-        builder <- case mbn of
-            Nothing -> do
-                reload Nothing
-            (Just (lastUpdate,n,builder)) -> do
-                if (ttl > 0 && tagName tree == Just cacheTagName &&
-                   diffUTCTime cur lastUpdate > fromIntegral ttl) ||
-                   isNothing builder
-                  then reload n
-                  else return $! fromJust builder
-        return builder
-
-
-cacheImplCompiled2 :: (MonadIO n) => C.Splice n
-cacheImplCompiled2 = do
-    tree <- getParamNode
-    let ttl = maybe 0 parseTTL $ getAttribute "ttl" tree
+    let !ttl = getTTL tree
 
     compiled <- C.runNodeList $ childNodes tree
     ref <- liftIO $ newIORef Nothing
     let reload curTime = do
             builder <- C.codeGen compiled
-            let !out = fromByteString $! toByteString $! builder
+            let out = fromByteString $! toByteString $! builder
             liftIO $ writeIORef ref (Just (curTime, out))
             return $! out
     return $ C.yieldRuntime $ do
@@ -165,7 +135,7 @@ cacheImplCompiled2 = do
         case mbn of
             Nothing -> reload cur
             (Just (lastUpdate,bs)) -> do
-                if (ttl > 0 && diffUTCTime cur lastUpdate > fromIntegral ttl)
+                if (ttl > 0 && diffUTCTime cur lastUpdate > ttl)
                   then reload cur
                   else return $! bs
 

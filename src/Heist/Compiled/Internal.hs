@@ -209,7 +209,7 @@ runDocumentFile tpath df = do
     runNodeList nodes
   where
     curPath     = dfFile df
-    nodes       = X.docContent $ dfDoc df
+    nodes       = X.docContent $! dfDoc df
 
 
 ------------------------------------------------------------------------------
@@ -219,7 +219,7 @@ compileTemplate :: Monad n
                 -> DocumentFile
                 -> IO (n Builder)
 compileTemplate hs tpath df = do
-    runSplice nullNode hs $ runDocumentFile tpath df
+    runSplice nullNode hs $! runDocumentFile tpath df
   where
     -- This gets overwritten in runDocumentFile
     nullNode = X.TextNode ""
@@ -229,15 +229,15 @@ compileTemplate hs tpath df = do
 compileTemplates :: Monad n => HeistState n -> IO (HeistState n)
 compileTemplates hs = do
     ctm <- foldM runOne H.empty tpathDocfiles
-    return $ hs { _compiledTemplateMap = ctm }
+    return $! hs { _compiledTemplateMap = ctm }
   where
     tpathDocfiles :: [(TPath, DocumentFile)]
     tpathDocfiles = map (\(a,b) -> (a, b))
                         (H.toList $ _templateMap hs)
 
     runOne tmap (tpath, df) = do
-        mHtml <- compileTemplate hs tpath df
-        return $! H.insert tpath (mHtml, mimeType $ dfDoc df) tmap
+        !mHtml <- compileTemplate hs tpath df
+        return $! H.insert tpath (mHtml, mimeType $! dfDoc df) tmap
 
 
 ------------------------------------------------------------------------------
@@ -570,6 +570,6 @@ renderTemplate :: HeistState n
                -> ByteString
                -> Maybe (n Builder, MIMEType)
 renderTemplate hs nm =
-    fmap fst $ lookupTemplate nm hs _compiledTemplateMap
+    fmap fst $! lookupTemplate nm hs _compiledTemplateMap
 
 
