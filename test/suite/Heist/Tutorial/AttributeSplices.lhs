@@ -48,9 +48,7 @@ assume that the current value we're checking against is passed as the bound
 attribute's value, so we compare that against the value to be checked.  Then
 we return a list with the appropriate value and the checked attribute if
 necessary.  We bind this splice to the "autocheck" attribute by adding it to
-initHeist's fourth parameter like this:
-
-< initHeist [] [] [] [("autocheck", autocheckedSplice)] templates
+the hcAttributeSplices list in HeistConfig.
 
 To make everything work we use the following markup for our radio buttons:
 
