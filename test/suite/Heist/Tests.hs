@@ -35,6 +35,7 @@ tests = [ testCase     "loadErrors"            loadErrorsTest
         , testCase     "tdirCache"             tdirCacheTest
         , testCase     "headMerge"             headMergeTest
         , testCase     "bindApplyInteraction"  bindApplyInteractionTest 
+        , testCase     "backslashHandling"     backslashHandlingTest 
         ]
 
 
@@ -180,5 +181,23 @@ bindApplyInteractionTest = do
       ,"apply content"
       ,"Last test line."
       ,""
+      ]
+
+
+------------------------------------------------------------------------------
+-- | Test backslash escaping in the attribute parser.
+backslashHandlingTest :: IO ()
+backslashHandlingTest = do
+    hs <- loadHS "templates"
+    cOut <- cRender hs "backslash"
+    H.assertEqual "compiled failure" cExpected cOut
+
+    iOut <- iRender hs "backslash"
+    H.assertEqual "interpreted failure" iExpected iOut
+  where
+    cExpected = "<foo regex=\"d+\\d\" />&#10;"
+    iExpected = B.unlines
+      [doctype
+      ,"<foo regex='d+\\d'></foo>"
       ]
 

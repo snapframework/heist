@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 -- | The \"cache\" splice ensures that its contents are cached and only
 -- evaluated periodically.  The cached contents are returned every time the
 -- splice is referenced.
@@ -9,7 +10,10 @@
 -- specifying the units.  Valid units are a single letter abbreviation for one
 -- of seconds, minutes, hours, days, and weeks.  If the ttl string is invalid
 -- or the ttl attribute is not specified, the cache is never refreshed unless
--- explicitly cleared with clearCacheTagState.
+-- explicitly cleared with clearCacheTagState.  The compiled splice version of
+-- the cache tag does not require a cache tag state, so clearCacheTagState
+-- will not work for compiled cache tags.
+
 module Heist.Splices.Cache
   ( CacheTagState
   , cacheImpl
@@ -50,14 +54,20 @@ cacheTagName = "cache"
 ------------------------------------------------------------------------------
 -- | State for storing cache tag information
 newtype CacheTagState =
-    CTS (MVar (HashMap Text (UTCTime, Template)))
+    CTS (MVar ([IORef (Maybe (UTCTime, Builder))], HashMap Text (UTCTime, Template)))
 
 
+addCompiledRef :: IORef (Maybe (UTCTime, Builder)) -> CacheTagState -> IO ()
+addCompiledRef ref (CTS mv) = do
+    modifyMVar_ mv (\(a,b) -> return (ref:a, b))
+
+    
 ------------------------------------------------------------------------------
 -- | Clears the cache tag state.
 clearCacheTagState :: CacheTagState -> IO ()
-clearCacheTagState (CTS cacheMVar) =
-    modifyMVar_ cacheMVar (const $ return H.empty)
+clearCacheTagState (CTS cacheMVar) = do
+    refs <- modifyMVar cacheMVar (\(a,_) -> return ((a, H.empty), a))
+    mapM_ (\ref -> writeIORef ref Nothing) refs
 
 
 ------------------------------------------------------------------------------
@@ -96,11 +106,11 @@ cacheImpl (CTS mv) = do
 
     ns <- do
         cur <- liftIO getCurrentTime
-        let mbn = H.lookup i mp
+        let mbn = H.lookup i $ snd mp
             reload = do
                 nodes' <- runNodeList $ childNodes tree
-                let newMap = H.insert i (cur, nodes') mp
-                liftIO $ modifyMVar_ mv (const $ return newMap)
+                let newMap = H.insert i (cur, nodes') $ snd mp
+                liftIO $ modifyMVar_ mv (\(a,_) -> return (a, newMap))
                 return $! nodes'
         case mbn of
             Nothing -> reload
@@ -117,13 +127,14 @@ cacheImpl (CTS mv) = do
 
 ------------------------------------------------------------------------------
 -- | This is the compiled splice version of cacheImpl.
-cacheImplCompiled :: (MonadIO n) => C.Splice n
-cacheImplCompiled = do
+cacheImplCompiled :: (MonadIO n) => CacheTagState -> C.Splice n
+cacheImplCompiled cts = do
     tree <- getParamNode
     let !ttl = getTTL tree
 
     compiled <- C.runNodeList $ childNodes tree
     ref <- liftIO $ newIORef Nothing
+    liftIO $ addCompiledRef ref cts
     let reload curTime = do
             builder <- C.codeGen compiled
             let out = fromByteString $! toByteString $! builder
@@ -153,7 +164,7 @@ cacheImplCompiled = do
 mkCacheTag :: IO (Splice IO, CacheTagState)
 mkCacheTag = do
     sr <- newIORef $ Set.empty
-    mv <- liftM CTS $ newMVar H.empty
+    mv <- liftM CTS $ newMVar ([], H.empty)
 
     return $ (setupSplice sr, mv)
 

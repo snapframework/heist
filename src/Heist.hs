@@ -220,7 +220,7 @@ initHeistWithCacheTag (HeistConfig i lt c a rawTemplates) = do
     let tag = "cache"
         hc' = HeistConfig ((tag, cacheImpl cts) : i)
                           ((tag, ss) : lt)
-                          ((tag, cacheImplCompiled) : c)
+                          ((tag, cacheImplCompiled cts) : c)
                           a rawTemplates
     hs <- initHeist hc'
     return (hs, cts)

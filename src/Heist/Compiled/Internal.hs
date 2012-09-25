@@ -74,6 +74,7 @@ promiseChildren :: Monad m => HeistT m IO (RuntimeSplice m Builder)
 promiseChildren = do
     res <- runNodeList . X.childNodes =<< getParamNode
     return $ codeGen res
+{-# INLINE promiseChildren #-}
 
 
 ------------------------------------------------------------------------------
@@ -283,9 +284,9 @@ codeGen = compileConsolidated . consolidate . DL.toList
     compileConsolidated :: (Monad m) => [Chunk m] -> RuntimeSplice m Builder
     compileConsolidated l = V.foldr mappend mempty v
       where
-        toAct (RuntimeHtml m)   = m
-        toAct (Pure h)          = return h
-        toAct (RuntimeAction m) = m >> return mempty
+        toAct (RuntimeHtml !m)   = m
+        toAct (Pure !h)          = return h
+        toAct (RuntimeAction !m) = m >> return mempty
 
         !v = V.map toAct $! V.fromList l
     {-# INLINE compileConsolidated #-}
