@@ -135,7 +135,7 @@ Library
     Heist.Interpreted.Internal,
     Heist.Types
 
-  if impl(ghc <= 7.0.3)
+  if impl(ghc < 7.0.3)
     build-depends:
       directory <= 1.1.0.1
   else
