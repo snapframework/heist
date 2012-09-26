@@ -462,8 +462,8 @@ data AttAST = Literal Text
 
 
 ------------------------------------------------------------------------------
-isLiteral :: AttAST -> Bool
-isLiteral (Literal _) = True
-isLiteral _           = False
+isIdent :: AttAST -> Bool
+isIdent (Ident _) = True
+isIdent _         = False
 
 

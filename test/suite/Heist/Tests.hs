@@ -147,15 +147,12 @@ headMergeTest = do
     H.assertEqual "assertion failed" expected
       (toByteString mres)
   where
-    expected = B.concat
-      ["<html><head>&#10;"
-      ,"<link href=\"wrapper-link\" />&#10;&#10;"
-      ,"<link href=\"nav-link\" />&#10;&#10;"
-      ,"<link href=\"index-link\" />&#10;"
-      ,"</head>&#10;&#10;<body>\n\n<div>nav bar</div>\n\n\n\n"
-      ,"<div>index page</div>\n\n</body>&#10;</html>&#10;&#10;"
+    expected = B.intercalate "\n"
+      ["<html><head>\n<link href='wrapper-link' />\n"
+      ,"<link href='nav-link' />\n\n<link href='index-link' />"
+      ,"</head>\n\n<body>\n\n<div>nav bar</div>\n\n\n"
+      ,"<div>index page</div>\n\n</body>\n</html>&#10;&#10;"
       ]
-
 
 bindApplyInteractionTest :: IO ()
 bindApplyInteractionTest = do
@@ -195,7 +192,7 @@ backslashHandlingTest = do
     iOut <- iRender hs "backslash"
     H.assertEqual "interpreted failure" iExpected iOut
   where
-    cExpected = "<foo regex=\"d+\\d\" />&#10;"
+    cExpected = "<foo regex='d+\\d'></foo>&#10;"
     iExpected = B.unlines
       [doctype
       ,"<foo regex='d+\\d'></foo>"

@@ -307,9 +307,27 @@ runNode :: Monad n => X.Node -> Splice n
 runNode node = localParamNode (const node) $ do
     isStatic <- subtreeIsStatic node
     if isStatic
-      then return $ yieldPure $! X.renderHtmlFragment X.UTF8 [node]
+      then return $! yieldPure $!
+             X.renderHtmlFragment X.UTF8 [parseAttrs node]
       else compileNode node
 
+
+parseAttrs :: X.Node -> X.Node
+parseAttrs (X.Element nm attrs ch) = newAttrs `seq` X.Element nm newAttrs ch
+  where
+    newAttrs = map parseAttr attrs
+parseAttrs !n = n
+
+parseAttr :: (Text, Text) -> (Text, Text)
+parseAttr (k,v) = (k, T.concat $! map cvt ast)
+  where
+    !ast = case AP.feed (AP.parse attParser v) "" of
+            (AP.Done _ res) -> res
+            (AP.Fail _ _ _) -> []
+            (AP.Partial _ ) -> []
+    cvt (Literal x) = x
+    cvt (Escaped c) = T.singleton c
+    cvt (Ident _) = error "parseAttrs: impossible case"
 
 ------------------------------------------------------------------------------
 -- | Checks whether a node's subtree is static and can be rendered up front at
@@ -318,8 +336,7 @@ subtreeIsStatic :: X.Node -> HeistT n IO Bool
 subtreeIsStatic (X.Element nm attrs ch) = do
     isNodeDynamic <- liftM isJust $ lookupSplice nm
     attrSplices <- getsHS _attrSpliceMap
-    let hasSubstitutions (k,v) = hasAttributeSubstitutions k ||
-                                 hasAttributeSubstitutions v ||
+    let hasSubstitutions (k,v) = hasAttributeSubstitutions v ||
                                  H.member k attrSplices
     if isNodeDynamic
       then return False
@@ -337,7 +354,7 @@ subtreeIsStatic _ = return True
 ------------------------------------------------------------------------------
 -- | Checks whether a string has any attribute substitutions.
 hasAttributeSubstitutions :: Text -> Bool
-hasAttributeSubstitutions txt = all isLiteral ast
+hasAttributeSubstitutions txt = any isIdent ast
   where
     ast = case AP.feed (AP.parse attParser txt) "" of
             (AP.Done _ res) -> res
@@ -345,6 +362,35 @@ hasAttributeSubstitutions txt = all isLiteral ast
             (AP.Partial _ ) -> []
 
 
+------------------------------------------------------------------------------
+-- |
+parseAtt :: Monad n => (Text, Text) -> HeistT n IO (DList (Chunk n))
+parseAtt (k,v) = do
+    mas <- getsHS (H.lookup k . _attrSpliceMap)
+    maybe doInline (return . doAttrSplice) mas
+
+  where
+    cvt (Literal x) = return $ yieldPureText x
+    cvt (Escaped c) = return $ yieldPureText $ T.singleton c
+    cvt (Ident x) =
+        localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
+
+    -- Handles inline parsing of $() splice syntax in attributes
+    doInline = do
+        let ast = case AP.feed (AP.parse attParser v) "" of
+                    (AP.Done _ res) -> res
+                    (AP.Fail _ _ _) -> []
+                    (AP.Partial _ ) -> []
+        chunks <- mapM cvt ast
+        let value = DL.concat chunks
+        return $ attrToChunk k value
+
+    -- Handles attribute splices
+    doAttrSplice splice = DL.singleton $ RuntimeHtml $ lift $ do
+        res <- splice v
+        return $ mconcat $ map attrToBuilder res
+
+    
 ------------------------------------------------------------------------------
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
 -- generate html at runtime. Leaves the writer monad state untouched.
@@ -398,37 +444,6 @@ attrToBuilder (k,v)
     ]
 
 
-------------------------------------------------------------------------------
--- | If this function returns a 'Nothing', there are no dynamic splices in the
--- attribute text, and you can just spit out the text value statically.
--- Otherwise, the splice has to be resolved at runtime.
-parseAtt :: Monad n => (Text, Text) -> HeistT n IO (DList (Chunk n))
-parseAtt (k,v) = do
-    mas <- getsHS (H.lookup k . _attrSpliceMap)
-    maybe doInline (return . doAttrSplice) mas
-
-  where
-    cvt (Literal x) = return $ yieldPureText x
-    cvt (Escaped c) = return $ yieldPureText $ T.singleton c
-    cvt (Ident x) =
-        localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
-
-    -- Handles inline parsing of $() splice syntax in attributes
-    doInline = do
-        let ast = case AP.feed (AP.parse attParser v) "" of
-                    (AP.Done _ res) -> res
-                    (AP.Fail _ _ _) -> []
-                    (AP.Partial _ ) -> []
-        chunks <- mapM cvt ast
-        let value = DL.concat chunks
-        return $ attrToChunk k value
-
-    -- Handles attribute splices
-    doAttrSplice splice = DL.singleton $ RuntimeHtml $ lift $ do
-        res <- splice v
-        return $ mconcat $ map attrToBuilder res
-
-    
 ------------------------------------------------------------------------------
 getAttributeSplice :: Text -> HeistT n IO (DList (Chunk n))
 getAttributeSplice name =
