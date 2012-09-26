@@ -13,16 +13,21 @@ import           Control.Error
 import           Control.Exception (evaluate)
 import           Control.Monad
 import qualified Data.ByteString as B
+import qualified Data.DList as DL
 import qualified Data.Text as T
 import           Data.Text.Encoding
 import           Data.Time.Clock
 import           Data.Maybe
+import qualified Text.XmlHtml as X
 import           System.Environment
 
 import Heist
+import Heist.Common
 import qualified Heist.Compiled as C
+import qualified Heist.Compiled.Internal as CI
 import qualified Heist.Interpreted as I
 import Heist.TestCommon
+import Heist.Types
 
 loadWithCache baseDir = do
     etm <- runEitherT $ do
@@ -107,4 +112,17 @@ cmdLineTemplate dir page = do
     defaultMain [
          bench (page++"-speed") action
        ]
+
+
+testNode =
+  X.Element "div" [("foo", "aoeu"), ("bar", "euid")] 
+    [X.Element "b" [] [X.TextNode "bolded text"]
+    ,X.TextNode " not bolded"
+    ,X.Element "a" [("href", "/path/to/page")] [X.TextNode "link"]
+    ]
+
+getChunks templateName = do
+    hs <- loadHS "snap-website-nocache"
+    let (Just t) = lookupTemplate templateName hs _compiledTemplateMap
+    return $! fst $! fst t
 

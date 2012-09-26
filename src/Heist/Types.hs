@@ -34,6 +34,8 @@ import           Data.HeterogeneousEnvironment   (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment as HE
 import           Data.Monoid
 import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Text.Encoding
 import           Data.Typeable
 import           Prelude hiding (catch)
 import qualified Text.XmlHtml as X
@@ -101,6 +103,22 @@ data Chunk m = Pure !Builder
                -- ^ runtime action used only for its side-effect
 
 
+instance Show (Chunk m) where
+    show (Pure _) = "Pure"
+    show (RuntimeHtml _) = "RuntimeHtml"
+    show (RuntimeAction _) = "RuntimeAction"
+
+
+showChunk :: Chunk m -> String
+showChunk (Pure b) = T.unpack $ decodeUtf8 $ toByteString b
+showChunk (RuntimeHtml _) = "RuntimeHtml"
+showChunk (RuntimeAction _) = "RuntimeAction"
+
+
+isPureChunk :: Chunk m -> Bool
+isPureChunk (Pure _) = True
+isPureChunk _ = False
+
 ------------------------------------------------------------------------------
 -- | Type alias for attribute splices.  The function parameter is the value of
 -- the bound attribute splice.  The return value is a list of attribute
@@ -124,7 +142,8 @@ data HeistState m = HeistState {
     -- | A mapping of splice names to splice actions
     , _compiledSpliceMap   :: HashMap Text (HeistT m IO (DList (Chunk m)))
     -- | A mapping of template names to templates
-    , _compiledTemplateMap :: HashMap TPath (m Builder, MIMEType)
+    --, _compiledTemplateMap :: HashMap TPath (m Builder, MIMEType)
+    , _compiledTemplateMap :: !(HashMap TPath ([Chunk m], MIMEType))
 
     , _attrSpliceMap       :: HashMap Text (AttrSplice m)
 

@@ -73,7 +73,7 @@ mapPromises f getList = do
 promiseChildren :: Monad m => HeistT m IO (RuntimeSplice m Builder)
 promiseChildren = do
     res <- runNodeList . X.childNodes =<< getParamNode
-    return $ codeGen res
+    return $! codeGen $! consolidate res
 {-# INLINE promiseChildren #-}
 
 
@@ -124,12 +124,12 @@ promiseChildrenWithNodes :: (Monad n)
                          -> HeistT n IO (RuntimeSplice n Builder)
 promiseChildrenWithNodes =
     promiseChildrenWithTrans (X.renderHtmlFragment X.UTF8)
-    
+
 
 ------------------------------------------------------------------------------
 -- | Yields pure text known at load time.
 pureTextChunk :: Text -> Chunk n
-pureTextChunk = Pure . fromByteString . T.encodeUtf8
+pureTextChunk t = Pure $ fromByteString $ T.encodeUtf8 t
 {-# INLINE pureTextChunk #-}
 
 
@@ -193,10 +193,10 @@ runSplice :: (Monad n)
           => X.Node
           -> HeistState n
           -> Splice n
-          -> IO (n Builder)
+          -> IO [Chunk n]
 runSplice node hs splice = do
     (!a,_) <- runHeistT splice node hs
-    return $! (flip evalStateT HE.empty $! unRT $! codeGen a)
+    return $! consolidate a
 
 
 ------------------------------------------------------------------------------
@@ -218,19 +218,33 @@ compileTemplate :: Monad n
                 => HeistState n
                 -> TPath
                 -> DocumentFile
-                -> IO (n Builder)
+                -> IO [Chunk n]
 compileTemplate hs tpath df = do
-    runSplice nullNode hs $! runDocumentFile tpath df
+    !chunks <- runSplice nullNode hs $! runDocumentFile tpath df
+    return $! map strictify chunks
   where
     -- This gets overwritten in runDocumentFile
     nullNode = X.TextNode ""
+    strictify (Pure b) = Pure $! fromByteString $! toByteString b
+    strictify c = c
 
 
 ------------------------------------------------------------------------------
 compileTemplates :: Monad n => HeistState n -> IO (HeistState n)
 compileTemplates hs = do
-    ctm <- foldM runOne H.empty tpathDocfiles
+    ctm <- compileTemplates' hs
     return $! hs { _compiledTemplateMap = ctm }
+--    let f = flip evalStateT HE.empty . unRT . codeGen
+--    return $! hs { _compiledTemplateMap = H.map (first f) ctm }
+
+
+------------------------------------------------------------------------------
+compileTemplates' :: Monad m
+                  => HeistState m
+                  -> IO (H.HashMap TPath ([Chunk m], MIMEType))
+compileTemplates' hs = do
+    ctm <- foldM runOne H.empty tpathDocfiles
+    return $! ctm
   where
     tpathDocfiles :: [(TPath, DocumentFile)]
     tpathDocfiles = map (\(a,b) -> (a, b))
@@ -242,54 +256,51 @@ compileTemplates hs = do
 
 
 ------------------------------------------------------------------------------
--- | Given a list of output chunks, consolidate turns consecutive runs of
--- @Pure Html@ values into maximally-efficient pre-rendered strict
--- 'ByteString' chunks.
-codeGen :: Monad m => DList (Chunk m) -> RuntimeSplice m Builder
-codeGen = compileConsolidated . consolidate . DL.toList
+-- | Consolidate consecutive Pure Chunks.
+consolidate :: (Monad m) => DList (Chunk m) -> [Chunk m]
+consolidate = consolidateL . DL.toList
   where
-    consolidate :: (Monad m) => [Chunk m] -> [Chunk m]
-    consolidate []     = []
-    consolidate (y:ys) = boilDown [] $! go [] y ys
+    consolidateL []     = []
+    consolidateL (y:ys) = boilDown [] $! go [] y ys
       where
         ----------------------------------------------------------------------
         go soFar x [] = x : soFar
-
+    
         go soFar (Pure a) ((Pure b) : xs) =
             go soFar (Pure $! a `mappend` b) xs
-
+    
         go soFar (RuntimeHtml a) ((RuntimeHtml b) : xs) =
             go soFar (RuntimeHtml $! a `mappend` b) xs
-
+    
         go soFar (RuntimeHtml a) ((RuntimeAction b) : xs) =
             go soFar (RuntimeHtml $! a >>= \x -> b >> return x) xs
-
+    
         go soFar (RuntimeAction a) ((RuntimeHtml b) : xs) =
             go soFar (RuntimeHtml $! a >> b) xs
-
+    
         go soFar (RuntimeAction a) ((RuntimeAction b) : xs) =
             go soFar (RuntimeAction $! a >> b) xs
-
+    
         go soFar a (b : xs) = go (a : soFar) b xs
-
+    
         ----------------------------------------------------------------------
         boilDown soFar []              = soFar
-
+    
         boilDown soFar ((Pure h) : xs) = boilDown ((Pure $! h) : soFar) xs
-
+    
         boilDown soFar (x : xs) = boilDown (x : soFar) xs
 
 
-    --------------------------------------------------------------------------
-    compileConsolidated :: (Monad m) => [Chunk m] -> RuntimeSplice m Builder
-    compileConsolidated l = V.foldr mappend mempty v
-      where
-        toAct (RuntimeHtml !m)   = m
-        toAct (Pure !h)          = return h
-        toAct (RuntimeAction !m) = m >> return mempty
-
-        !v = V.map toAct $! V.fromList l
-    {-# INLINE compileConsolidated #-}
+------------------------------------------------------------------------------
+-- | Given a list of output chunks, consolidate turns consecutive runs of
+-- @Pure Html@ values into maximally-efficient pre-rendered strict
+-- 'ByteString' chunks.
+codeGen :: Monad m => [Chunk m] -> RuntimeSplice m Builder
+codeGen l = V.foldr mappend mempty $! V.map toAct $! V.fromList l
+  where
+    toAct (RuntimeHtml !m)   = m
+    toAct (Pure !h)          = return h
+    toAct (RuntimeAction !m) = m >> return mempty
 {-# INLINE codeGen #-}
 
 
@@ -408,39 +419,39 @@ compileNode (X.Element nm attrs ch) =
 
         childHtml <- runNodeList ch
 
-        return $ if null (DL.toList childHtml)
-          then DL.concat [ DL.singleton $ pureTextChunk tag0
+        return $! if null (DL.toList childHtml)
+          then DL.concat [ DL.singleton $! pureTextChunk $! tag0
                          , DL.concat compiledAttrs
-                         , DL.singleton $ pureTextChunk " />"
+                         , DL.singleton $! pureTextChunk " />"
                          ]
-          else DL.concat [ DL.singleton $ pureTextChunk tag0
+          else DL.concat [ DL.singleton $! pureTextChunk $! tag0
                          , DL.concat compiledAttrs
-                         , DL.singleton $ pureTextChunk ">"
+                         , DL.singleton $! pureTextChunk ">"
                          , childHtml
-                         , DL.singleton $ pureTextChunk end
+                         , DL.singleton $! pureTextChunk $! end
                          ]
 compileNode _ = error "impossible"
 
 
 attrToChunk :: Text -> DList (Chunk n) -> DList (Chunk n)
-attrToChunk k v = do
+attrToChunk !k !v = do
     DL.concat
-        [ DL.singleton $ pureTextChunk $ T.concat [" ", k, "=\""]
-        , v, DL.singleton $ pureTextChunk "\"" ]
+        [ DL.singleton $! pureTextChunk $! T.concat [" ", k, "=\""]
+        , v, DL.singleton $! pureTextChunk "\"" ]
     
 
 attrToBuilder :: (Text, Text) -> Builder
 attrToBuilder (k,v)
   | T.null v  = mconcat
-    [ fromByteString $ T.encodeUtf8 " "
-    , fromByteString $ T.encodeUtf8 k
+    [ fromByteString $! T.encodeUtf8 " "
+    , fromByteString $! T.encodeUtf8 k
     ]
   | otherwise = mconcat
-    [ fromByteString $ T.encodeUtf8 " "
-    , fromByteString $ T.encodeUtf8 k
-    , fromByteString $ T.encodeUtf8 "=\""
-    , fromByteString $ T.encodeUtf8 v
-    , fromByteString $ T.encodeUtf8 "\""
+    [ fromByteString $! T.encodeUtf8 " "
+    , fromByteString $! T.encodeUtf8 k
+    , fromByteString $! T.encodeUtf8 "=\""
+    , fromByteString $! T.encodeUtf8 v
+    , fromByteString $! T.encodeUtf8 "\""
     ]
 
 
@@ -582,10 +593,14 @@ addSplices ss = modifyHS (bindSplices ss)
 ------------------------------------------------------------------------------
 -- | Looks up a compiled template and returns a runtime monad computation that
 -- constructs a builder.
-renderTemplate :: HeistState n
+renderTemplate :: Monad n
+               => HeistState n
                -> ByteString
                -> Maybe (n Builder, MIMEType)
 renderTemplate hs nm =
-    fmap fst $! lookupTemplate nm hs _compiledTemplateMap
+    fmap (first interpret . fst) $! lookupTemplate nm hs _compiledTemplateMap
+
+interpret :: Monad m => [Chunk m] -> m Builder
+interpret = flip evalStateT HE.empty . unRT . codeGen
 
 
