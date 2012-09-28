@@ -119,6 +119,7 @@ isPureChunk :: Chunk m -> Bool
 isPureChunk (Pure _) = True
 isPureChunk _ = False
 
+
 ------------------------------------------------------------------------------
 -- | Type alias for attribute splices.  The function parameter is the value of
 -- the bound attribute splice.  The return value is a list of attribute

@@ -39,7 +39,7 @@ loadWithCache baseDir = do
 main = do
     let page = "faq"
         pageStr = T.unpack $ decodeUtf8 page
-        dir = "snap-website"
+        dir = "snap-website-nocache"
     hs <- loadWithCache dir
     let !compiledTemplate = fst $! fromJust $! C.renderTemplate hs page
         compiledAction = do
@@ -48,7 +48,7 @@ main = do
     out <- compiledAction
     B.writeFile (pageStr++".out.compiled."++dir) $ out
     putStrLn "Templates loaded"
-    replicateM_ 10000 $ whnfIO compiledAction
+    replicateM_ 1000000 $ whnfIO compiledAction
     putStrLn "done"
 
 justRender dir = do

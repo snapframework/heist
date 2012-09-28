@@ -221,12 +221,16 @@ compileTemplate :: Monad n
                 -> IO [Chunk n]
 compileTemplate hs tpath df = do
     !chunks <- runSplice nullNode hs $! runDocumentFile tpath df
-    return $! map strictify chunks
+    return $! map strictifyChunk chunks
   where
     -- This gets overwritten in runDocumentFile
     nullNode = X.TextNode ""
-    strictify (Pure b) = Pure $! fromByteString $! toByteString b
-    strictify c = c
+
+
+strictifyChunk :: Monad m => Chunk m -> Chunk m
+strictifyChunk (Pure b) = Pure $! fromByteString $! toByteString b
+strictifyChunk !c = c
+{-# INLINE strictifyChunk #-}
 
 
 ------------------------------------------------------------------------------
