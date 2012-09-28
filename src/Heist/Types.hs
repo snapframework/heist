@@ -95,7 +95,7 @@ instance (Monad m, Monoid a) => Monoid (RuntimeSplice m a) where
 
 ------------------------------------------------------------------------------
 -- | Opaque type representing pieces of output from compiled splices.
-data Chunk m = Pure !Builder
+data Chunk m = Pure !ByteString
                -- ^ output known at load time
              | RuntimeHtml !(RuntimeSplice m Builder)
                -- ^ output computed at run time
@@ -110,7 +110,7 @@ instance Show (Chunk m) where
 
 
 showChunk :: Chunk m -> String
-showChunk (Pure b) = T.unpack $ decodeUtf8 $ toByteString b
+showChunk (Pure b) = T.unpack $ decodeUtf8 b
 showChunk (RuntimeHtml _) = "RuntimeHtml"
 showChunk (RuntimeAction _) = "RuntimeAction"
 

@@ -129,7 +129,7 @@ promiseChildrenWithNodes =
 ------------------------------------------------------------------------------
 -- | Yields pure text known at load time.
 pureTextChunk :: Text -> Chunk n
-pureTextChunk t = Pure $ fromByteString $ T.encodeUtf8 t
+pureTextChunk t = Pure $ T.encodeUtf8 t
 {-# INLINE pureTextChunk #-}
 
 
@@ -138,7 +138,7 @@ pureTextChunk t = Pure $ fromByteString $ T.encodeUtf8 t
 -- 'yieldPureText' as much as possible to maximize the parts of your page that
 -- can be compiled to static ByteStrings.
 yieldPure :: Builder -> DList (Chunk m)
-yieldPure = DL.singleton . Pure
+yieldPure = DL.singleton . Pure . toByteString
 {-# INLINE yieldPure #-}
 
 
@@ -221,16 +221,10 @@ compileTemplate :: Monad n
                 -> IO [Chunk n]
 compileTemplate hs tpath df = do
     !chunks <- runSplice nullNode hs $! runDocumentFile tpath df
-    return $! map strictifyChunk chunks
+    return chunks
   where
     -- This gets overwritten in runDocumentFile
     nullNode = X.TextNode ""
-
-
-strictifyChunk :: Monad m => Chunk m -> Chunk m
-strictifyChunk (Pure b) = Pure $! fromByteString $! toByteString b
-strictifyChunk !c = c
-{-# INLINE strictifyChunk #-}
 
 
 ------------------------------------------------------------------------------
@@ -302,9 +296,9 @@ consolidate = consolidateL . DL.toList
 codeGen :: Monad m => [Chunk m] -> RuntimeSplice m Builder
 codeGen l = V.foldr mappend mempty $! V.map toAct $! V.fromList l
   where
-    toAct (RuntimeHtml !m)   = m
-    toAct (Pure !h)          = return h
-    toAct (RuntimeAction !m) = m >> return mempty
+    toAct !(RuntimeHtml !m)   = m
+    toAct !(Pure !h)          = return $! fromByteString h
+    toAct !(RuntimeAction !m) = m >> return mempty
 {-# INLINE codeGen #-}
 
 

@@ -43,7 +43,7 @@ main = do
     hs <- loadWithCache dir
     let !compiledTemplate = fst $! fromJust $! C.renderTemplate hs page
         compiledAction = do
-            res <- compiledTemplate
+            !res <- compiledTemplate
             return $! toByteString $! res
     out <- compiledAction
     B.writeFile (pageStr++".out.compiled."++dir) $ out
