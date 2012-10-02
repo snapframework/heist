@@ -36,20 +36,7 @@ loadWithCache baseDir = do
         initHeistWithCacheTag hc
     either (error . unlines) (return . fst) etm
 
-main = do
-    let page = "faq"
-        pageStr = T.unpack $ decodeUtf8 page
-        dir = "snap-website-nocache"
-    hs <- loadWithCache dir
-    let !compiledTemplate = fst $! fromJust $! C.renderTemplate hs page
-        compiledAction = do
-            !res <- compiledTemplate
-            return $! toByteString $! res
-    out <- compiledAction
-    B.writeFile (pageStr++".out.compiled."++dir) $ out
-    putStrLn "Templates loaded"
-    replicateM_ 1000000 $ whnfIO compiledAction
-    putStrLn "done"
+main = justRender "snap-website-nocache"
 
 justRender dir = do
     let page = "faq"
@@ -60,6 +47,7 @@ justRender dir = do
             res <- compiledTemplate
             return $! toByteString $! res
     out <- compiledAction
+    putStrLn $ "Rendered ByteString of length "++(show $ B.length out)
     B.writeFile (pageStr++".out.compiled."++dir) $ out
 
     defaultMain
@@ -68,9 +56,8 @@ justRender dir = do
 
 ------------------------------------------------------------------------------
 --applyComparison :: IO ()
-applyComparison dir = do
-    let page = "faq"
-        pageStr = T.unpack $ decodeUtf8 page
+applyComparison dir page = do
+    let pageStr = T.unpack $ decodeUtf8 page
     hs <- loadWithCache dir
     let compiledAction = do
             res <- fst $ fromJust $ C.renderTemplate hs page
@@ -87,7 +74,6 @@ applyComparison dir = do
     defaultMain
        [ bench (pageStr++"-compiled") (whnfIO compiledAction)
        , bench (pageStr++"-interpreted") (whnfIO interpretedAction)
-       , bench "getCurrentTime"         (whnfIO getCurrentTime)
        ]
 
 cmdLineTemplate :: String -> String -> IO ()
