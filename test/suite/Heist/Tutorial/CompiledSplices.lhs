@@ -1,12 +1,20 @@
 Introduction to Compiled Heist
 ==============================
 
-Before version 0.9, Heist has essentially been an interpreter.  It loads your
+Before version 0.10, Heist has essentially been an interpreter.  It loads your
 templates and "runs" them whenever a page is served.  This is relatively
 inefficient since a lot of document transformations happen every time the
-template is requested.  Compiled Heist does most of your splice processing up
-front at load time.  Dynamic information can still be rendered at runtime, but
-it is faster than the fully interpreted approach that Heist started with.
+template is requested.  For Heist version 0.10 we completely rethought
+everything with performance in mind.  We call it "compiled Heist".  The main
+idea is to do most of your splice processing up front at load time.  There is
+still a mechanism for rendering dynamic information at runtime, but it is
+faster than the fully interpreted approach that Heist started with.
+
+It should also be mentioned that the old "interpreted Heist" is not gone.  You
+can still use the old approach where all the transformations happen at
+render time.  This allows you to upgrade without making sweeping changes to
+your code, and gradually convert your application to the more performant
+compiled approach as you see fit.
 
 Before we continue it should be mentioned that you are reading real live
 literate Haskell code from our test suite.  All the code you see here is
@@ -24,10 +32,10 @@ As a review, normal (interpreted) Heist splices are defined like this.
 < type Splice m = HeistT m m [Node]
 
 The type parameter `m` is the runtime execution monad (in a Snap application
-this will usually be `Handler` or `Snap`).  Don't worry why the `m` is there
-twice right now.  We'll get to that later.  The splice's return value is a
-list of nodes that is substituted back into the document wherever the spliced
-node was.  
+this will usually be `Handler` or `Snap`).  Don't worry about why the `m` is
+there twice right now.  We'll get to that later.  The splice's return value is
+a list of nodes that is substituted back into the document wherever the
+spliced node was.  
 
 This kind of splice proccessing involves traversing the DOM, which is
 inefficient.  Compiled Heist is designed so that all the DOM traversals happen
@@ -50,7 +58,7 @@ exposed publicly, but there are three ways to construct a Chunk.
 < yieldRuntime :: RuntimeSplice m Builder -> DList (Chunk m)
 < yieldRuntimeEffect :: Monad m => RuntimeSplice m () -> DList (Chunk m)
 
-If your splice output can be calculated at load time, then you will use
+If your splice output can be calculated at load time, then you should use
 `yieldPure` or one of its variants.  When you do this, Heist can concatenate
 all adjacent pure chunks into a single precalculated ByteString that can be
 rendered very efficiently.  If your template needs a value that has to be
@@ -59,7 +67,12 @@ supply a computation in the RuntimeSplice monad transformer that is
 parameterized by `m` which we saw above is the runtime monad.  Occasionally
 you might want to run a runtime side effect that doesn't actually insert any
 data into your template.  The `yieldRuntimeEffect` function gives you that
-capability.  With that background, let's get to a real example.
+capability.
+
+An Example
+==========
+
+With that background, let's get to a real example.
 
 > stateSplice :: C.Splice (StateT Int IO)
 > stateSplice = return $ C.yieldRuntimeText $ do
@@ -158,7 +171,7 @@ structure with a compiled splice.
 Disadvantages of Compiled Heist
 ===============================
 
-Complied Heist is faster than the original interpreted approach, but as with
+Compiled Heist is faster than the original interpreted approach, but as with
 most things in computing there is a tradeoff.  Compiled Heist is strictly less
 powerful than interpreted Heist.  There are two things that compiled Heist
 loses: the ability to bind new splices on the fly at runtime and splice
@@ -205,4 +218,41 @@ transformations that don't require runtime data.  All of the built-in splices
 that we ship with Heist work as load time splices.  So you can still have head
 merging by including our html splice in the load time splice list in your
 HeistConfig.
+
+
+A More Involved Example
+=======================
+
+The person example above is a very common and useful pattern for using dynamic
+data in splices.  But it has the simplification that it always generates
+output the same way.  Sometimes you might want a splice's output to have one
+form in some cases and a different form in other cases.  A simple example is a
+splice that reads some kind of a key from a request parameter then looks that
+key up in some kind of map.  If the key is present the splice outputs
+the value, otherwise it outputs an error message.  
+
+< failingSplice :: MonadSnap m => C.Splice m
+< failingSplice = do
+<     children <- childNodes <$> getParamNode
+<     promise <- C.newEmptyPromise
+<     outputChildren <- C.promiseChildrenWithNodes splices promise
+<     return $ C.yieldRuntime $ do         
+<         -- :: RuntimeSplice m Builder
+<         mname <- lift $ getParam "username"
+<         let err = return $ fromByteString "Must supply a username"
+<             single name = do          
+<                 euser <- liftIO $ lookupUser $ decodeUtf8 name
+<                 either (return . fromByteString . encodeUtf8 . T.pack)
+<                        doUser euser
+<               where
+<                 doUser value = do
+<                   C.putPromise promise (name, value)
+<                   outputChildren
+<         maybe err single mname
+<   
+<   
+< splices :: [(Text, (Text, Text) -> [Node])]
+< splices = [ ("user", (:[]) . TextNode . T.pack . fst)
+<           , ("value", (:[]) . TextNode . T.pack . snd)
+<           ]                                                                                                                                             
 
