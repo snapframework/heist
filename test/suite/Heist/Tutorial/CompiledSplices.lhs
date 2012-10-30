@@ -228,8 +228,19 @@ data in splices.  But it has the simplification that it always generates
 output the same way.  Sometimes you might want a splice's output to have one
 form in some cases and a different form in other cases.  A simple example is a
 splice that reads some kind of a key from a request parameter then looks that
-key up in some kind of map.  If the key is present the splice outputs
-the value, otherwise it outputs an error message.  
+key up in some kind of map.  If the key is present the splice uses its child
+nodes as a view for the retrieved value, otherwise it outputs an error message.  
+
+This pattern is a little tricky because you're making decisions about what to
+render based on runtime data, but the actual rendering of child nodes has to
+be done at load time.  To bridge the gap and allow communication between load
+time and runtime processing we provide the Promise data type.  A Promise is
+kind of like an IORef except that operations on them are restricted to the
+appropriate Heist context.  You create a new empty promise in the HeistT n IO
+(load time) monad, and you operate on it in the RuntimeSplice monad.
+
+Here's an example of how to use a promise manually to render a splice
+differently in the case of failure.
 
 < failingSplice :: MonadSnap m => C.Splice m
 < failingSplice = do
