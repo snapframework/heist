@@ -1,7 +1,7 @@
 Attribute Splices
 =================
 
-Attribute splices are new in Heist 0.9.  They solve the problem of wanting to
+Attribute splices are new in Heist 0.10.  They solve the problem of wanting to
 be able to dynamically make empty attributes appear or disappear with a splice
 without binding a splice to the whole tag.  This issue comes up most
 frequently when dealing with empty attributes such as HTML's "disabled" or

@@ -36,7 +36,9 @@ loadWithCache baseDir = do
         initHeistWithCacheTag hc
     either (error . unlines) (return . fst) etm
 
-main = justRender "snap-website-nocache"
+main = do
+    (dir:file:_) <- getArgs
+    applyComparison dir file
 
 justRender dir = do
     let page = "faq"
@@ -55,9 +57,9 @@ justRender dir = do
        ]
 
 ------------------------------------------------------------------------------
---applyComparison :: IO ()
-applyComparison dir page = do
-    let pageStr = T.unpack $ decodeUtf8 page
+applyComparison :: FilePath -> String -> IO ()
+applyComparison dir pageStr = do
+    let page = encodeUtf8 $ T.pack pageStr
     hs <- loadWithCache dir
     let compiledAction = do
             res <- fst $ fromJust $ C.renderTemplate hs page
