@@ -193,19 +193,19 @@ output is no longer something that can be passed into other splices.
 
 This composability turns out to be a very powerful feature.  Head merging is
 one feature that can't be done without it.  Head merging allows you to put
-<head> tags anyhere in any template and have them all merged into a single
-<head> tag at the top of your HTML document.  This is useful because it allows
+`<head>` tags anyhere in any template and have them all merged into a single
+`<head>` tag at the top of your HTML document.  This is useful because it allows
 you to keep concerns localized.  For instance, you can have a template
 represent a small piece of functionality that uses a less common javascript or
 CSS file.  Instead of having to depend on that resource being included in the
-top-level <head> tag, you can include it in a <head> tag right where you're
+top-level `<head>` tag, you can include it in a `<head>` tag right where you're
 using it.  Then it will only be included on your pages when you are using the
 markup that needs it.
 
-Our implementation of head merging uses a splice bound to the <html> tag.
-This splice removes all the <head> nodes from its children, combines them, and
-inserts them as its first child.  This won't work unless the <html> splice
-first runs all its children to make sure all <apply> and <bind> tags have
+Our implementation of head merging uses a splice bound to the `<html>` tag.
+This splice removes all the `<head>` nodes from its children, combines them, and
+inserts them as its first child.  This won't work unless the `<html>` splice
+first runs all its children to make sure all `<apply>` and `<bind>` tags have
 happened first.  And that is impossible to do with compiled splices.
 
 To get around this problem we added the concept of load time splices.  Load
