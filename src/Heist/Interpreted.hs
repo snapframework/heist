@@ -65,6 +65,7 @@ module Heist.Interpreted
   -- * HeistT functions
   , stopRecursion
   , runNode
+  , runAttributes
   , runNodeList
   , evalTemplate
   , bindStrings

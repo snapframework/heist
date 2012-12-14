@@ -48,6 +48,7 @@ module Heist.Compiled
   , runNodeList
   , runNode
   , compileNode
+  , runAttributes
   , runSplice
 
   ) where

@@ -413,7 +413,7 @@ compileNode (X.Element nm attrs ch) =
     -- If the tag is not a splice, but it contains dynamic children
     compileStaticElement = do
         -- Parse the attributes: we have Left for static and Right for runtime
-        compiledAttrs <- mapM parseAtt attrs
+        compiledAttrs <- runAttributes attrs
 
         childHtml <- runNodeList ch
 
@@ -429,6 +429,14 @@ compileNode (X.Element nm attrs ch) =
                          , DL.singleton $! pureTextChunk $! end
                          ]
 compileNode _ = error "impossible"
+
+
+------------------------------------------------------------------------------
+-- | Performs splice processing on a list of attributes.  This is useful in
+-- situations where you need to stop recursion, but still run splice
+-- processing on the node's attributes.
+runAttributes :: Monad n => [(Text, Text)] -> HeistT n IO [DList (Chunk n)]
+runAttributes = mapM parseAtt
 
 
 attrToChunk :: Text -> DList (Chunk n) -> DList (Chunk n)

@@ -177,7 +177,7 @@ stopRecursion = modifyHS (\st -> st { _recurse = False })
 -- | Performs splice processing on a single node.
 runNode :: Monad n => X.Node -> Splice n
 runNode (X.Element nm at ch) = do
-    newAtts <- (return . concat) =<< mapM runAttrSplice at
+    newAtts <- runAttributes at
     let n = X.Element nm newAtts ch
     s <- liftM (lookupSplice nm) getHS
     maybe (runKids newAtts) (recurseSplice n) s
@@ -186,6 +186,14 @@ runNode (X.Element nm at ch) = do
         newKids <- runNodeList ch
         return [X.Element nm newAtts newKids]
 runNode n                    = return [n]
+
+
+------------------------------------------------------------------------------
+-- | Performs splice processing on a list of attributes.  This is useful in
+-- situations where you need to stop recursion, but still run splice
+-- processing on the node's attributes.
+runAttributes :: Monad n => [(Text, Text)] -> HeistT n n [(Text, Text)]
+runAttributes attrs = (return . concat) =<< mapM runAttrSplice attrs
 
 
 ------------------------------------------------------------------------------
@@ -226,6 +234,9 @@ parseAtt bs = do
     renderEscaped c = do
         hs <- getHS
         if _preprocessingMode hs
+          -- Load time splices can't be descructive, therefore we need to
+          -- output the slashes so we don't change anything before later
+          -- splice processing.
           then return $ T.snoc "\\" c
           else return $ T.singleton c
 
@@ -288,7 +299,8 @@ recurseSplice node splice = do
                        restoreHS hs
                        return res
                else return result `orError` err
-        else return result
+        else do modifyHS (\st -> st { _recurse = True })
+                return result
   where
     err = unwords
         ["Recursion limit reached in node"
