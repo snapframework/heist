@@ -178,8 +178,8 @@ initHeist (HeistConfig i lt c a rawTemplates) = do
         hs0 = empty { _spliceMap = Map.fromList lt
                     , _templateMap = rawTemplates
                     , _preprocessingMode = True }
-    tPairs <- lift $ evalHeistT
-        (mapM preprocess $ Map.toList rawTemplates) (X.TextNode "") hs0
+        eval a = evalHeistT a (X.TextNode "") hs0
+    tPairs <- lift $ mapM (eval . preprocess) $ Map.toList rawTemplates
     let bad = lefts tPairs
         tmap = Map.fromList $ rights tPairs
         hs1 = empty { _spliceMap = Map.fromList i

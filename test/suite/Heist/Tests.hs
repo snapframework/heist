@@ -76,8 +76,8 @@ attrSpliceTest = do
     H.assertEqual "compiled bar" expected4
       (toByteString builder2)
   where
-    expected1 = doctype `B.append` "\n<input type='checkbox' value='foo' checked />\n<input type='checkbox' value='bar' />\n"
-    expected2 = doctype `B.append` "\n<input type='checkbox' value='foo' />\n<input type='checkbox' value='bar' checked />\n"
+    expected1 = "<input type='checkbox' value='foo' checked />\n<input type='checkbox' value='bar' />\n"
+    expected2 = "<input type='checkbox' value='foo' />\n<input type='checkbox' value='bar' checked />\n"
     expected3 = "<input type=\"checkbox\" value=\"foo\" checked />&#10;<input type=\"checkbox\" value=\"bar\" />&#10;"
     expected4 = "<input type=\"checkbox\" value=\"foo\" />&#10;<input type=\"checkbox\" value=\"bar\" checked />&#10;"
 
@@ -171,8 +171,7 @@ bindApplyInteractionTest = do
       ,"&#10;"
       ]
     iExpected = B.unlines
-      [doctype
-      ,"&#10;This is a test."
+      ["&#10;This is a test."
       ,"===bind content==="
       ,"Another test line."
       ,"apply content"
@@ -193,8 +192,5 @@ backslashHandlingTest = do
     H.assertEqual "interpreted failure" iExpected iOut
   where
     cExpected = "<foo regex='d+\\d'></foo>&#10;"
-    iExpected = B.unlines
-      [doctype
-      ,"<foo regex='d+\\d'></foo>"
-      ]
+    iExpected = "<foo regex='d+\\d'></foo>\n"
 

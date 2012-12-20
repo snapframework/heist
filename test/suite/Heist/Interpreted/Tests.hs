@@ -201,14 +201,12 @@ attrSubstTest = do
         H.assertEqual str expected $ toByteString $ resDoc
 
     out1 = B.unlines
-        [doctype
-        ,"<mytag flag>Empty attribute</mytag>"
+        ["<mytag flag>Empty attribute</mytag>"
         ,"<mytag flag='abc${foo}'>No ident capture</mytag>"
         ,"<div id='pre_meaning_of_everything_post'></div>"
         ]
     out2 = B.unlines
-        [doctype
-        ,"<mytag flag>Empty attribute</mytag>"
+        ["<mytag flag>Empty attribute</mytag>"
         ,"<mytag flag='abc${foo}'>No ident capture</mytag>"
         ,"<div id='pre__post'></div>"
         ]
@@ -232,10 +230,8 @@ bindAttrTest = do
 
 ------------------------------------------------------------------------------
 markdownHtmlExpected :: ByteString
-markdownHtmlExpected = B.concat
-    [ doctype
-    , "<div class='markdown'><p>This <em>is</em> a test.</p></div>"
-    ]
+markdownHtmlExpected =
+    "<div class='markdown'><p>This <em>is</em> a test.</p></div>"
 
 ------------------------------------------------------------------------------
 -- | Markdown test on a file
@@ -250,11 +246,9 @@ jsonValueTest = do
     renderTest "json_snippet" jsonExpected2
 
   where
-    jsonExpected1 = B.concat [ doctype
-                             , "<i>&lt;b&gt;ok&lt;/b&gt;</i><i>1</i>"
+    jsonExpected1 = B.concat [ "<i>&lt;b&gt;ok&lt;/b&gt;</i><i>1</i>"
                              , "<i></i><i>false</i><i>foo</i>" ]
-    jsonExpected2 = B.concat
-        [doctype, "<i><b>ok</b></i><i>1</i><i></i><i>false</i><i>foo</i>"]
+    jsonExpected2 = "<i><b>ok</b></i><i>1</i><i></i><i>false</i><i>foo</i>"
 
 
 
@@ -263,9 +257,7 @@ jsonObjectTest :: H.Assertion
 jsonObjectTest = do
     renderTest "json_object" jsonExpected
   where
-    jsonExpected = B.concat
-        [ doctype
-        , "<i>1</i><i><b>ok</b></i>12quuxquux1<b>ok</b>" ]
+    jsonExpected = "<i>1</i><i><b>ok</b></i>12quuxquux1<b>ok</b>"
 
 
 ------------------------------------------------------------------------------
@@ -305,10 +297,7 @@ renderTest templateName expectedResult = do
 titleExpansion :: H.Assertion
 titleExpansion = renderTest "title_expansion" expected
   where
-    expected = B.concat
-        [ doctype
-        , "<title>foo</title>"
-        ]
+    expected = "<title>foo</title>"
 
 
 ------------------------------------------------------------------------------
@@ -325,24 +314,20 @@ textareaExpansion = renderTest "textarea_expansion" expected
 divExpansion :: H.Assertion
 divExpansion = renderTest "div_expansion" expected
   where
-    expected = B.concat
-        [ doctype
-        , "<div>foo</div>"
-        ]
+    expected = "<div>foo</div>"
 
 
 ------------------------------------------------------------------------------
 -- | Handling of <content> and bound parameters in a bound tag.
 bindParam :: H.Assertion
-bindParam = renderTest "bind_param" $
-    B.concat [doctype, "<li>Hi there world</li>"]
+bindParam = renderTest "bind_param" "<li>Hi there world</li>"
 
 
 ------------------------------------------------------------------------------
 -- | Handling of <content> and bound parameters in a bound tag.
 attrSpliceContext :: H.Assertion
-attrSpliceContext = renderTest "attrsubtest2" $
-    B.append doctype "<a href='asdf'>link</a><a href='before$after'>foo</a>"
+attrSpliceContext = renderTest "attrsubtest2"
+    "<a href='asdf'>link</a><a href='before$after'>foo</a>"
 
 
 ------------------------------------------------------------------------------
@@ -355,11 +340,7 @@ markdownTextTest = do
                          hs
     H.assertEqual "Markdown text" markdownHtmlExpected 
       (B.filter (/= '\n') $ toByteString $
-        X.render (X.HtmlDocument X.UTF8 (Just dt) result))
-  where
-    dt = X.DocType "html" (X.Public "-//W3C//DTD XHTML 1.0 Strict//EN"
-                                    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd")
-                        X.NoInternalSubset
+        X.render (X.HtmlDocument X.UTF8 Nothing result))
 
 
 ------------------------------------------------------------------------------
