@@ -3,6 +3,7 @@ module Heist.TestCommon where
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Error
+import           Control.Monad.Trans
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.HashMap.Strict as Map
@@ -26,7 +27,7 @@ doctype = B.concat
     , "'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>" ]
 
 
-loadT :: Monad m
+loadT :: MonadIO m
       => FilePath
       -> [(Text, I.Splice m)]
       -> [(Text, I.Splice IO)]
@@ -35,7 +36,8 @@ loadT :: Monad m
       -> IO (Either [String] (HeistState m))
 loadT baseDir a b c d = runEitherT $ do
     ts <- loadTemplates baseDir
-    let hc = HeistConfig a (defaultLoadTimeSplices ++ b) c d ts
+    let hc = HeistConfig (defaultInterpretedSplices ++ a)
+                         (defaultLoadTimeSplices ++ b) c d ts
     initHeist hc
 
 
@@ -48,7 +50,8 @@ loadIO :: FilePath
        -> IO (Either [String] (HeistState IO))
 loadIO baseDir a b c d = runEitherT $ do
     ts <- loadTemplates baseDir
-    let hc = HeistConfig a (defaultLoadTimeSplices ++ b) c d ts
+    let hc = HeistConfig (defaultInterpretedSplices ++ a)
+                         (defaultLoadTimeSplices ++ b) c d ts
     initHeist hc
 
 
@@ -57,7 +60,8 @@ loadHS :: FilePath -> IO (HeistState IO)
 loadHS baseDir = do
     etm <- runEitherT $ do
         templates <- loadTemplates baseDir
-        let hc = HeistConfig [] defaultLoadTimeSplices [] [] templates
+        let hc = HeistConfig defaultInterpretedSplices
+                             defaultLoadTimeSplices [] [] templates
         initHeist hc
     either (error . concat) return etm
 
@@ -68,7 +72,8 @@ loadEmpty :: [(Text, I.Splice IO)]
           -> [(Text, AttrSplice IO)]
           -> IO (HeistState IO)
 loadEmpty a b c d = do
-    let hc = HeistConfig a (defaultLoadTimeSplices ++ b) c d Map.empty
+    let hc = HeistConfig (defaultInterpretedSplices ++ a)
+                         (defaultLoadTimeSplices ++ b) c d Map.empty
     res <- runEitherT $ initHeist hc
     either (error . concat) return res
 

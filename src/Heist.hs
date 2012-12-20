@@ -20,6 +20,7 @@ module Heist
   , addTemplatePathPrefix
   , initHeist
   , initHeistWithCacheTag
+  , defaultInterpretedSplices
   , defaultLoadTimeSplices
 
   -- * Core Heist data types
@@ -75,6 +76,8 @@ import           Heist.Splices
 import           Heist.Types
 
 
+type TemplateRepo = HashMap TPath DocumentFile
+
 data HeistConfig m = HeistConfig
     { hcInterpretedSplices :: [(Text, I.Splice m)]
     -- ^ Interpreted splices are the splices that Heist has always had.  They
@@ -91,7 +94,7 @@ data HeistConfig m = HeistConfig
     , hcAttributeSplices   :: [(Text, AttrSplice m)]
     -- ^ Attribute splices are bound to attribute names and return a list of
     -- attributes.
-    , hcTemplates          :: HashMap TPath DocumentFile
+    , hcTemplates          :: TemplateRepo
     -- ^ Templates returned from the 'loadTemplates' function.
     }
 
@@ -112,11 +115,20 @@ instance Monoid (HeistConfig m) where
 -- should include these in the hcLoadTimeSplices list in your HeistConfig.
 defaultLoadTimeSplices :: MonadIO m => [(Text, (I.Splice m))]
 defaultLoadTimeSplices =
+    ("content", deprecatedContentCheck) -- To be removed in later versions
+    : defaultInterpretedSplices
+
+
+------------------------------------------------------------------------------
+-- | The built-in set of static splices.  All the splices that used to be
+-- enabled by default are included here.  To get the normal Heist behavior you
+-- should include these in the hcLoadTimeSplices list in your HeistConfig.
+defaultInterpretedSplices :: MonadIO m => [(Text, (I.Splice m))]
+defaultInterpretedSplices =
     [ (applyTag, applyImpl)
     , (bindTag, bindImpl)
     , (ignoreTag, ignoreImpl)
     , (markdownTag, markdownSplice)
-    , ("content", deprecatedContentCheck) -- To be removed in later versions
     ]
 
 
@@ -124,7 +136,7 @@ defaultLoadTimeSplices =
 -- | Loads templates from disk.  This function returns just a template map so
 -- you can load multiple directories and combine the maps before initializing
 -- your HeistState.
-loadTemplates :: FilePath -> EitherT [String] IO (HashMap TPath DocumentFile)
+loadTemplates :: FilePath -> EitherT [String] IO TemplateRepo
 loadTemplates dir = do
     d <- lift $ readDirectoryWith (loadTemplate dir) dir
     let tlist = F.fold (free d)
@@ -139,9 +151,7 @@ loadTemplates dir = do
 -- you want to add multiple levels of directories, separate them with slashes
 -- as in "foo/bar".  Using an empty string as a path prefix will leave the
 -- map unchanged.
-addTemplatePathPrefix :: ByteString
-                      -> HashMap TPath DocumentFile
-                      -> HashMap TPath DocumentFile
+addTemplatePathPrefix :: ByteString -> TemplateRepo -> TemplateRepo
 addTemplatePathPrefix dir ts
   | B.null dir = ts
   | otherwise  = Map.fromList $
@@ -149,6 +159,13 @@ addTemplatePathPrefix dir ts
                  Map.toList ts
   where
     f ps = ps++splitTemplatePath dir
+
+
+------------------------------------------------------------------------------
+-- | Creates an empty HeistState.
+emptyHS :: HE.KeyGen -> HeistState m
+emptyHS kg = HeistState Map.empty Map.empty Map.empty Map.empty
+                        Map.empty True [] 0 [] Nothing kg False
 
 
 ------------------------------------------------------------------------------
@@ -171,37 +188,54 @@ addTemplatePathPrefix dir ts
 initHeist :: Monad n
           => HeistConfig n
           -> EitherT [String] IO (HeistState n)
-initHeist (HeistConfig i lt c a rawTemplates) = do
+initHeist hc = do
     keyGen <- lift HE.newKeyGen
-    let empty = HeistState Map.empty Map.empty Map.empty Map.empty
-                           Map.empty True [] 0 [] Nothing keyGen False
-        hs0 = empty { _spliceMap = Map.fromList lt
-                    , _templateMap = rawTemplates
-                    , _preprocessingMode = True }
-        eval a = evalHeistT a (X.TextNode "") hs0
-    tPairs <- lift $ mapM (eval . preprocess) $ Map.toList rawTemplates
-    let bad = lefts tPairs
-        tmap = Map.fromList $ rights tPairs
-        hs1 = empty { _spliceMap = Map.fromList i
+    initHeist' keyGen hc
+
+
+initHeist' :: Monad n
+           => HE.KeyGen
+           -> HeistConfig n
+           -> EitherT [String] IO (HeistState n)
+initHeist' keyGen (HeistConfig i lt c a rawTemplates) = do
+    let empty = emptyHS keyGen
+    tmap <- preproc keyGen lt rawTemplates
+    let hs1 = empty { _spliceMap = Map.fromList i
                     , _templateMap = tmap
                     , _compiledSpliceMap = Map.fromList c
                     , _attrSpliceMap = Map.fromList a
                     }
-    if not (null bad)
-      then left bad
-      else lift $ C.compileTemplates hs1
+    lift $ C.compileTemplates hs1
 
 
 ------------------------------------------------------------------------------
--- | 
+-- | Runs preprocess on a TemplateRepo and returns the modified templates.
+preproc :: HE.KeyGen
+        -> [(Text, I.Splice IO)]
+        -> TemplateRepo
+        -> EitherT [String] IO TemplateRepo
+preproc keyGen splices templates = do
+    let hs = (emptyHS keyGen) { _spliceMap = Map.fromList splices
+                              , _templateMap = templates
+                              , _preprocessingMode = True }
+    let eval a = evalHeistT a (X.TextNode "") hs
+    tPairs <- lift $ mapM (eval . preprocess) $ Map.toList templates
+    let bad = lefts tPairs
+    if not (null bad)
+      then left bad
+      else right $ Map.fromList $ rights tPairs
+
+
+------------------------------------------------------------------------------
+-- | Processes a single template, running load time splices.
 preprocess :: (TPath, DocumentFile)
            -> HeistT IO IO (Either String (TPath, DocumentFile))
 preprocess (tpath, docFile) = do
-        let tname = tpathName tpath
-        !emdoc <- try $ I.evalWithDoctypes tname
-                  :: HeistT IO IO (Either SomeException (Maybe X.Document))
-        let f !doc = (tpath, docFile { dfDoc = doc })
-        return $! either (Left . show) (Right . maybe die f) emdoc
+    let tname = tpathName tpath
+    !emdoc <- try $ I.evalWithDoctypes tname
+              :: HeistT IO IO (Either SomeException (Maybe X.Document))
+    let f !doc = (tpath, docFile { dfDoc = doc })
+    return $! either (Left . show) (Right . maybe die f) emdoc
   where
     die = error "Preprocess didn't succeed!  This should never happen."
 
@@ -218,10 +252,17 @@ initHeistWithCacheTag :: MonadIO n
 initHeistWithCacheTag (HeistConfig i lt c a rawTemplates) = do
     (ss, cts) <- liftIO mkCacheTag
     let tag = "cache"
-        hc' = HeistConfig ((tag, cacheImpl cts) : i)
-                          ((tag, ss) : lt)
+    keyGen <- lift HE.newKeyGen
+
+    -- We have to do one preprocessing pass with the cache setup splice.  This
+    -- has to happen for both interpreted and compiled templates, so we do it
+    -- here by itself because interpreted templates don't get the same load
+    -- time splices as compiled templates.
+    rawWithCache <- preproc keyGen [(tag, ss)] rawTemplates
+
+    let hc' = HeistConfig ((tag, cacheImpl cts) : i) lt
                           ((tag, cacheImplCompiled cts) : c)
-                          a rawTemplates
-    hs <- initHeist hc'
+                          a rawWithCache
+    hs <- initHeist' keyGen hc'
     return (hs, cts)
 

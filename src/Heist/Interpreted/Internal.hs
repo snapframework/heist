@@ -48,7 +48,7 @@ bindSplice :: Text            -- ^ tag name
            -> Splice n        -- ^ splice action
            -> HeistState n    -- ^ source state
            -> HeistState n
-bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
+bindSplice n v hs = hs {_spliceMap = Map.insert n v (_spliceMap hs)}
 
 
 ------------------------------------------------------------------------------
@@ -56,9 +56,18 @@ bindSplice n v ts = ts {_spliceMap = Map.insert n v (_spliceMap ts)}
 bindSplices :: [(Text, Splice n)] -- ^ splices to bind
             -> HeistState n       -- ^ start state
             -> HeistState n
-bindSplices ss ts = foldl' (flip id) ts acts
+bindSplices ss hs = foldl' (flip id) hs acts
   where
     acts = map (uncurry bindSplice) ss
+
+
+------------------------------------------------------------------------------
+-- | Binds a set of new splice declarations within a 'HeistState'.
+bindAttributeSplices :: [(Text, AttrSplice n)] -- ^ splices to bind
+                     -> HeistState n           -- ^ start state
+                     -> HeistState n
+bindAttributeSplices ss hs =
+    hs { _attrSpliceMap = Map.union (Map.fromList ss) (_attrSpliceMap hs) }
 
 
 ------------------------------------------------------------------------------
@@ -117,7 +126,7 @@ runChildrenWithText = runChildrenWithTrans textSplice
 lookupSplice :: Text
              -> HeistState n
              -> Maybe (Splice n)
-lookupSplice nm ts = Map.lookup nm $ _spliceMap ts
+lookupSplice nm hs = Map.lookup nm $ _spliceMap hs
 {-# INLINE lookupSplice #-}
 
 
@@ -317,8 +326,8 @@ lookupAndRun :: Monad m
              -> ((DocumentFile, TPath) -> HeistT n m (Maybe a))
              -> HeistT n m (Maybe a)
 lookupAndRun name k = do
-    ts <- getHS
-    let mt = lookupTemplate name ts _templateMap
+    hs <- getHS
+    let mt = lookupTemplate name hs _templateMap
     let curPath = join $ fmap (dfFile . fst) mt
     modifyHS (setCurTemplateFile curPath)
     maybe (return Nothing) k mt
@@ -330,7 +339,7 @@ evalTemplate :: Monad n
              => ByteString
              -> HeistT n n (Maybe Template)
 evalTemplate name = lookupAndRun name
-    (\(t,ctx) -> localHS (\ts -> ts {_curContext = ctx})
+    (\(t,ctx) -> localHS (\hs -> hs {_curContext = ctx})
                          (liftM Just $ runNodeList $ X.docContent $ dfDoc t))
 
 
@@ -351,11 +360,11 @@ evalWithDoctypes :: Monad n
                  -> HeistT n n (Maybe X.Document)
 evalWithDoctypes name = lookupAndRun name $ \(t,ctx) -> do
     addDoctype $ maybeToList $ X.docType $ dfDoc t
-    ts <- getHS
+    hs <- getHS
     let nodes = X.docContent $ dfDoc t
-    putHS (ts {_curContext = ctx})
+    putHS (hs {_curContext = ctx})
     newNodes <- runNodeList nodes
-    restoreHS ts
+    restoreHS hs
     newDoc   <- fixDocType $ (dfDoc t) { X.docContent = newNodes }
     return (Just newDoc)
 
@@ -366,7 +375,7 @@ bindStrings :: Monad n
             => [(Text, Text)]
             -> HeistState n
             -> HeistState n
-bindStrings pairs ts = foldr (uncurry bindString) ts pairs
+bindStrings pairs hs = foldr (uncurry bindString) hs pairs
 
 
 ------------------------------------------------------------------------------
@@ -417,7 +426,7 @@ renderTemplate :: Monad n
                => HeistState n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
-renderTemplate ts name = evalHeistT tpl (X.TextNode "") ts
+renderTemplate hs name = evalHeistT tpl (X.TextNode "") hs
   where tpl = do mt <- evalWithDoctypes name
                  case mt of
                     Nothing  -> return Nothing
@@ -434,6 +443,6 @@ renderWithArgs :: Monad n
                -> HeistState n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
-renderWithArgs args ts = renderTemplate (bindStrings args ts)
+renderWithArgs args hs = renderTemplate (bindStrings args hs)
 
 

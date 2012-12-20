@@ -52,6 +52,7 @@ module Heist.Interpreted
   , lookupSplice
   , bindSplice
   , bindSplices
+  , bindAttributeSplices
 
   -- * Functions for creating splices
   , textSplice
