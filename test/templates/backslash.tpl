@@ -1,1 +1,1 @@
-<foo regex='\d+\\d'/>
+<foo regex='abc\d+\\e'/>

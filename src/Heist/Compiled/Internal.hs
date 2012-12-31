@@ -335,8 +335,7 @@ parseAttr (k,v) = (k, T.concat $! map cvt ast)
             (AP.Fail _ _ _) -> []
             (AP.Partial _ ) -> []
     cvt (Literal x) = x
-    cvt (Escaped c) = T.singleton c
-    cvt (Ident _) = error "parseAttrs: impossible case"
+    cvt (Ident i) = T.concat ["${", i, "}"]
 
 ------------------------------------------------------------------------------
 -- | Checks whether a node's subtree is static and can be rendered up front at
@@ -380,7 +379,6 @@ parseAtt (k,v) = do
 
   where
     cvt (Literal x) = return $ yieldPureText x
-    cvt (Escaped c) = return $ yieldPureText $ T.singleton c
     cvt (Ident x) =
         localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
 
@@ -464,7 +462,9 @@ attrToBuilder (k,v)
 ------------------------------------------------------------------------------
 getAttributeSplice :: Text -> HeistT n IO (DList (Chunk n))
 getAttributeSplice name =
-    lookupSplice name >>= fromMaybe (return DL.empty)
+    lookupSplice name >>= fromMaybe
+      (return $ DL.singleton $ Pure $ T.encodeUtf8 $
+       T.concat ["${", name, "}"])
 {-# INLINE getAttributeSplice #-}
 
 

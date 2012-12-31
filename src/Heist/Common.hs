@@ -81,17 +81,11 @@ attParser = liftM ($! []) (loop id)
         go !subDL = (gobbleText >>= go . append subDL)
                     <|> (AP.endOfInput *> finish subDL)
                     <|> (do
-                            res <- escSequence
-                            dl' <- finish subDL
-                            loop $! append dl' res)
-                    <|> (do
                             idp <- identParser
                             dl' <- finish subDL
                             loop $! append dl' idp)
 
-    gobbleText = AP.takeWhile1 (AP.notInClass "\\$")
-
-    escSequence = AP.char '\\' *> (Escaped <$> AP.anyChar)
+    gobbleText = AP.takeWhile1 (AP.notInClass "$")
 
     identParser = AP.char '$' *> (ident <|> return (Literal "$"))
     ident = (AP.char '{' *> (Ident <$> AP.takeWhile (/='}')) <* AP.string "}")

@@ -477,7 +477,6 @@ modRecursionDepth f =
 -- attoparsec doesn't support parsers running in another monad.
 data AttAST = Literal Text
             | Ident   Text
-            | Escaped Char
   deriving (Show)
 
 

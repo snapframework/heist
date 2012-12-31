@@ -202,13 +202,13 @@ attrSubstTest = do
 
     out1 = B.unlines
         ["<mytag flag>Empty attribute</mytag>"
-        ,"<mytag flag='abc${foo}'>No ident capture</mytag>"
+        ,"<mytag flag='abc${bar}'>No ident capture</mytag>"
         ,"<div id='pre_meaning_of_everything_post'></div>"
         ]
     out2 = B.unlines
         ["<mytag flag>Empty attribute</mytag>"
-        ,"<mytag flag='abc${foo}'>No ident capture</mytag>"
-        ,"<div id='pre__post'></div>"
+        ,"<mytag flag='abc${bar}'>No ident capture</mytag>"
+        ,"<div id='pre_${foo}_post'></div>"
         ]
 
 
