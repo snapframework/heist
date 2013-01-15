@@ -37,6 +37,7 @@ module Heist
   , compiledTemplateNames
   , hasTemplate
   , spliceNames
+  , compiledSpliceNames
   , HeistT
   , evalHeistT
   , getParamNode

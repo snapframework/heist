@@ -8,6 +8,8 @@
 
 module Heist.Compiled.Internal where
 
+
+------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Arrow
 import           Control.Monad.RWS.Strict
@@ -25,9 +27,11 @@ import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
 import           Prelude                         hiding (catch)
 import qualified Text.XmlHtml                    as X
-
+------------------------------------------------------------------------------
 import           Heist.Common
 import           Heist.Types
+------------------------------------------------------------------------------
+
 
 ------------------------------------------------------------------------------
 -- | A compiled Splice is a HeistT computation that returns a @DList
@@ -44,6 +48,26 @@ type Splice n = HeistT n IO (DList (Chunk n))
 
 
 ------------------------------------------------------------------------------
+-- | Allows you to use deferred Promises in a compiled splice.  It takes care
+-- of the boilerplate of creating and storing data in a promise to be used at
+-- load time when compiled splices are processed.  This function is similar to
+-- mapPromises but runs on a single value instead of a list.
+defer :: Monad n
+      => (Promise a -> HeistT n IO (RuntimeSplice n Builder))
+      -- ^ Function that generates a Builder from runtime information
+      -> RuntimeSplice n a
+      -- ^ Runtime computation
+      -> Splice n
+defer f getItem = do
+    promise <- newEmptyPromise
+    run <- f promise
+    return $ yieldRuntime $ do
+        item <- getItem
+        putPromise promise item
+        run
+
+
+------------------------------------------------------------------------------
 -- | Takes a promise function and a runtime action returning a list of items
 -- that fit in the promise and returns a Splice that executes the promise
 -- function for each item and concatenates the results.
@@ -55,14 +79,14 @@ mapPromises :: Monad n
             => (Promise a -> HeistT n IO (RuntimeSplice n Builder))
             -- ^ Use 'promiseChildrenWith' or a variant to create this
             -- function.
-            -> n [a]
+            -> RuntimeSplice n [a]
             -- ^ Runtime computation returning a list of items
             -> Splice n
 mapPromises f getList = do
     singlePromise <- newEmptyPromise
     runSingle <- f singlePromise
     return $ yieldRuntime $ do
-        list <- lift getList
+        list <- getList
         htmls <- forM list $ \item ->
             putPromise singlePromise item >> runSingle
         return $ mconcat htmls
@@ -310,8 +334,8 @@ lookupSplice nm = getsHS (H.lookup nm . _compiledSpliceMap)
 
 ------------------------------------------------------------------------------
 -- | Runs a single node.  If there is no splice referenced anywhere in the
--- subtree, then it is rendered as a pure chunk, otherwise it is compiled to
--- a runtime computation.
+-- subtree, then it is rendered as a pure chunk, otherwise it calls
+-- compileNode to generate the appropriate runtime computation.
 runNode :: Monad n => X.Node -> Splice n
 runNode node = localParamNode (const node) $ do
     isStatic <- subtreeIsStatic node
@@ -393,7 +417,7 @@ parseAtt (k,v) = do
         return $ attrToChunk k value
 
     -- Handles attribute splices
-    doAttrSplice splice = DL.singleton $ RuntimeHtml $ lift $ do
+    doAttrSplice splice = DL.singleton $ RuntimeHtml $ do
         res <- splice v
         return $ mconcat $ map attrToBuilder res
 
@@ -594,6 +618,18 @@ bindSplices ss ts = foldr (uncurry bindSplice) ts ss
 -- during load-time splice processing.
 addSplices :: Monad m => [(Text, Splice n)] -> HeistT n m ()
 addSplices ss = modifyHS (bindSplices ss)
+{-# DEPRECATED addSplices "addSplices will be removed in the next release!  Use withLocalSplices instead."#-}
+
+
+------------------------------------------------------------------------------
+-- | Adds a list of compiled splices to the splice map.  This function is
+-- useful because it allows compiled splices to bind other compiled splices
+-- during load-time splice processing.
+withLocalSplices :: [(Text, Splice n)]
+                 -> [(Text, AttrSplice n)]
+                 -> HeistT n IO a
+                 -> HeistT n IO a
+withLocalSplices ss as = localHS (bindSplices ss . bindAttributeSplices as)
 
 
 ------------------------------------------------------------------------------

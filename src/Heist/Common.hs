@@ -280,3 +280,12 @@ mimeType d = case d of
     enc X.UTF16LE = "utf-16"
 
 
+------------------------------------------------------------------------------
+-- | Binds a set of new splice declarations within a 'HeistState'.
+bindAttributeSplices :: [(T.Text, AttrSplice n)] -- ^ splices to bind
+                     -> HeistState n             -- ^ start state
+                     -> HeistState n
+bindAttributeSplices ss hs =
+    hs { _attrSpliceMap = Map.union (Map.fromList ss) (_attrSpliceMap hs) }
+
+

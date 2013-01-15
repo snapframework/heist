@@ -17,6 +17,7 @@ module Heist.Compiled
   -- * High level compiled splice API
     Splice
   , renderTemplate
+  , defer
   , mapPromises
   , promiseChildren
   , promiseChildrenWith
@@ -33,6 +34,7 @@ module Heist.Compiled
   , yieldRuntimeText
   , yieldLater
   , addSplices
+  , withLocalSplices
 
   -- * Lower level promise functions
   , Promise

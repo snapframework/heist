@@ -58,7 +58,7 @@ loadErrorsTest = do
 
 attrSpliceTest :: IO ()
 attrSpliceTest = do
-    ehs <- loadT "templates" [] [] [] [("autocheck", autocheckedSplice)]
+    ehs <- loadT "templates" [] [] [] [("autocheck", lift . autocheckedSplice)]
     let hs = either (error . show) id ehs
         runtime = fromJust $ C.renderTemplate hs "attr_splice"
 

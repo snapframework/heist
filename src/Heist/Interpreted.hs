@@ -78,5 +78,5 @@ module Heist.Interpreted
   ) where
 
 import Heist.Interpreted.Internal
-import Heist.Common (mapSplices)
+import Heist.Common (mapSplices, bindAttributeSplices)
 

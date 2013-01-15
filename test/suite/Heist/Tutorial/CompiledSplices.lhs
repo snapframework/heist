@@ -149,12 +149,12 @@ structure with a compiled splice.
 >     ]
 > 
 > peopleSplice :: (Monad n)
->              => n [Person]
+>              => RuntimeSplice n [Person]
 >              -> C.Splice n
 > peopleSplice getPeople = C.mapPromises personSplice getPeople
 > 
 > allPeopleSplice :: C.Splice (StateT [Person] IO)
-> allPeopleSplice = peopleSplice get
+> allPeopleSplice = peopleSplice (lift get)
 > 
 > personListTest :: FilePath
 >                -> IO ByteString

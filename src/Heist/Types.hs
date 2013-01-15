@@ -124,7 +124,7 @@ isPureChunk _ = False
 -- | Type alias for attribute splices.  The function parameter is the value of
 -- the bound attribute splice.  The return value is a list of attribute
 -- key/value pairs that get substituted in the place of the bound attribute.
-type AttrSplice m = Text -> m [(Text, Text)]
+type AttrSplice m = Text -> RuntimeSplice m [(Text, Text)]
 
 
 ------------------------------------------------------------------------------
@@ -212,9 +212,15 @@ compiledTemplateNames ts = H.keys $ _compiledTemplateMap ts
 
 
 ------------------------------------------------------------------------------
--- | Gets the names of all the splices defined in a HeistState.
+-- | Gets the names of all the interpreted splices defined in a HeistState.
 spliceNames :: HeistState m -> [Text]
 spliceNames ts = H.keys $ _spliceMap ts
+
+
+------------------------------------------------------------------------------
+-- | Gets the names of all the compiled splices defined in a HeistState.
+compiledSpliceNames :: HeistState m -> [Text]
+compiledSpliceNames ts = H.keys $ _compiledSpliceMap ts
 
 
 ------------------------------------------------------------------------------

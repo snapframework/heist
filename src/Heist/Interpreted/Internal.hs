@@ -10,11 +10,13 @@ module Heist.Interpreted.Internal where
 import           Blaze.ByteString.Builder
 import           Control.Arrow hiding (loop)
 import           Control.Monad
+import           Control.Monad.State.Strict
 import           Control.Monad.Trans
 import qualified Data.Attoparsec.Text as AP
 import           Data.ByteString (ByteString)
 import           Data.List
 import qualified Data.HashMap.Strict as Map
+import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
@@ -59,15 +61,6 @@ bindSplices :: [(Text, Splice n)] -- ^ splices to bind
 bindSplices ss hs = foldl' (flip id) hs acts
   where
     acts = map (uncurry bindSplice) ss
-
-
-------------------------------------------------------------------------------
--- | Binds a set of new splice declarations within a 'HeistState'.
-bindAttributeSplices :: [(Text, AttrSplice n)] -- ^ splices to bind
-                     -> HeistState n           -- ^ start state
-                     -> HeistState n
-bindAttributeSplices ss hs =
-    hs { _attrSpliceMap = Map.union (Map.fromList ss) (_attrSpliceMap hs) }
 
 
 ------------------------------------------------------------------------------
@@ -211,7 +204,8 @@ runAttributes attrs = (return . concat) =<< mapM runAttrSplice attrs
 runAttrSplice :: (Monad n) => (Text, Text) -> HeistT n n [(Text, Text)]
 runAttrSplice a@(k,v) = do
     splice <- getsHS (Map.lookup k . _attrSpliceMap)
-    maybe (liftM (:[]) $ attSubst a) (lift . ($v)) splice
+    maybe (liftM (:[]) $ attSubst a)
+          (lift . flip evalStateT HE.empty . unRT . ($v)) splice
 
 
 ------------------------------------------------------------------------------
