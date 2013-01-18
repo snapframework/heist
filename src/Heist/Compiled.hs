@@ -49,7 +49,7 @@ module Heist.Compiled
   -- * Running nodes and splices
   , runNodeList
   , runNode
-  , compileNode
+  , consolidate
   , runAttributes
   , runSplice
 

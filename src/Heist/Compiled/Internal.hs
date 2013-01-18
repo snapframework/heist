@@ -424,7 +424,7 @@ parseAtt (k,v) = do
     
 ------------------------------------------------------------------------------
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
--- generate html at runtime. Leaves the writer monad state untouched.
+-- generate html at runtime.
 compileNode :: Monad n => X.Node -> Splice n
 compileNode (X.Element nm attrs ch) =
     -- Is this node a splice, or does it merely contain splices?
