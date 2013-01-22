@@ -136,7 +136,7 @@ cacheImplCompiled cts = do
     ref <- liftIO $ newIORef Nothing
     liftIO $ addCompiledRef ref cts
     let reload curTime = do
-            builder <- C.codeGen $! C.consolidate compiled
+            builder <- C.codeGen compiled
             let out = fromByteString $! toByteString $! builder
             liftIO $ writeIORef ref (Just (curTime, out))
             return $! out

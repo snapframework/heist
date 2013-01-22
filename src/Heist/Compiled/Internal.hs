@@ -12,6 +12,7 @@ module Heist.Compiled.Internal where
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Arrow
+import           Control.Monad
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict
 import qualified Data.Attoparsec.Text            as AP
@@ -48,23 +49,13 @@ type Splice n = HeistT n IO (DList (Chunk n))
 
 
 ------------------------------------------------------------------------------
--- | Allows you to use deferred Promises in a compiled splice.  It takes care
--- of the boilerplate of creating and storing data in a promise to be used at
--- load time when compiled splices are processed.  This function is similar to
--- mapPromises but runs on a single value instead of a list.
-defer :: Monad n
-      => (Promise a -> HeistT n IO (RuntimeSplice n Builder))
-      -- ^ Function that generates a Builder from runtime information
-      -> RuntimeSplice n a
-      -- ^ Runtime computation
-      -> Splice n
-defer f getItem = do
-    promise <- newEmptyPromise
-    run <- f promise
-    return $ yieldRuntime $ do
-        item <- getItem
-        putPromise promise item
-        run
+-- | Runs the parameter node's children and returns the resulting compiled
+-- chunks.  By itself this function is a simple passthrough splice that makes
+-- the spliced node disappear.  In combination with locally bound splices,
+-- this function makes it easier to pass the desired view into your splices.
+runChildren :: Monad n => Splice n
+runChildren = runNodeList . X.childNodes =<< getParamNode
+{-# INLINE runChildren #-}
 
 
 ------------------------------------------------------------------------------
@@ -95,9 +86,7 @@ mapPromises f getList = do
 ------------------------------------------------------------------------------
 -- | Returns a runtime computation that simply renders the node's children.
 promiseChildren :: Monad m => HeistT m IO (RuntimeSplice m Builder)
-promiseChildren = do
-    res <- runNodeList . X.childNodes =<< getParamNode
-    return $! codeGen $! consolidate res
+promiseChildren = liftM codeGen runChildren
 {-# INLINE promiseChildren #-}
 
 
@@ -317,8 +306,9 @@ consolidate = consolidateL . DL.toList
 -- | Given a list of output chunks, consolidate turns consecutive runs of
 -- @Pure Html@ values into maximally-efficient pre-rendered strict
 -- 'ByteString' chunks.
-codeGen :: Monad m => [Chunk m] -> RuntimeSplice m Builder
-codeGen l = V.foldr mappend mempty $! V.map toAct $! V.fromList l
+codeGen :: Monad m => DList (Chunk m) -> RuntimeSplice m Builder
+codeGen l = V.foldr mappend mempty $!
+            V.map toAct $! V.fromList $! consolidate l
   where
     toAct !(RuntimeHtml !m)   = m
     toAct !(Pure !h)          = return $! fromByteString h
@@ -640,9 +630,156 @@ renderTemplate :: Monad n
                -> ByteString
                -> Maybe (n Builder, MIMEType)
 renderTemplate hs nm =
-    fmap (first interpret . fst) $! lookupTemplate nm hs _compiledTemplateMap
+    fmap (first (interpret . DL.fromList) . fst) $!
+      lookupTemplate nm hs _compiledTemplateMap
 
-interpret :: Monad m => [Chunk m] -> m Builder
+
+------------------------------------------------------------------------------
+-- | Looks up a compiled template and returns a compiled splice.
+callTemplate :: Monad n
+             => ByteString
+             -> HeistT n IO (DList (Chunk n))
+callTemplate nm = do
+    hs <- getHS
+    return $ maybe DL.empty (DL.fromList . fst . fst) $
+      lookupTemplate nm hs _compiledTemplateMap
+
+
+interpret :: Monad m => DList (Chunk m) -> m Builder
 interpret = flip evalStateT HE.empty . unRT . codeGen
 
+
+------------------------------------------------------------------------------
+-- Functions for manipulating lists of compiled splices
+------------------------------------------------------------------------------
+
+
+mapSnd :: (b -> c) -> [(d, b)] -> [(d, c)]
+mapSnd = map . second
+
+applySnd :: a -> [(d, a -> b)] -> [(d, b)]
+applySnd a = mapSnd ($a)
+
+textSplices :: [(Text, a -> Text)] -> [(Text, a -> Builder)]
+textSplices = mapSnd textSplice
+
+textSplice :: (a -> Text) -> a -> Builder
+textSplice f = fromByteString . T.encodeUtf8 . f
+
+nodeSplices :: [(Text, a -> [X.Node])] -> [(Text, a -> Builder)]
+nodeSplices = mapSnd nodeSplice
+
+nodeSplice :: (a -> [X.Node]) -> a -> Builder
+nodeSplice f = X.renderHtmlFragment X.UTF8 . f
+
+pureSplices :: Monad m => [(d, a -> Builder)] -> [(d, Promise a -> Splice m)]
+pureSplices = mapSnd pureSplice
+
+pureSplice :: Monad m => (a -> Builder) -> Promise a -> Splice m
+pureSplice f p = do
+    return $ yieldRuntime $ do
+        a <- getPromise p
+        return $ f a
+
+mapInputPromise :: Monad m
+                => (a -> b)
+                -> (Promise b -> Splice m)
+                -> Promise a -> Splice m
+mapInputPromise f g p1 = do
+    p2 <- newEmptyPromise
+    let action = yieldRuntimeEffect $ do
+        a <- getPromise p1
+        putPromise p2 (f a)
+    res <- g p2
+    return $ action <> res
+
+
+------------------------------------------------------------------------------
+-- | Allows you to use deferred Promises in a compiled splice.  It takes care
+-- of the boilerplate of creating and storing data in a promise to be used at
+-- load time when compiled splices are processed.  This function is similar to
+-- mapPromises but runs on a single value instead of a list.
+defer :: Monad n
+      => (Promise a -> Splice n)
+      -> RuntimeSplice n a
+      -> Splice n
+defer f getItem = do
+    promise <- newEmptyPromise
+    chunks <- f promise
+    return $ yieldRuntime $ do
+        item <- getItem
+        putPromise promise item
+        codeGen chunks
+
+
+------------------------------------------------------------------------------
+-- | Takes a promise function and a runtime action returning a list of items
+-- that fit in the promise and returns a Splice that executes the promise
+-- function for each item and concatenates the results.
+deferMany :: Monad n
+          => (Promise a -> Splice n)
+          -> RuntimeSplice n [a]
+          -> Splice n
+deferMany f getItems = do
+    promise <- newEmptyPromise
+    chunks <- f promise
+    return $ yieldRuntime $ do
+        items <- getItems
+        res <- forM items $ \item -> do
+            putPromise promise item
+            codeGen chunks
+        return $ mconcat res
+
+
+withSplices :: Monad n
+            => Splice n
+            -> [(Text, Promise a -> Splice n)]
+            -> n a
+            -> Splice n
+withSplices splice splices runtimeAction = do
+    p <- newEmptyPromise
+    let splices' = mapSnd ($p) splices
+    chunks <- withLocalSplices splices' [] splice
+    let fillPromise = yieldRuntimeEffect $ putPromise p =<< lift runtimeAction
+    return $ fillPromise <> chunks
+
+
+manyWithSplices :: Monad n
+                => Splice n
+                -> [(Text, Promise a -> Splice n)]
+                -> n [a]
+                -> Splice n
+manyWithSplices splice splices runtimeAction = do
+    p <- newEmptyPromise
+    let splices' = mapSnd ($p) splices
+    chunks <- withLocalSplices splices' [] splice
+    return $ yieldRuntime $ do
+        items <- lift runtimeAction
+        res <- forM items $ \item -> putPromise p item >> codeGen chunks
+        return $ mconcat res
+
+
+withPureSplices :: Monad n
+                => Splice n
+                -> [(Text, a -> Builder)]
+                -> n a
+                -> Splice n
+withPureSplices splice splices action = do
+    let fieldSplice g = return $ yieldRuntime $ liftM g $ lift action
+    let splices' = map (second fieldSplice) splices
+    withLocalSplices splices' [] splice
+
+
+manyWithPureSplices :: Monad n
+                    => Splice n
+                    -> [(Text, a -> Builder)]
+                    -> n [a]
+                    -> Splice n
+manyWithPureSplices splice splices action = do
+    let fieldSplice g = return $ yieldRuntime $ do
+            items <- lift action
+            res <- forM items $ return . g
+            return $ mconcat res
+    let splices' = map (second fieldSplice) splices
+    withLocalSplices splices' [] splice
 

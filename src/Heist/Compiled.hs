@@ -17,7 +17,27 @@ module Heist.Compiled
   -- * High level compiled splice API
     Splice
   , renderTemplate
+  , codeGen
+  , runChildren
+
+  -- * Functions for manipulating lists of compiled splices
+  , mapSnd
+  , applySnd
+  , textSplices
+  , nodeSplices
+  , pureSplices
+  , textSplice
+  , nodeSplice
+  , pureSplice
+  , mapInputPromise
   , defer
+  , deferMany
+  , withSplices
+  , manyWithSplices
+  , withPureSplices
+  , manyWithPureSplices
+
+  -- * Old compiled splice API
   , mapPromises
   , promiseChildren
   , promiseChildrenWith
@@ -39,19 +59,15 @@ module Heist.Compiled
   -- * Lower level promise functions
   , Promise
   , newEmptyPromise
-
-  -- * RuntimeSplice functions
   , getPromise
   , putPromise
   , adjustPromise
-  , codeGen
 
   -- * Running nodes and splices
   , runNodeList
   , runNode
-  , consolidate
   , runAttributes
-  , runSplice
+  , callTemplate
 
   ) where
 
