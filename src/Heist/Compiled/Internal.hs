@@ -22,6 +22,7 @@ import qualified Data.DList                      as DL
 import qualified Data.HashMap.Strict             as H
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.Maybe
+import           Data.Monoid
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T

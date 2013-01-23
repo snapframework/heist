@@ -11,7 +11,6 @@ import           Blaze.ByteString.Builder
 import           Control.Arrow hiding (loop)
 import           Control.Monad
 import           Control.Monad.State.Strict
-import           Control.Monad.Trans
 import qualified Data.Attoparsec.Text as AP
 import           Data.ByteString (ByteString)
 import           Data.List
