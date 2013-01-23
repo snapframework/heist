@@ -22,7 +22,6 @@ import qualified Data.DList                      as DL
 import qualified Data.HashMap.Strict             as H
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
@@ -692,7 +691,7 @@ mapInputPromise f g p1 = do
         a <- getPromise p1
         putPromise p2 (f a)
     res <- g p2
-    return $ action <> res
+    return $ action `mappend` res
 
 
 ------------------------------------------------------------------------------
@@ -742,7 +741,7 @@ withSplices splice splices runtimeAction = do
     let splices' = mapSnd ($p) splices
     chunks <- withLocalSplices splices' [] splice
     let fillPromise = yieldRuntimeEffect $ putPromise p =<< lift runtimeAction
-    return $ fillPromise <> chunks
+    return $ fillPromise `mappend` chunks
 
 
 manyWithSplices :: Monad n
