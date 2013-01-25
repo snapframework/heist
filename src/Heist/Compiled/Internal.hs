@@ -744,10 +744,19 @@ withSplices splice splices runtimeAction = do
     return $ fillPromise `mappend` chunks
 
 
+------------------------------------------------------------------------------
+-- | Gets a list of items at runtime, then for each item it runs the splice
+-- with the list of splices bound.  There is no pure variant of this function
+-- because the desired behavior can only be achieved as a function of a
+-- Promise.
 manyWithSplices :: Monad n
                 => Splice n
+                -- ^ Splice to run for each of the items in the runtime list.
+                -- You'll frequently use 'runChildren' here.
                 -> [(Text, Promise a -> Splice n)]
+                -- ^ List of splices to bind
                 -> n [a]
+                -- ^ Runtime action returning a list of items to render.
                 -> Splice n
 manyWithSplices splice splices runtimeAction = do
     p <- newEmptyPromise
@@ -769,17 +778,4 @@ withPureSplices splice splices action = do
     let splices' = map (second fieldSplice) splices
     withLocalSplices splices' [] splice
 
-
-manyWithPureSplices :: Monad n
-                    => Splice n
-                    -> [(Text, a -> Builder)]
-                    -> n [a]
-                    -> Splice n
-manyWithPureSplices splice splices action = do
-    let fieldSplice g = return $ yieldRuntime $ do
-            items <- lift action
-            res <- forM items $ return . g
-            return $ mconcat res
-    let splices' = map (second fieldSplice) splices
-    withLocalSplices splices' [] splice
 

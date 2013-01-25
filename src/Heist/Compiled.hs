@@ -35,7 +35,6 @@ module Heist.Compiled
   , withSplices
   , manyWithSplices
   , withPureSplices
-  , manyWithPureSplices
 
   -- * Old compiled splice API
   , mapPromises
