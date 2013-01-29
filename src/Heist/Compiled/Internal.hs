@@ -11,6 +11,7 @@ module Heist.Compiled.Internal where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
+import           Blaze.ByteString.Builder.Char8
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.RWS.Strict
@@ -122,8 +123,7 @@ promiseChildrenWithText :: (Monad n)
                         => [(Text, a -> Text)]
                         -> Promise a
                         -> HeistT n IO (RuntimeSplice n Builder)
-promiseChildrenWithText =
-    promiseChildrenWithTrans (fromByteString . T.encodeUtf8)
+promiseChildrenWithText = promiseChildrenWithTrans fromText
 
 
 ------------------------------------------------------------------------------
@@ -181,7 +181,7 @@ yieldPureText = DL.singleton . pureTextChunk
 ------------------------------------------------------------------------------
 -- | Convenience wrapper around yieldRuntime allowing you to work with Text.
 yieldRuntimeText :: Monad m => RuntimeSplice m Text -> DList (Chunk m)
-yieldRuntimeText = yieldRuntime .  liftM (fromByteString . T.encodeUtf8)
+yieldRuntimeText = yieldRuntime .  liftM fromText
 {-# INLINE yieldRuntimeText #-}
 
 
@@ -461,15 +461,15 @@ attrToChunk !k !v = do
 attrToBuilder :: (Text, Text) -> Builder
 attrToBuilder (k,v)
   | T.null v  = mconcat
-    [ fromByteString $! T.encodeUtf8 " "
-    , fromByteString $! T.encodeUtf8 k
+    [ fromText " "
+    , fromText k
     ]
   | otherwise = mconcat
-    [ fromByteString $! T.encodeUtf8 " "
-    , fromByteString $! T.encodeUtf8 k
-    , fromByteString $! T.encodeUtf8 "=\""
-    , fromByteString $! T.encodeUtf8 v
-    , fromByteString $! T.encodeUtf8 "\""
+    [ fromText " "
+    , fromText k
+    , fromText "=\""
+    , fromText v
+    , fromText "\""
     ]
 
 
@@ -664,7 +664,7 @@ textSplices :: [(Text, a -> Text)] -> [(Text, a -> Builder)]
 textSplices = mapSnd textSplice
 
 textSplice :: (a -> Text) -> a -> Builder
-textSplice f = fromByteString . T.encodeUtf8 . f
+textSplice f = fromText . f
 
 nodeSplices :: [(Text, a -> [X.Node])] -> [(Text, a -> Builder)]
 nodeSplices = mapSnd nodeSplice
