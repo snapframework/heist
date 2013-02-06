@@ -641,8 +641,10 @@ callTemplate :: Monad n
              -> HeistT n IO (DList (Chunk n))
 callTemplate nm = do
     hs <- getHS
-    return $ maybe DL.empty (DL.fromList . fst . fst) $
-      lookupTemplate nm hs _compiledTemplateMap
+    runNodeList $ maybe (error err) (X.docContent . dfDoc . fst) $
+      lookupTemplate nm hs _templateMap
+  where
+    err = "callTemplate: "++(T.unpack $ T.decodeUtf8 nm)++(" does not exist")
 
 
 interpret :: Monad m => DList (Chunk m) -> m Builder
