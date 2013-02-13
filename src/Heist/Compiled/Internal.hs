@@ -662,6 +662,9 @@ mapSnd = map . second
 applySnd :: a -> [(d, a -> b)] -> [(d, b)]
 applySnd a = mapSnd ($a)
 
+prefixSplices :: Text -> [(Text, a)] -> [(Text, a)]
+prefixSplices prefix = map (first (T.append prefix))
+
 textSplices :: [(Text, a -> Text)] -> [(Text, a -> Builder)]
 textSplices = mapSnd textSplice
 
