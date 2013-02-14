@@ -24,6 +24,7 @@ module Heist.Compiled
   , mapSnd
   , applySnd
   , prefixSplices
+  , namespaceSplices
   , textSplices
   , nodeSplices
   , pureSplices
@@ -31,6 +32,10 @@ module Heist.Compiled
   , nodeSplice
   , pureSplice
   , mapInputPromise
+  , repromise
+  , repromiseMay
+  , repromise'
+  , repromiseMay'
   , defer
   , deferMany
   , withSplices

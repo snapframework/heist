@@ -86,7 +86,7 @@ mapPromises f getList = do
 
 ------------------------------------------------------------------------------
 -- | Returns a runtime computation that simply renders the node's children.
-promiseChildren :: Monad m => HeistT m IO (RuntimeSplice m Builder)
+promiseChildren :: Monad n => HeistT n IO (RuntimeSplice n Builder)
 promiseChildren = liftM codeGen runChildren
 {-# INLINE promiseChildren #-}
 
@@ -150,14 +150,14 @@ pureTextChunk t = Pure $ T.encodeUtf8 t
 -- | Yields a pure Builder known at load time.  You should use this and
 -- 'yieldPureText' as much as possible to maximize the parts of your page that
 -- can be compiled to static ByteStrings.
-yieldPure :: Builder -> DList (Chunk m)
+yieldPure :: Builder -> DList (Chunk n)
 yieldPure = DL.singleton . Pure . toByteString
 {-# INLINE yieldPure #-}
 
 
 ------------------------------------------------------------------------------
 -- | Yields a runtime action that returns a builder.
-yieldRuntime :: RuntimeSplice m Builder -> DList (Chunk m)
+yieldRuntime :: RuntimeSplice n Builder -> DList (Chunk n)
 yieldRuntime = DL.singleton . RuntimeHtml
 {-# INLINE yieldRuntime #-}
 
@@ -165,7 +165,7 @@ yieldRuntime = DL.singleton . RuntimeHtml
 ------------------------------------------------------------------------------
 -- | Yields a runtime action that returns no value and is only needed for its
 -- side effect.
-yieldRuntimeEffect :: Monad m => RuntimeSplice m () -> DList (Chunk m)
+yieldRuntimeEffect :: Monad n => RuntimeSplice n () -> DList (Chunk n)
 yieldRuntimeEffect = DL.singleton . RuntimeAction
 {-# INLINE yieldRuntimeEffect #-}
 
@@ -173,14 +173,14 @@ yieldRuntimeEffect = DL.singleton . RuntimeAction
 ------------------------------------------------------------------------------
 -- | A convenience wrapper around yieldPure for working with Text.  Roughly
 -- equivalent to 'textSplice' from Heist.Interpreted.
-yieldPureText :: Text -> DList (Chunk m)
+yieldPureText :: Text -> DList (Chunk n)
 yieldPureText = DL.singleton . pureTextChunk
 {-# INLINE yieldPureText #-}
 
 
 ------------------------------------------------------------------------------
 -- | Convenience wrapper around yieldRuntime allowing you to work with Text.
-yieldRuntimeText :: Monad m => RuntimeSplice m Text -> DList (Chunk m)
+yieldRuntimeText :: Monad n => RuntimeSplice n Text -> DList (Chunk n)
 yieldRuntimeText = yieldRuntime .  liftM fromText
 {-# INLINE yieldRuntimeText #-}
 
@@ -188,7 +188,7 @@ yieldRuntimeText = yieldRuntime .  liftM fromText
 ------------------------------------------------------------------------------
 -- | This lets you turn a plain runtime monad function returning a Builder
 -- into a compiled splice.
-yieldLater :: Monad m => m Builder -> DList (Chunk m)
+yieldLater :: Monad n => n Builder -> DList (Chunk n)
 yieldLater = yieldRuntime . RuntimeSplice . lift
 {-# INLINE yieldLater #-}
 
@@ -250,9 +250,9 @@ compileTemplates hs = do
 
 
 ------------------------------------------------------------------------------
-compileTemplates' :: Monad m
-                  => HeistState m
-                  -> IO (H.HashMap TPath ([Chunk m], MIMEType))
+compileTemplates' :: Monad n
+                  => HeistState n
+                  -> IO (H.HashMap TPath ([Chunk n], MIMEType))
 compileTemplates' hs = do
     ctm <- foldM runOne H.empty tpathDocfiles
     return $! ctm
@@ -268,7 +268,7 @@ compileTemplates' hs = do
 
 ------------------------------------------------------------------------------
 -- | Consolidate consecutive Pure Chunks.
-consolidate :: (Monad m) => DList (Chunk m) -> [Chunk m]
+consolidate :: (Monad n) => DList (Chunk n) -> [Chunk n]
 consolidate = consolidateL . DL.toList
   where
     consolidateL []     = []
@@ -306,7 +306,7 @@ consolidate = consolidateL . DL.toList
 -- | Given a list of output chunks, consolidate turns consecutive runs of
 -- @Pure Html@ values into maximally-efficient pre-rendered strict
 -- 'ByteString' chunks.
-codeGen :: Monad m => DList (Chunk m) -> RuntimeSplice m Builder
+codeGen :: Monad n => DList (Chunk n) -> RuntimeSplice n Builder
 codeGen l = V.foldr mappend mempty $!
             V.map toAct $! V.fromList $! consolidate l
   where
@@ -490,7 +490,7 @@ newtype Promise a = Promise (HE.Key a)
 
 ------------------------------------------------------------------------------
 -- | Gets the result of a promised runtime computation.
-getPromise :: (Monad m) => Promise a -> RuntimeSplice m a
+getPromise :: (Monad n) => Promise a -> RuntimeSplice n a
 getPromise (Promise k) = do
     mb <- gets (HE.lookup k)
     return $ fromMaybe e mb
@@ -503,14 +503,14 @@ getPromise (Promise k) = do
 
 ------------------------------------------------------------------------------
 -- | Adds a promise to the runtime splice context.
-putPromise :: (Monad m) => Promise a -> a -> RuntimeSplice m ()
+putPromise :: (Monad n) => Promise a -> a -> RuntimeSplice n ()
 putPromise (Promise k) x = modify (HE.insert k x)
 {-# INLINE putPromise #-}
 
 
 ------------------------------------------------------------------------------
 -- | Modifies a promise.
-adjustPromise :: Monad m => Promise a -> (a -> a) -> RuntimeSplice m ()
+adjustPromise :: Monad n => Promise a -> (a -> a) -> RuntimeSplice n ()
 adjustPromise (Promise k) f = modify (HE.adjust f k)
 {-# INLINE adjustPromise #-}
 
@@ -647,7 +647,7 @@ callTemplate nm = do
     err = "callTemplate: "++(T.unpack $ T.decodeUtf8 nm)++(" does not exist")
 
 
-interpret :: Monad m => DList (Chunk m) -> m Builder
+interpret :: Monad n => DList (Chunk n) -> n Builder
 interpret = flip evalStateT HE.empty . unRT . codeGen
 
 
@@ -656,47 +656,138 @@ interpret = flip evalStateT HE.empty . unRT . codeGen
 ------------------------------------------------------------------------------
 
 
+------------------------------------------------------------------------------
+-- | Helper function for transforming the second element of each of a list of
+-- tuples.
 mapSnd :: (b -> c) -> [(d, b)] -> [(d, c)]
 mapSnd = map . second
 
+
+------------------------------------------------------------------------------
+-- | The type signature says it all.
 applySnd :: a -> [(d, a -> b)] -> [(d, b)]
 applySnd a = mapSnd ($a)
 
-prefixSplices :: Text -> [(Text, a)] -> [(Text, a)]
-prefixSplices prefix = map (first (T.append prefix))
 
+------------------------------------------------------------------------------
+-- | Adds a prefix to the tag names for a list of splices.  If the existing
+-- tag name is empty, then the new tag name is just the prefix.  Otherwise the
+-- new tag name is the prefix followed by the separator followed by the
+-- existing name.
+prefixSplices :: Text -> Text -> [(Text, a)] -> [(Text, a)]
+prefixSplices sep pre = map f
+  where
+    f (t,v) = if T.null t then (pre,v) else (T.concat [pre,sep,t], v)
+
+
+------------------------------------------------------------------------------
+-- | 'prefixSplices' specialized to use a colon as separator in the style of
+-- XML namespaces.
+namespaceSplices :: Text -> [(Text, a)] -> [(Text, a)]
+namespaceSplices = prefixSplices ":"
+
+
+------------------------------------------------------------------------------
+-- | Converts pure text splices to pure Builder splices.
 textSplices :: [(Text, a -> Text)] -> [(Text, a -> Builder)]
 textSplices = mapSnd textSplice
 
+
+------------------------------------------------------------------------------
+-- | Converts a pure text splice function to a pure Builder splice function.
 textSplice :: (a -> Text) -> a -> Builder
 textSplice f = fromText . f
 
+
+------------------------------------------------------------------------------
+-- | Converts pure Node splices to pure Builder splices.
 nodeSplices :: [(Text, a -> [X.Node])] -> [(Text, a -> Builder)]
 nodeSplices = mapSnd nodeSplice
 
+
+------------------------------------------------------------------------------
+-- | Converts a pure Node splice function to a pure Builder splice function.
 nodeSplice :: (a -> [X.Node]) -> a -> Builder
 nodeSplice f = X.renderHtmlFragment X.UTF8 . f
 
-pureSplices :: Monad m => [(d, a -> Builder)] -> [(d, Promise a -> Splice m)]
+
+------------------------------------------------------------------------------
+-- | Converts pure Builder splices into monadic splice functions of a
+-- 'Promise'.
+pureSplices :: Monad n => [(d, a -> Builder)] -> [(d, Promise a -> Splice n)]
 pureSplices = mapSnd pureSplice
 
-pureSplice :: Monad m => (a -> Builder) -> Promise a -> Splice m
+
+------------------------------------------------------------------------------
+-- | Converts a pure Builder splice function into a monadic splice function
+-- that takes a 'Promise'.
+pureSplice :: Monad n => (a -> Builder) -> Promise a -> Splice n
 pureSplice f p = do
     return $ yieldRuntime $ do
         a <- getPromise p
         return $ f a
 
-mapInputPromise :: Monad m
+
+mapInputPromise :: Monad n
                 => (a -> b)
-                -> (Promise b -> Splice m)
-                -> Promise a -> Splice m
-mapInputPromise f g p1 = do
+                -> (Promise b -> Splice n)
+                -> Promise a -> Splice n
+mapInputPromise f = repromise' (return . f)
+{-# DEPRECATED mapInputPromise "Use repromise' instead."#-}
+
+
+------------------------------------------------------------------------------
+-- | Change the promise type of a splice function.
+repromise' :: Monad n
+           => (a -> n b)
+           -> (Promise b -> Splice n)
+           -> Promise a -> Splice n
+repromise' f pf p = do
     p2 <- newEmptyPromise
     let action = yieldRuntimeEffect $ do
-        a <- getPromise p1
-        putPromise p2 (f a)
-    res <- g p2
+            a <- getPromise p
+            putPromise p2 =<< lift (f a)
+    res <- pf p2
     return $ action `mappend` res
+
+
+------------------------------------------------------------------------------
+-- | Repromise a list of splices.
+repromise :: Monad n
+          => (a -> n b)
+          -> [(d, Promise b -> Splice n)]
+          -> [(d, Promise a -> Splice n)]
+repromise f = mapSnd (repromise' f)
+
+
+------------------------------------------------------------------------------
+-- | Change the promise type of a splice function with a function that might
+-- fail.  If a Nothing is encountered, then the splice will generate no
+-- output.
+repromiseMay' :: Monad n
+              => (a -> n (Maybe b))
+              -> (Promise b -> Splice n)
+              -> Promise a -> Splice n
+repromiseMay' f pf p = do
+    p2 <- newEmptyPromise
+    action <- pf p2
+    return $ yieldRuntime $ do
+        a <- getPromise p
+        mb <- lift (f a)
+        case mb of
+          Nothing -> return mempty
+          Just b -> do
+            putPromise p2 b
+            codeGen action
+
+
+------------------------------------------------------------------------------
+-- | repromiseMay' for a list of splices.
+repromiseMay :: Monad n
+             => (a -> n (Maybe b))
+             -> [(d, Promise b -> Splice n)]
+             -> [(d, Promise a -> Splice n)]
+repromiseMay f = mapSnd (repromiseMay' f)
 
 
 ------------------------------------------------------------------------------
