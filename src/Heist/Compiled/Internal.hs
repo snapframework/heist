@@ -21,6 +21,7 @@ import           Data.ByteString (ByteString)
 import           Data.DList                      (DList)
 import qualified Data.DList                      as DL
 import qualified Data.HashMap.Strict             as H
+import qualified Data.HashSet                    as S
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.Maybe
 import           Data.Text                       (Text)
@@ -29,6 +30,7 @@ import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
 import           Prelude                         hiding (catch)
 import qualified Text.XmlHtml                    as X
+import qualified Text.XmlHtml.HTML.Meta          as X
 ------------------------------------------------------------------------------
 import           Heist.Common
 import           Heist.Types
@@ -429,7 +431,7 @@ compileNode (X.Element nm attrs ch) =
 
         childHtml <- runNodeList ch
 
-        return $! if null (DL.toList childHtml)
+        return $! if null (DL.toList childHtml) && nm `S.member` X.voidTags
           then DL.concat [ DL.singleton $! pureTextChunk $! tag0
                          , DL.concat compiledAttrs
                          , DL.singleton $! pureTextChunk " />"
