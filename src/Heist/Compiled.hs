@@ -72,6 +72,7 @@ module Heist.Compiled
   , runNodeList
   , runNode
   , runAttributes
+  , runAttributesRaw
   , callTemplate
 
   ) where

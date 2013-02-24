@@ -387,34 +387,6 @@ hasAttributeSubstitutions txt = any isIdent ast
 
 
 ------------------------------------------------------------------------------
--- |
-parseAtt :: Monad n => (Text, Text) -> HeistT n IO (DList (Chunk n))
-parseAtt (k,v) = do
-    mas <- getsHS (H.lookup k . _attrSpliceMap)
-    maybe doInline (return . doAttrSplice) mas
-
-  where
-    cvt (Literal x) = return $ yieldPureText x
-    cvt (Ident x) =
-        localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
-
-    -- Handles inline parsing of $() splice syntax in attributes
-    doInline = do
-        let ast = case AP.feed (AP.parse attParser v) "" of
-                    (AP.Done _ res) -> res
-                    (AP.Fail _ _ _) -> []
-                    (AP.Partial _ ) -> []
-        chunks <- mapM cvt ast
-        let value = DL.concat chunks
-        return $ attrToChunk k value
-
-    -- Handles attribute splices
-    doAttrSplice splice = DL.singleton $ RuntimeHtml $ do
-        res <- splice v
-        return $ mconcat $ map attrToBuilder res
-
-    
-------------------------------------------------------------------------------
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
 -- generate html at runtime.
 compileNode :: Monad n => X.Node -> Splice n
@@ -446,11 +418,55 @@ compileNode _ = error "impossible"
 
 
 ------------------------------------------------------------------------------
+-- |
+parseAtt :: Monad n => (Text, Text) -> HeistT n IO (DList (Chunk n))
+parseAtt (k,v) = do
+    mas <- getsHS (H.lookup k . _attrSpliceMap)
+    maybe doInline (return . doAttrSplice) mas
+
+  where
+    cvt (Literal x) = return $ yieldPureText x
+    cvt (Ident x) =
+        localParamNode (const $ X.Element x [] []) $ getAttributeSplice x
+
+    -- Handles inline parsing of $() splice syntax in attributes
+    doInline = do
+        let ast = case AP.feed (AP.parse attParser v) "" of
+                    (AP.Done _ res) -> res
+                    (AP.Fail _ _ _) -> []
+                    (AP.Partial _ ) -> []
+        chunks <- mapM cvt ast
+        let value = DL.concat chunks
+        return $ attrToChunk k value
+
+    -- Handles attribute splices
+    doAttrSplice splice = DL.singleton $ RuntimeHtml $ do
+        res <- splice v
+        return $ mconcat $ map attrToBuilder res
+
+
+------------------------------------------------------------------------------
 -- | Performs splice processing on a list of attributes.  This is useful in
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
 runAttributes :: Monad n => [(Text, Text)] -> HeistT n IO [DList (Chunk n)]
 runAttributes = mapM parseAtt
+
+
+------------------------------------------------------------------------------
+-- | Performs splice processing on a list of attributes.  This is useful in
+-- situations where you need to stop recursion, but still run splice
+-- processing on the node's attributes.
+runAttributesRaw :: (Monad m, Monad n)
+                 => [(Text, Text)]
+                 -> HeistT n m (RuntimeSplice n [(Text, Text)])
+runAttributesRaw attrs = do
+    arrs <- mapM runSingle attrs
+    return $ liftM concat $ sequence arrs
+  where
+    runSingle p@(k,v) = do
+        mas <- getsHS (H.lookup k . _attrSpliceMap)
+        return $ maybe (return [p]) ($v) mas
 
 
 attrToChunk :: Text -> DList (Chunk n) -> DList (Chunk n)
