@@ -446,6 +446,35 @@ parseAtt (k,v) = do
 
 
 ------------------------------------------------------------------------------
+-- |
+parseAtt2 :: Monad n
+          => (Text, Text)
+          -> HeistT n IO (RuntimeSplice n [(Text, Text)])
+parseAtt2 (k,v) = do
+    mas <- getsHS (H.lookup k . _attrSpliceMap)
+    maybe doInline (return . doAttrSplice) mas
+
+  where
+    cvt (Literal x) = return $ return x
+    cvt (Ident x) =
+        localParamNode (const $ X.Element x [] []) $ getAttributeSplice2 x
+
+    -- Handles inline parsing of $() splice syntax in attributes
+    doInline = do
+        let ast = case AP.feed (AP.parse attParser v) "" of
+                    (AP.Done _ res) -> res
+                    (AP.Fail _ _ _) -> []
+                    (AP.Partial _ ) -> []
+        chunks <- mapM cvt ast
+        return $ do
+            list <- sequence chunks
+            return [(k, T.concat list)]
+
+    -- Handles attribute splices
+    doAttrSplice splice = splice v
+
+
+------------------------------------------------------------------------------
 -- | Performs splice processing on a list of attributes.  This is useful in
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
@@ -457,16 +486,24 @@ runAttributes = mapM parseAtt
 -- | Performs splice processing on a list of attributes.  This is useful in
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
-runAttributesRaw :: (Monad m, Monad n)
+--runAttributesRaw :: (Monad m, Monad n)
+--                 => [(Text, Text)]
+--                 -> HeistT n m (RuntimeSplice n [(Text, Text)])
+--runAttributesRaw attrs = do
+--    arrs <- mapM runSingle attrs
+--    return $ liftM concat $ sequence arrs
+--  where
+--    runSingle p@(k,v) = do
+--        mas <- getsHS (H.lookup k . _attrSpliceMap)
+--        return $ maybe (return [p]) ($v) mas
+
+
+runAttributesRaw :: Monad n
                  => [(Text, Text)]
-                 -> HeistT n m (RuntimeSplice n [(Text, Text)])
+                 -> HeistT n IO (RuntimeSplice n [(Text, Text)])
 runAttributesRaw attrs = do
-    arrs <- mapM runSingle attrs
+    arrs <- mapM parseAtt2 attrs
     return $ liftM concat $ sequence arrs
-  where
-    runSingle p@(k,v) = do
-        mas <- getsHS (H.lookup k . _attrSpliceMap)
-        return $ maybe (return [p]) ($v) mas
 
 
 attrToChunk :: Text -> DList (Chunk n) -> DList (Chunk n)
@@ -498,6 +535,17 @@ getAttributeSplice name =
       (return $ DL.singleton $ Pure $ T.encodeUtf8 $
        T.concat ["${", name, "}"])
 {-# INLINE getAttributeSplice #-}
+
+
+getAttributeSplice2 :: Monad n => Text -> HeistT n IO (RuntimeSplice n Text)
+getAttributeSplice2 name = do
+    mSplice <- lookupSplice name
+    case mSplice of
+      Nothing -> return $ return $ T.concat ["${", name, "}"]
+      Just splice -> do
+        res <- splice
+        return $ liftM (T.decodeUtf8 . toByteString) $ codeGen res
+{-# INLINE getAttributeSplice2 #-}
 
 
 ------------------------------------------------------------------------------
