@@ -188,14 +188,6 @@ yieldRuntimeText = yieldRuntime .  liftM fromText
 
 
 ------------------------------------------------------------------------------
--- | This lets you turn a plain runtime monad function returning a Builder
--- into a compiled splice.
-yieldLater :: Monad n => n Builder -> DList (Chunk n)
-yieldLater = yieldRuntime . RuntimeSplice . lift
-{-# INLINE yieldLater #-}
-
-
-------------------------------------------------------------------------------
 -- | Returns a computation that performs load-time splice processing on the
 -- supplied list of nodes.
 runNodeList :: Monad n => [X.Node] -> Splice n
@@ -486,18 +478,6 @@ runAttributes = mapM parseAtt
 -- | Performs splice processing on a list of attributes.  This is useful in
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
---runAttributesRaw :: (Monad m, Monad n)
---                 => [(Text, Text)]
---                 -> HeistT n m (RuntimeSplice n [(Text, Text)])
---runAttributesRaw attrs = do
---    arrs <- mapM runSingle attrs
---    return $ liftM concat $ sequence arrs
---  where
---    runSingle p@(k,v) = do
---        mas <- getsHS (H.lookup k . _attrSpliceMap)
---        return $ maybe (return [p]) ($v) mas
-
-
 runAttributesRaw :: Monad n
                  => [(Text, Text)]
                  -> HeistT n IO (RuntimeSplice n [(Text, Text)])
@@ -603,51 +583,6 @@ newEmptyPromise = do
 --                        $ "deferenced empty promise created at" ++ from
 --     return prom
 -- {-# INLINE newEmptyPromiseWithError #-}
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Creates a promise for a future runtime computation.
--- promise :: (Monad n) => n a -> HeistT n IO (Promise a)
--- promise act = runtimeSplicePromise (lift act)
--- {-# INLINE promise #-}
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Turns a RuntimeSplice computation into a promise.
--- runtimeSplicePromise :: (Monad n)
---                      => RuntimeSplice n a
---                      -> HeistT n IO (Promise a)
--- runtimeSplicePromise act = do
---     prom <- newEmptyPromiseWithError "runtimeSplicePromise"
--- 
---     let m = do
---         x <- act
---         putPromise prom x
---         return ()
--- 
---     yieldRuntimeEffect m
---     return prom
--- {-# INLINE runtimeSplicePromise #-}
--- 
--- 
--- ------------------------------------------------------------------------------
--- -- | Sets up a runtime transformation on a 'Promise'.
--- withPromise :: (Monad n)
---             => Promise a
---             -> (a -> n b)
---             -> HeistT n IO (Promise b)
--- withPromise promA f = do
---     promB <- newEmptyPromiseWithError "withPromise"
--- 
---     let m = do
---         a <- getPromise promA
---         b <- lift $ f a
---         putPromise promB b
---         return ()
--- 
---     yieldRuntimeEffect m
---     return promB
--- {-# INLINE withPromise #-}
 
 
 ------------------------------------------------------------------------------
@@ -666,15 +601,6 @@ bindSplices :: [(Text, Splice n)]  -- ^ splices to bind
             -> HeistState n        -- ^ source state
             -> HeistState n
 bindSplices ss ts = foldr (uncurry bindSplice) ts ss
-
-
-------------------------------------------------------------------------------
--- | Adds a list of compiled splices to the splice map.  This function is
--- useful because it allows compiled splices to bind other compiled splices
--- during load-time splice processing.
-addSplices :: Monad m => [(Text, Splice n)] -> HeistT n m ()
-addSplices ss = modifyHS (bindSplices ss)
-{-# DEPRECATED addSplices "addSplices will be removed in the next release!  Use withLocalSplices instead."#-}
 
 
 ------------------------------------------------------------------------------
@@ -794,25 +720,17 @@ pureSplice f p = do
         return $ f a
 
 
-mapInputPromise :: Monad n
-                => (a -> b)
-                -> (Promise b -> Splice n)
-                -> Promise a -> Splice n
-mapInputPromise f = repromise' (return . f)
-{-# DEPRECATED mapInputPromise "Use repromise' instead."#-}
-
-
 ------------------------------------------------------------------------------
 -- | Change the promise type of a splice function.
 repromise' :: Monad n
-           => (a -> n b)
+           => (a -> RuntimeSplice n b)
            -> (Promise b -> Splice n)
            -> Promise a -> Splice n
 repromise' f pf p = do
     p2 <- newEmptyPromise
     let action = yieldRuntimeEffect $ do
             a <- getPromise p
-            putPromise p2 =<< lift (f a)
+            putPromise p2 =<< f a
     res <- pf p2
     return $ action `mappend` res
 
@@ -820,7 +738,7 @@ repromise' f pf p = do
 ------------------------------------------------------------------------------
 -- | Repromise a list of splices.
 repromise :: Monad n
-          => (a -> n b)
+          => (a -> RuntimeSplice n b)
           -> [(d, Promise b -> Splice n)]
           -> [(d, Promise a -> Splice n)]
 repromise f = mapSnd (repromise' f)
@@ -831,7 +749,7 @@ repromise f = mapSnd (repromise' f)
 -- fail.  If a Nothing is encountered, then the splice will generate no
 -- output.
 repromiseMay' :: Monad n
-              => (a -> n (Maybe b))
+              => (a -> RuntimeSplice n (Maybe b))
               -> (Promise b -> Splice n)
               -> Promise a -> Splice n
 repromiseMay' f pf p = do
@@ -839,7 +757,7 @@ repromiseMay' f pf p = do
     action <- pf p2
     return $ yieldRuntime $ do
         a <- getPromise p
-        mb <- lift (f a)
+        mb <- f a
         case mb of
           Nothing -> return mempty
           Just b -> do
@@ -850,7 +768,7 @@ repromiseMay' f pf p = do
 ------------------------------------------------------------------------------
 -- | repromiseMay' for a list of splices.
 repromiseMay :: Monad n
-             => (a -> n (Maybe b))
+             => (a -> RuntimeSplice n (Maybe b))
              -> [(d, Promise b -> Splice n)]
              -> [(d, Promise a -> Splice n)]
 repromiseMay f = mapSnd (repromiseMay' f)
@@ -893,16 +811,39 @@ deferMany f getItems = do
         return $ mconcat res
 
 
+------------------------------------------------------------------------------
+-- | Another useful way of combining groups of splices.
+-- FIXME - We probably need to export this
+--applyDeferred :: Monad n
+--              => RuntimeSplice n a
+--              -> [(Text, Promise a -> Splice n)]
+--              -> [(Text, Splice n)]
+--applyDeferred m = applySnd m . mapSnd defer
+
+
+------------------------------------------------------------------------------
+-- | This is kind of the opposite of defer.  Not sure what to name it yet.
+-- FIXME - This is a really common pattern, so I think we do want to expose it
+--deferred :: (Monad n)
+--         => (t -> RuntimeSplice n Builder)
+--         -> Promise t
+--         -> Splice n
+--deferred f p = return $ yieldRuntime $ f =<< getPromise p
+
+
+------------------------------------------------------------------------------
+-- | Runs a splice computation with a list of splices that are functions of
+-- runtime data.
 withSplices :: Monad n
             => Splice n
             -> [(Text, Promise a -> Splice n)]
-            -> n a
+            -> RuntimeSplice n a
             -> Splice n
 withSplices splice splices runtimeAction = do
     p <- newEmptyPromise
     let splices' = mapSnd ($p) splices
     chunks <- withLocalSplices splices' [] splice
-    let fillPromise = yieldRuntimeEffect $ putPromise p =<< lift runtimeAction
+    let fillPromise = yieldRuntimeEffect $ putPromise p =<< runtimeAction
     return $ fillPromise `mappend` chunks
 
 
@@ -917,7 +858,7 @@ manyWithSplices :: Monad n
                 -- You'll frequently use 'runChildren' here.
                 -> [(Text, Promise a -> Splice n)]
                 -- ^ List of splices to bind
-                -> n [a]
+                -> RuntimeSplice n [a]
                 -- ^ Runtime action returning a list of items to render.
                 -> Splice n
 manyWithSplices splice splices runtimeAction = do
@@ -925,18 +866,21 @@ manyWithSplices splice splices runtimeAction = do
     let splices' = mapSnd ($p) splices
     chunks <- withLocalSplices splices' [] splice
     return $ yieldRuntime $ do
-        items <- lift runtimeAction
+        items <- runtimeAction
         res <- forM items $ \item -> putPromise p item >> codeGen chunks
         return $ mconcat res
 
 
+------------------------------------------------------------------------------
+-- | Like 'withSplices', but works for \"pure\" splices that don't operate in
+-- the HeistT monad.
 withPureSplices :: Monad n
                 => Splice n
                 -> [(Text, a -> Builder)]
-                -> n a
+                -> RuntimeSplice n a
                 -> Splice n
 withPureSplices splice splices action = do
-    let fieldSplice g = return $ yieldRuntime $ liftM g $ lift action
+    let fieldSplice g = return $ yieldRuntime $ liftM g action
     let splices' = map (second fieldSplice) splices
     withLocalSplices splices' [] splice
 

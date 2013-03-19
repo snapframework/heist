@@ -31,7 +31,6 @@ module Heist.Compiled
   , textSplice
   , nodeSplice
   , pureSplice
-  , mapInputPromise
   , repromise
   , repromiseMay
   , repromise'
@@ -57,8 +56,6 @@ module Heist.Compiled
   , yieldRuntimeEffect
   , yieldPureText
   , yieldRuntimeText
-  , yieldLater
-  , addSplices
   , withLocalSplices
 
   -- * Lower level promise functions
