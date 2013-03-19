@@ -111,9 +111,11 @@ instance Monoid (HeistConfig m) where
 
 
 ------------------------------------------------------------------------------
--- | The built-in set of static splices.  All the splices that used to be
--- enabled by default are included here.  To get the normal Heist behavior you
--- should include these in the hcLoadTimeSplices list in your HeistConfig.
+-- | The built-in set of splices that you should use in compiled splice mode.
+-- This list includes everything from 'defaultInterpretedSplices' plus a
+-- splice for the content tag that errors out when it sees any instance of the
+-- old content tag, which has now been moved to two separate tags called
+-- apply-content and bind-content.
 defaultLoadTimeSplices :: MonadIO m => [(Text, (I.Splice m))]
 defaultLoadTimeSplices =
     ("content", deprecatedContentCheck) -- To be removed in later versions
@@ -123,7 +125,9 @@ defaultLoadTimeSplices =
 ------------------------------------------------------------------------------
 -- | The built-in set of static splices.  All the splices that used to be
 -- enabled by default are included here.  To get the normal Heist behavior you
--- should include these in the hcLoadTimeSplices list in your HeistConfig.
+-- should include these in the hcLoadTimeSplices list in your HeistConfig.  If
+-- you are using interpreted splice mode, then you might also want to bind the
+-- 'deprecatedContentCheck' splice to the content tag as a load time splice.
 defaultInterpretedSplices :: MonadIO m => [(Text, (I.Splice m))]
 defaultInterpretedSplices =
     [ (applyTag, applyImpl)
