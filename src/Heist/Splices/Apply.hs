@@ -93,6 +93,12 @@ applyImpl = do
         Just template -> applyNodes (X.childNodes node) template
 
 
+------------------------------------------------------------------------------
+-- | This splice crashes with an error message.  Its purpose is to provide a
+-- load-time warning to anyone still using the old content tag in their
+-- templates.  In Heist 0.10, tho content tag was replaced by two separate
+-- apply-content and bind-content tags used by the apply and bind splices
+-- respectively.
 deprecatedContentCheck :: Monad m => Splice m
 deprecatedContentCheck =
     return [] `orError` unwords
