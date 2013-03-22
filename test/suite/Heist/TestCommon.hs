@@ -6,8 +6,8 @@ import           Control.Error
 import           Control.Monad.Trans
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
-import qualified Data.HashMap.Strict as Map
 import           Data.Maybe
+import           Data.Monoid
 import           Data.Text (Text)
 
 
@@ -35,9 +35,8 @@ loadT :: MonadIO m
       -> [(Text, AttrSplice m)]
       -> IO (Either [String] (HeistState m))
 loadT baseDir a b c d = runEitherT $ do
-    ts <- loadTemplates baseDir
     let hc = HeistConfig (defaultInterpretedSplices ++ a)
-                         (defaultLoadTimeSplices ++ b) c d ts
+                         (defaultLoadTimeSplices ++ b) c d [loadTemplates baseDir]
     initHeist hc
 
 
@@ -49,9 +48,8 @@ loadIO :: FilePath
        -> [(Text, AttrSplice IO)]
        -> IO (Either [String] (HeistState IO))
 loadIO baseDir a b c d = runEitherT $ do
-    ts <- loadTemplates baseDir
     let hc = HeistConfig (defaultInterpretedSplices ++ a)
-                         (defaultLoadTimeSplices ++ b) c d ts
+                         (defaultLoadTimeSplices ++ b) c d [loadTemplates baseDir]
     initHeist hc
 
 
@@ -59,9 +57,8 @@ loadIO baseDir a b c d = runEitherT $ do
 loadHS :: FilePath -> IO (HeistState IO)
 loadHS baseDir = do
     etm <- runEitherT $ do
-        templates <- loadTemplates baseDir
         let hc = HeistConfig defaultInterpretedSplices
-                             defaultLoadTimeSplices [] [] templates
+                             defaultLoadTimeSplices [] [] [loadTemplates baseDir]
         initHeist hc
     either (error . concat) return etm
 
@@ -73,7 +70,7 @@ loadEmpty :: [(Text, I.Splice IO)]
           -> IO (HeistState IO)
 loadEmpty a b c d = do
     let hc = HeistConfig (defaultInterpretedSplices ++ a)
-                         (defaultLoadTimeSplices ++ b) c d Map.empty
+                         (defaultLoadTimeSplices ++ b) c d mempty
     res <- runEitherT $ initHeist hc
     either (error . concat) return res
 

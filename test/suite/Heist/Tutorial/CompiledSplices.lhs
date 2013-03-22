@@ -107,8 +107,8 @@ directory with compiled splices.
 >      -> IO (HeistState n)
 > load baseDir splices = do
 >     tmap <- runEitherT $ do
->         templates <- loadTemplates baseDir
->         let hc = HeistConfig [] defaultLoadTimeSplices splices [] templates
+>         let hc = HeistConfig [] defaultLoadTimeSplices splices []
+>                              [loadTemplates baseDir]
 >         initHeist hc
 >     either (error . concat) return tmap
 

@@ -155,6 +155,7 @@ Library
     random                     >= 1.0.1.0 && < 1.1,
     text                       >= 0.10    && < 0.12,
     time                       >= 1.1     && < 1.5,
+    transformers               >= 0.3     && < 0.4,
     unordered-containers       >= 0.1.4   && < 0.3,
     vector                     >= 0.9     && < 0.11,
     xmlhtml                    >= 0.2.1   && < 0.3

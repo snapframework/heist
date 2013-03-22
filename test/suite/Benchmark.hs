@@ -31,8 +31,7 @@ import Heist.Types
 
 loadWithCache baseDir = do
     etm <- runEitherT $ do
-        templates <- loadTemplates baseDir
-        let hc = HeistConfig [] defaultLoadTimeSplices [] [] templates
+        let hc = HeistConfig [] defaultLoadTimeSplices [] [] [loadTemplates baseDir]
         initHeistWithCacheTag hc
     either (error . unlines) (return . fst) etm
 

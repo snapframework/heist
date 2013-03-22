@@ -42,8 +42,7 @@ newTemplateDirectory :: MonadIO n
                      -> HeistConfig n
                      -> EitherT [String] IO (TemplateDirectory n)
 newTemplateDirectory dir hc = do
-    templates <- loadTemplates dir
-    let hc' = hc { hcTemplates = templates }
+    let hc' = hc { hcTemplateLocations = [loadTemplates dir] }
     (hs,cts) <- initHeistWithCacheTag hc'
     tsMVar <- liftIO $ newMVar hs
     ctsMVar <- liftIO $ newMVar cts
@@ -84,8 +83,7 @@ reloadTemplateDirectory :: (MonadIO n)
                         -> IO (Either String ())
 reloadTemplateDirectory (TemplateDirectory p hc tsMVar ctsMVar) = do
     ehs <- runEitherT $ do
-        templates <- loadTemplates p
-        initHeistWithCacheTag (hc { hcTemplates = templates })
+        initHeistWithCacheTag (hc { hcTemplateLocations = [loadTemplates p] })
     leftPass ehs $ \(hs,cts) -> do
         modifyMVar_ tsMVar (const $ return hs)
         modifyMVar_ ctsMVar (const $ return cts)
