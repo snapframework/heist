@@ -203,22 +203,31 @@ getTemplateFilePath = getsHS _curTemplateFile
 loadTemplate :: String -- ^ path of the template root
              -> String -- ^ full file path (includes the template root)
              -> IO [Either String (TPath, DocumentFile)] --TemplateMap
-loadTemplate templateRoot fname
-    | isHTMLTemplate = do
-        c <- getDoc fname
-        return [fmap (\t -> (splitLocalPath $ BC.pack tName, t)) c]
-    | isXMLTemplate = do
-        c <- getXMLDoc fname
-        return [fmap (\t -> (splitLocalPath $ BC.pack tName, t)) c]
-    | otherwise = return []
+loadTemplate templateRoot fname = do
+    c <- loadTemplate' fname
+    return $ map (fmap (\t -> (splitLocalPath $ BC.pack tName, t))) c
   where -- tName is path relative to the template root directory
-        isHTMLTemplate = ".tpl"  `isSuffixOf` fname
-        isXMLTemplate  = ".xtpl" `isSuffixOf` fname
-        correction = if last templateRoot == '/' then 0 else 1
-        extLen     = if isHTMLTemplate then 4 else 5
-        tName = drop ((length templateRoot)+correction) $
-                -- We're only dropping the template root, not the whole path
-                take ((length fname) - extLen) fname
+    isHTMLTemplate = ".tpl"  `isSuffixOf` fname
+    correction = if last templateRoot == '/' then 0 else 1
+    extLen     = if isHTMLTemplate then 4 else 5
+    tName = drop ((length templateRoot)+correction) $
+            -- We're only dropping the template root, not the whole path
+            take ((length fname) - extLen) fname
+
+
+------------------------------------------------------------------------------
+-- | Loads a template at the specified path, choosing the appropriate parser
+-- based on the file extension.  The template is only loaded if it has a
+-- \".tpl\" or \".xtpl\" extension.  Returns an empty list if the extension
+-- doesn't match.
+loadTemplate' :: String -> IO [Either String DocumentFile]
+loadTemplate' fullDiskPath
+    | isHTMLTemplate = liftM (:[]) $ getDoc fullDiskPath
+    | isXMLTemplate = liftM (:[]) $ getXMLDoc fullDiskPath
+    | otherwise = return []
+  where
+    isHTMLTemplate = ".tpl"  `isSuffixOf` fullDiskPath
+    isXMLTemplate  = ".xtpl" `isSuffixOf` fullDiskPath
 
 
 ------------------------------------------------------------------------------

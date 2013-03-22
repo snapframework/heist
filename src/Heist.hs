@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 
 {-|
 
@@ -17,6 +18,7 @@ module Heist
   (
   -- * Primary Heist initialization functions
     loadTemplates
+  , reloadTemplates
   , addTemplatePathPrefix
   , initHeist
   , initHeistWithCacheTag
@@ -137,6 +139,16 @@ defaultInterpretedSplices =
     ]
 
 
+allErrors :: [Either String (TPath, v)]
+          -> EitherT [String] IO (HashMap TPath v)
+allErrors tlist =
+    case errs of
+        [] -> right $ Map.fromList $ rights tlist
+        _  -> left errs
+  where
+    errs = lefts tlist
+
+
 ------------------------------------------------------------------------------
 -- | Loads templates from disk.  This function returns just a template map so
 -- you can load multiple directories and combine the maps before initializing
@@ -144,11 +156,24 @@ defaultInterpretedSplices =
 loadTemplates :: FilePath -> EitherT [String] IO TemplateRepo
 loadTemplates dir = do
     d <- lift $ readDirectoryWith (loadTemplate dir) dir
-    let tlist = F.fold (free d)
-        errs = lefts tlist
-    case errs of
-        [] -> right $ Map.fromList $ rights tlist
-        _  -> left errs
+    allErrors $ F.fold (free d)
+
+
+------------------------------------------------------------------------------
+-- | Reloads all the templates an an existing TemplateRepo.
+reloadTemplates :: TemplateRepo -> EitherT [String] IO TemplateRepo
+reloadTemplates repo = do
+    tlist <- lift $ mapM loadOrKeep $ Map.toList repo
+    allErrors tlist
+  where
+    loadOrKeep (p,df) =
+      case dfFile df of
+        Nothing -> return $ Right (p, df)
+        Just fp -> do
+          df' <- loadTemplate' fp
+          return $ fmap (p,) $ case df' of
+            [t] -> t
+            _ -> Left "Template repo has non-templates"
 
 
 ------------------------------------------------------------------------------
