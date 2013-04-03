@@ -71,6 +71,7 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attrSpliceContext"     attrSpliceContext
         , testCase     "heist/json/values"           jsonValueTest
         , testCase     "heist/json/object"           jsonObjectTest
+        , testCase     "heist/renderXML"             xmlNotHtmlTest
         ]
 
 
@@ -195,7 +196,7 @@ attrSubstTest = do
   where
     splices = defaultLoadTimeSplices ++
         [("foo", return [X.TextNode "meaning_of_everything"])]
-        
+
     check str ts expected = do
         Just (resDoc, _) <- renderTemplate ts "attrs"
         H.assertEqual str expected $ toByteString $ resDoc
@@ -338,7 +339,7 @@ markdownTextTest = do
     result <- evalHeistT markdownSplice
                          (X.TextNode "This *is* a test.")
                          hs
-    H.assertEqual "Markdown text" markdownHtmlExpected 
+    H.assertEqual "Markdown text" markdownHtmlExpected
       (B.filter (/= '\n') $ toByteString $
         X.render (X.HtmlDocument X.UTF8 Nothing result))
 
@@ -358,7 +359,7 @@ ignoreTest :: H.Assertion
 ignoreTest = do
     es <- loadEmpty [] [] [] []
     res <- evalHeistT ignoreImpl
-        (X.Element "ignore" [("tag", "ignorable")] 
+        (X.Element "ignore" [("tag", "ignorable")]
           [X.TextNode "This should be ignored"]) es
     H.assertEqual "<ignore> tag" [] res
 
@@ -372,6 +373,10 @@ lookupTemplateTest = do
     res <- runHeistT k (X.TextNode "") hs
     H.assertBool "lookup context test" $ isJust $ fst res
 
+------------------------------------------------------------------------------
+xmlNotHtmlTest :: H.Assertion
+xmlNotHtmlTest = renderTest "rss" expected where
+  expected = "<rss><channel><link>http://www.devalot.com/</link></channel></rss>"
 
 ------------------------------------------------------------------------------
 identStartChar :: [Char]
@@ -636,4 +641,3 @@ calcResult apply@(Apply name _ callee _ _) = do
 --prn = L.putStrLn . formatNode
 --runTests :: IO ()
 --runTests = defaultMain tests
-
