@@ -26,10 +26,10 @@ module Heist.Compiled
   , prefixSplices
   , namespaceSplices
   , textSplices
-  , nodeSplices
+  , htmlSplices
   , pureSplices
   , textSplice
-  , nodeSplice
+  , htmlSplice
   , pureSplice
   , repromise
   , repromiseMay

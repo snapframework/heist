@@ -138,7 +138,7 @@ loadTest = do
     ets <- loadIO "templates" [] [] [] []
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertEqual "loadTest size" 36 $ Map.size tm
+                      H.assertEqual "loadTest size" 37 $ Map.size tm
            ) ets
 
 
@@ -376,7 +376,7 @@ lookupTemplateTest = do
 ------------------------------------------------------------------------------
 xmlNotHtmlTest :: H.Assertion
 xmlNotHtmlTest = renderTest "rss" expected where
-  expected = "<rss><channel><link>http://www.devalot.com/</link></channel></rss>"
+  expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss><channel><link>http://www.devalot.com/</link></channel></rss>"
 
 ------------------------------------------------------------------------------
 identStartChar :: [Char]

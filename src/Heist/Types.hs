@@ -72,6 +72,11 @@ data DocumentFile = DocumentFile
 
 
 ------------------------------------------------------------------------------
+-- | Designates whether a document should be treated as XML or HTML.
+data Markup = Xml | Html
+
+
+------------------------------------------------------------------------------
 -- | Monad used for runtime splice execution.
 newtype RuntimeSplice m a = RuntimeSplice {
       unRT :: StateT HeterogeneousEnvironment m a
@@ -166,6 +171,10 @@ data HeistState m = HeistState {
     -- preprocessing, errors should stop execution and be reported.  During
     -- template rendering, it's better to skip the errors and render the page.
     , _preprocessingMode   :: Bool
+
+    -- | This is needed because compiled templates are generated with a bunch
+    -- of calls to renderFragment rather than a single call to render.
+    , _curMarkup           :: Markup
 }
 
 

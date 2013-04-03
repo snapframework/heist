@@ -137,8 +137,16 @@ promiseChildrenWithNodes :: (Monad n)
                          => [(Text, a -> [X.Node])]
                          -> Promise a
                          -> HeistT n IO (RuntimeSplice n Builder)
-promiseChildrenWithNodes =
-    promiseChildrenWithTrans (X.renderHtmlFragment X.UTF8)
+promiseChildrenWithNodes ss p = do
+    markup <- getsHS _curMarkup
+    promiseChildrenWithTrans (renderFragment markup) ss p
+
+
+renderFragment :: Markup -> [X.Node] -> Builder
+renderFragment markup ns =
+    case markup of
+      Html -> X.renderHtmlFragment X.UTF8 ns
+      Xml  -> X.renderXmlFragment X.UTF8 ns
 
 
 ------------------------------------------------------------------------------
@@ -227,7 +235,11 @@ compileTemplate :: Monad n
                 -> DocumentFile
                 -> IO [Chunk n]
 compileTemplate hs tpath df = do
-    !chunks <- runSplice nullNode hs $! runDocumentFile tpath df
+    let markup = case dfDoc df of
+                   X.XmlDocument _ _ _ -> Xml
+                   X.HtmlDocument _ _ _ -> Html
+        hs' = hs { _curMarkup = markup }
+    !chunks <- runSplice nullNode hs' $! runDocumentFile tpath df
     return chunks
   where
     -- This gets overwritten in runDocumentFile
@@ -323,9 +335,9 @@ lookupSplice nm = getsHS (H.lookup nm . _compiledSpliceMap)
 runNode :: Monad n => X.Node -> Splice n
 runNode node = localParamNode (const node) $ do
     isStatic <- subtreeIsStatic node
+    markup <- getsHS _curMarkup
     if isStatic
-      then return $! yieldPure $!
-             X.renderHtmlFragment X.UTF8 [parseAttrs node]
+      then return $! yieldPure $! renderFragment markup [parseAttrs node]
       else compileNode node
 
 
@@ -693,14 +705,14 @@ textSplice f = fromText . f
 
 ------------------------------------------------------------------------------
 -- | Converts pure Node splices to pure Builder splices.
-nodeSplices :: [(Text, a -> [X.Node])] -> [(Text, a -> Builder)]
-nodeSplices = mapSnd nodeSplice
+htmlSplices :: [(Text, a -> [X.Node])] -> [(Text, a -> Builder)]
+htmlSplices = mapSnd htmlSplice
 
 
 ------------------------------------------------------------------------------
 -- | Converts a pure Node splice function to a pure Builder splice function.
-nodeSplice :: (a -> [X.Node]) -> a -> Builder
-nodeSplice f = X.renderHtmlFragment X.UTF8 . f
+htmlSplice :: (a -> [X.Node]) -> a -> Builder
+htmlSplice f = X.renderHtmlFragment X.UTF8 . f
 
 
 ------------------------------------------------------------------------------
