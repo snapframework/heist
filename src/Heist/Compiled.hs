@@ -21,33 +21,21 @@ module Heist.Compiled
   , runChildren
 
   -- * Functions for manipulating lists of compiled splices
-  , mapSnd
-  , applySnd
+  , mapS
+  , applyS
   , prefixSplices
   , namespaceSplices
-  , textSplices
-  , htmlSplices
-  , pureSplices
   , textSplice
-  , htmlSplice
+  , nodeSplice
   , pureSplice
-  , repromise
-  , repromiseMay
-  , repromise'
-  , repromiseMay'
-  , defer
+
   , deferMany
+  , contramapM
+  , mayContramapM
+  , bindLater
   , withSplices
   , manyWithSplices
-  , withPureSplices
-
-  -- * Old compiled splice API
-  , mapPromises
-  , promiseChildren
-  , promiseChildrenWith
-  , promiseChildrenWithTrans
-  , promiseChildrenWithText
-  , promiseChildrenWithNodes
+  , withLocalSplices
 
   -- * Constructing Chunks
   -- $yieldOverview
@@ -56,14 +44,6 @@ module Heist.Compiled
   , yieldRuntimeEffect
   , yieldPureText
   , yieldRuntimeText
-  , withLocalSplices
-
-  -- * Lower level promise functions
-  , Promise
-  , newEmptyPromise
-  , getPromise
-  , putPromise
-  , adjustPromise
 
   -- * Running nodes and splices
   , runNodeList
@@ -75,9 +55,13 @@ module Heist.Compiled
   ) where
 
 import Heist.Compiled.Internal
+import Heist.SpliceAPI
 
 -- $yieldOverview
 -- The internals of the Chunk data type are deliberately not exported because
 -- we want to hide the underlying implementation as much as possible.  The
--- @yield...@ functions give you lower lever construction of Chunks and DLists
--- of Chunks.
+-- @yield...@ functions give you lower level construction of DLists of Chunks.
+--
+-- Most of the time you will use these functions composed with return to
+-- generate a Splice.  But we decided not to include the return in these
+-- functions to allow you to work with the DLists purely.

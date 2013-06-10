@@ -24,6 +24,7 @@ import           Text.XmlHtml
 ------------------------------------------------------------------------------
 
 import           Heist.Interpreted.Internal
+import           Heist.SpliceAPI
 import           Heist.Types
 
                                  ------------
@@ -161,9 +162,9 @@ explodeTag = ask >>= go
     go (Object o) = goObject o
 
     --------------------------------------------------------------------------
-    goText t = lift $ runChildrenWith [ ("value"   , return [TextNode t])
-                                      , ("snippet" , asHtml t           )
-                                      ]
+    goText t = lift $ runChildrenWith $ do
+        "value"   ?! return [TextNode t]
+        "snippet" ?! asHtml t
 
     --------------------------------------------------------------------------
     goArray :: (Monad n) => V.Vector Value -> JsonMonad n n [Node]
@@ -203,11 +204,12 @@ explodeTag = ask >>= go
                                  (findExpr expr v)
 
     --------------------------------------------------------------------------
-    genericBindings :: Monad n => JsonMonad n n [(Text, Splice n)]
-    genericBindings = ask >>= \v -> return [ ("with",    varAttrTag v explodeTag)
-                                           , ("snippet", varAttrTag v snippetTag)
-                                           , ("value",   varAttrTag v valueTag  )
-                                           ]
+    genericBindings :: Monad n => JsonMonad n n (Splices (Splice n))
+    genericBindings = ask >>= \v -> return $ do
+        "with"     ?! varAttrTag v explodeTag
+        "snippet"  ?! varAttrTag v snippetTag
+        "value"    ?! varAttrTag v valueTag
+        
 
     --------------------------------------------------------------------------
     goObject obj = do
@@ -217,8 +219,8 @@ explodeTag = ask >>= go
 
     --------------------------------------------------------------------------
     bindKvp bindings k v =
-        let newBindings = [ (T.append "with:" k   , withValue v explodeTag)
-                          , (T.append "snippet:" k, withValue v snippetTag)
-                          , (T.append "value:" k  , withValue v valueTag  )
-                          ]
-        in  newBindings ++ bindings
+        let newBindings = do
+                T.append "with:" k    ?! withValue v explodeTag
+                T.append "snippet:" k ?! withValue v snippetTag
+                T.append "value:" k   ?! withValue v valueTag
+        in  unionWith (\a _ -> a) newBindings bindings

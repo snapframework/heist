@@ -4,10 +4,44 @@
 {-# LANGUAGE PackageImports             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
-module Heist.Interpreted.Internal where
+module Heist.Interpreted.Internal
+  (
+    Splice
+
+  -- * HeistState Functions
+  , addTemplate
+  , addXMLTemplate
+  , lookupSplice
+  , bindSplice
+  , bindSplices
+  , bindAttributeSplices
+
+  -- * Functions for creating splices
+  , textSplice
+  , runChildren
+  , runChildrenWith
+  , runChildrenWithTrans
+  , runChildrenWithTemplates
+  , runChildrenWithText
+  , mapSplices
+
+  -- * HeistT functions
+  , stopRecursion
+  , runNode
+  , runAttributes
+  , runNodeList
+  , evalTemplate
+  , bindStrings
+  , bindString
+  , callTemplate
+  , callTemplateWithText
+  , renderTemplate
+  , renderWithArgs
+  ) where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
+import           Control.Arrow hiding (loop)
 import           Control.Monad
 import           Control.Monad.State.Strict
 import qualified Data.Attoparsec.Text as AP
@@ -24,11 +58,7 @@ import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
 import           Heist.Common
-import           Heist.SpliceAPI
 import           Heist.Types
-
-
-type Splice n = HeistT n n Template
 
 
 ------------------------------------------------------------------------------
@@ -54,12 +84,12 @@ bindSplice n v hs = hs {_spliceMap = Map.insert n v (_spliceMap hs)}
 
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
-bindSplices :: Splices (Splice n) -- ^ splices to bind
+bindSplices :: [(Text, Splice n)] -- ^ splices to bind
             -> HeistState n       -- ^ start state
             -> HeistState n
 bindSplices ss hs = foldl' (flip id) hs acts
   where
-    acts = map (uncurry bindSplice) $ splicesToList ss
+    acts = map (uncurry bindSplice) ss
 
 
 ------------------------------------------------------------------------------
@@ -81,7 +111,7 @@ runChildren = runNodeList . X.childNodes =<< getParamNode
 -- | Binds a list of splices before using the children of the spliced node as
 -- a view.
 runChildrenWith :: (Monad n)
-                => Splices (Splice n)
+                => [(Text, Splice n)]
                 -- ^ List of splices to bind before running the param nodes.
                 -> Splice n
                 -- ^ Returns the passed in view.
@@ -94,22 +124,22 @@ runChildrenWith splices = localHS (bindSplices splices) runChildren
 runChildrenWithTrans :: (Monad n)
           => (b -> Splice n)
           -- ^ Splice generating function
-          -> Splices b
+          -> [(Text, b)]
           -- ^ List of tuples to be bound
           -> Splice n
-runChildrenWithTrans f = runChildrenWith . mapS f
+runChildrenWithTrans f = runChildrenWith . map (second f)
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using constant templates rather than dynamic
 -- splices.
-runChildrenWithTemplates :: (Monad n) => Splices Template -> Splice n
+runChildrenWithTemplates :: (Monad n) => [(Text, Template)] -> Splice n
 runChildrenWithTemplates = runChildrenWithTrans return
 
 
 ------------------------------------------------------------------------------
 -- | Like runChildrenWith but using literal text rather than dynamic splices.
-runChildrenWithText :: (Monad n) => Splices Text -> Splice n
+runChildrenWithText :: (Monad n) => [(Text, Text)] -> Splice n
 runChildrenWithText = runChildrenWithTrans textSplice
 
 
@@ -353,10 +383,10 @@ evalWithDoctypes name = lookupAndRun name $ \(t,ctx) -> do
 ------------------------------------------------------------------------------
 -- | Binds a list of constant string splices.
 bindStrings :: Monad n
-            => Splices Text
+            => [(Text, Text)]
             -> HeistState n
             -> HeistState n
-bindStrings splices hs = foldr (uncurry bindString) hs $ splicesToList splices
+bindStrings pairs hs = foldr (uncurry bindString) hs pairs
 
 
 ------------------------------------------------------------------------------
@@ -376,10 +406,11 @@ bindString n = bindSplice n . textSplice
 -- returns an empty list.
 callTemplate :: Monad n
              => ByteString         -- ^ The name of the template
-             -> Splices (Splice n) -- ^ Splices to call the template with
+             -> [(Text, Splice n)] -- ^ Association list of
+                                   -- (name,value) parameter pairs
              -> HeistT n n Template
-callTemplate name splices = do
-    modifyHS $ bindSplices splices
+callTemplate name params = do
+    modifyHS $ bindSplices params
     liftM (maybe [] id) $ evalTemplate name
 
 
@@ -388,12 +419,12 @@ callTemplate name splices = do
 -- splices.
 callTemplateWithText :: Monad n
                      => ByteString     -- ^ The name of the template
-                     -> Splices Text -- ^ Splices to call the template with
+                     -> [(Text, Text)] -- ^ Association list of
+                                       -- (name,value) parameter pairs
                      -> HeistT n n Template
-callTemplateWithText name splices = callTemplate name $ mapS textSplice splices
--- FIXME
---    modifyHS $ bindStrings splices
---    liftM (maybe [] id) $ evalTemplate name
+callTemplateWithText name params = do
+    modifyHS $ bindStrings params
+    liftM (maybe [] id) $ evalTemplate name
 
 
 ------------------------------------------------------------------------------
@@ -419,7 +450,7 @@ renderTemplate hs name = evalHeistT tpl (X.TextNode "") hs
 -- using bindString, bindStrings, or bindSplice to set up the arguments to the
 -- template.
 renderWithArgs :: Monad n
-               => Splices Text
+               => [(Text, Text)]
                -> HeistState n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
