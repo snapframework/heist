@@ -22,6 +22,7 @@ import           Data.Monoid
 import qualified Data.Text                       as T
 import           Prelude hiding (catch)
 import           System.FilePath
+import           Heist.SpliceAPI
 import           Heist.Types
 import qualified Text.XmlHtml as X
 
@@ -291,10 +292,11 @@ mimeType d = case d of
 
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
-bindAttributeSplices :: [(T.Text, AttrSplice n)] -- ^ splices to bind
-                     -> HeistState n             -- ^ start state
+bindAttributeSplices :: Splices (AttrSplice n) -- ^ splices to bind
+                     -> HeistState n           -- ^ start state
                      -> HeistState n
 bindAttributeSplices ss hs =
-    hs { _attrSpliceMap = Map.union (Map.fromList ss) (_attrSpliceMap hs) }
+    hs { _attrSpliceMap = Map.union (Map.fromList $ splicesToList ss)
+                                    (_attrSpliceMap hs) }
 
 

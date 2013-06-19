@@ -14,49 +14,56 @@ import qualified Data.Text as T
 
 ------------------------------------------------------------------------------
 -- | A monad providing convenient syntax for defining splices.
-newtype SplicesM s a = SplicesM { unCSplices :: State (Map Text s) a }
+newtype SplicesM s a = SplicesM { unSplices :: State (Map Text s) a }
   deriving (Monad, MonadState (Map Text s))
 
 
 type Splices s = SplicesM s ()
 
 
+noSplices :: Splices s
+noSplices = put M.empty
+
+
 ------------------------------------------------------------------------------
 -- | Runs the SplicesM monad, generating a map of splices.
-runCSplices :: SplicesM s a -> Map Text s
-runCSplices splices = execState (unCSplices splices) M.empty
+runSplices :: SplicesM s a -> Map Text s
+runSplices splices = execState (unSplices splices) M.empty
 
 
 splicesToList :: SplicesM s a -> [(Text, s)]
-splicesToList = M.toList . runCSplices
+splicesToList = M.toList . runSplices
 
 
 mapS :: (a -> b) -> Splices a -> Splices b
-mapS f ss = put $ M.map f $ runCSplices ss 
+mapS f ss = put $ M.map f $ runSplices ss 
 
 
 applyS :: a -> Splices (a -> b) -> Splices b
 applyS a = mapS ($a)
 
 
+insert :: Text -> s -> Splices s -> Splices s
 insert = insertWith const
 
 insertWith :: (s -> s -> s) -> Text -> s -> SplicesM s a2 -> SplicesM s ()
-insertWith f k v b = put $ M.insertWith f k v (runCSplices b)
+insertWith f k v b = put $ M.insertWith f k v (runSplices b)
 
 
 unionWith :: (s -> s -> s) -> SplicesM s a1 -> SplicesM s a2 -> SplicesM s ()
-unionWith f a b = put $ M.unionWith f (runCSplices a) (runCSplices b)
+unionWith f a b = put $ M.unionWith f (runSplices a) (runSplices b)
 
 
 ($$) :: Splices (a -> b) -> a -> Splices b
 ($$) = flip applyS
+infixr 0 $$
 
 
 ------------------------------------------------------------------------------
 -- | Inserts into the map only if the key does not exist.
 (??) :: Text -> s -> Splices s
 (??) tag splice = modify $ M.insertWith (const id) tag splice
+infixr 0 ??
 
 
 ------------------------------------------------------------------------------
@@ -64,10 +71,11 @@ unionWith f a b = put $ M.unionWith f (runCSplices a) (runCSplices b)
 -- overwritten.
 (?!) :: Text -> s -> Splices s
 (?!) tag splice = modify $ M.insert tag splice
+infixr 0 ?!
 
 
 mapNames :: (Text -> Text) -> Splices a -> Splices a
-mapNames f = put . M.mapKeys f . runCSplices
+mapNames f = put . M.mapKeys f . runSplices
 
 
 -- The following two functions are formulated as functions of Splices instead

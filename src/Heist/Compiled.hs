@@ -23,8 +23,6 @@ module Heist.Compiled
   -- * Functions for manipulating lists of compiled splices
   , mapS
   , applyS
-  , prefixSplices
-  , namespaceSplices
   , textSplice
   , nodeSplice
   , pureSplice

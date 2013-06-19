@@ -36,7 +36,7 @@ module Heist
   , AttrSplice
   , RuntimeSplice
   , Chunk
-  , HeistState(..)
+  , HeistState
   , templateNames
   , compiledTemplateNames
   , hasTemplate
@@ -57,6 +57,9 @@ module Heist
   , getDoc
   , getXMLDoc
   , orError
+
+  -- * Splice API
+  , module Heist.SpliceAPI
   ) where
 
 import           Control.Error
@@ -70,7 +73,6 @@ import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
 import           Data.Monoid
-import           Data.Text                       (Text)
 import           System.Directory.Tree
 import qualified Text.XmlHtml                    as X
 
@@ -130,10 +132,11 @@ instance Monoid (HeistConfig m) where
 -- splice for the content tag that errors out when it sees any instance of the
 -- old content tag, which has now been moved to two separate tags called
 -- apply-content and bind-content.
-defaultLoadTimeSplices :: MonadIO m => [(Text, (I.Splice m))]
+defaultLoadTimeSplices :: MonadIO m => Splices (I.Splice m)
 defaultLoadTimeSplices =
-    ("content", deprecatedContentCheck) -- To be removed in later versions
-    : defaultInterpretedSplices
+    -- To be removed in later versions
+    insert "content" deprecatedContentCheck defaultInterpretedSplices
+    
 
 
 ------------------------------------------------------------------------------
@@ -142,13 +145,13 @@ defaultLoadTimeSplices =
 -- should include these in the hcLoadTimeSplices list in your HeistConfig.  If
 -- you are using interpreted splice mode, then you might also want to bind the
 -- 'deprecatedContentCheck' splice to the content tag as a load time splice.
-defaultInterpretedSplices :: MonadIO m => [(Text, (I.Splice m))]
-defaultInterpretedSplices =
-    [ (applyTag, applyImpl)
-    , (bindTag, bindImpl)
-    , (ignoreTag, ignoreImpl)
-    , (markdownTag, markdownSplice)
-    ]
+defaultInterpretedSplices :: MonadIO m => Splices (I.Splice m)
+defaultInterpretedSplices = do
+    applyTag ?! applyImpl
+    bindTag ?! bindImpl
+    ignoreTag ?! ignoreImpl
+    markdownTag ?! markdownSplice
+
 
 
 allErrors :: [Either String (TPath, v)]

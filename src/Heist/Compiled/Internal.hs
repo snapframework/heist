@@ -529,18 +529,18 @@ bindSplice n v ts =
 
 ------------------------------------------------------------------------------
 -- | Binds a list of compiled splices.  This function should not be exported.
-bindSplices :: [(Text, Splice n)]  -- ^ splices to bind
+bindSplices :: Splices (Splice n)  -- ^ splices to bind
             -> HeistState n        -- ^ source state
             -> HeistState n
-bindSplices ss ts = foldr (uncurry bindSplice) ts ss
+bindSplices ss ts = foldr (uncurry bindSplice) ts $ splicesToList ss
 
 
 ------------------------------------------------------------------------------
 -- | Adds a list of compiled splices to the splice map.  This function is
 -- useful because it allows compiled splices to bind other compiled splices
 -- during load-time splice processing.
-withLocalSplices :: [(Text, Splice n)]
-                 -> [(Text, AttrSplice n)]
+withLocalSplices :: Splices (Splice n)
+                 -> Splices (AttrSplice n)
                  -> HeistT n IO a
                  -> HeistT n IO a
 withLocalSplices ss as = localHS (bindSplices ss . bindAttributeSplices as)
@@ -657,7 +657,7 @@ withSplices :: Monad n
             -> RuntimeSplice n a
             -> Splice n
 withSplices splice splices runtimeAction =
-    withLocalSplices (splicesToList splices') [] splice
+    withLocalSplices splices' noSplices splice
   where
     splices' = mapS ($runtimeAction) splices
 
@@ -670,7 +670,7 @@ manyWithSplices :: Monad n
 manyWithSplices splice splices runtimeAction = do
     p <- newEmptyPromise
     let splices' = mapS ($ getPromise p) splices
-    chunks <- withLocalSplices (splicesToList splices') [] splice
+    chunks <- withLocalSplices splices' noSplices splice
     return $ yieldRuntime $ do
         items <- runtimeAction
         res <- forM items $ \item -> putPromise p item >> codeGen chunks

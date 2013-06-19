@@ -11,7 +11,6 @@ module Heist.Splices
 
 import           Data.Monoid
 import qualified Heist.Compiled as C
-import           Heist.Compiled.LowLevel
 import qualified Heist.Interpreted as I
 import           Heist.Splices.Apply
 import           Heist.Splices.Bind
@@ -19,6 +18,7 @@ import           Heist.Splices.Cache
 import           Heist.Splices.Html
 import           Heist.Splices.Ignore
 import           Heist.Splices.Markdown
+import           Heist.Types
 
 ------------------------------------------------------------------------------
 -- | Run the splice contents if given condition is True, make splice disappear
@@ -35,12 +35,12 @@ ifISplice cond =
 -- function to determine whether the node's children should be rendered.
 ifCSplice :: Monad m
           => (t -> Bool)
-          -> Promise t
+          -> RuntimeSplice m t
           -> C.Splice m
-ifCSplice predicate prom = do
+ifCSplice predicate runtime = do
     chunks <- C.runChildren
     return $ C.yieldRuntime $ do
-        a <- getPromise prom
+        a <- runtime
         if predicate a
           then
             C.codeGen chunks

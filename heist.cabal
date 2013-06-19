@@ -116,6 +116,7 @@ Library
   exposed-modules:
     Heist,
     Heist.Compiled,
+    Heist.Compiled.LowLevel,
     Heist.Interpreted,
     Heist.SpliceAPI,
     Heist.Splices,
