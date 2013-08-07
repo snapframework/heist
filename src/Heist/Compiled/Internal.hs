@@ -402,7 +402,9 @@ parseAtt2 (k,v) = do
 -- | Performs splice processing on a list of attributes.  This is useful in
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
-runAttributes :: Monad n => [(Text, Text)] -> HeistT n IO [DList (Chunk n)]
+runAttributes :: Monad n
+              => [(Text, Text)] -- ^ List of attributes
+              -> HeistT n IO [DList (Chunk n)]
 runAttributes = mapM parseAtt
 
 
@@ -411,7 +413,8 @@ runAttributes = mapM parseAtt
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
 runAttributesRaw :: Monad n
-                 => [(Text, Text)]
+                 -- Note that this parameter should not be changed to Splices
+                 => [(Text, Text)] -- ^ List of attributes
                  -> HeistT n IO (RuntimeSplice n [(Text, Text)])
 runAttributesRaw attrs = do
     arrs <- mapM parseAtt2 attrs
@@ -600,6 +603,41 @@ pureSplice f n = return $ yieldRuntime (return . f =<< n)
 
 
 ------------------------------------------------------------------------------
+-- | Runs a splice, but first binds splices given by splice functions that
+-- need some runtime data.
+withSplices :: Monad n
+            => Splice n
+            -- ^ Splice to be run
+            -> Splices (RuntimeSplice n a -> Splice n)
+            -- ^ Splices to be bound first
+            -> RuntimeSplice n a
+            -- ^ Runtime data needed by the above splices
+            -> Splice n
+withSplices splice splices runtimeAction =
+    withLocalSplices splices' noSplices splice
+  where
+    splices' = mapS ($runtimeAction) splices
+
+
+------------------------------------------------------------------------------
+-- | Like withSplices, but evaluates the splice repeatedly for each element in
+-- a list generated at runtime.
+manyWithSplices :: Monad n
+                => Splice n
+                -> Splices (RuntimeSplice n a -> Splice n)
+                -> RuntimeSplice n [a]
+                -> Splice n
+manyWithSplices splice splices runtimeAction = do
+    p <- newEmptyPromise
+    let splices' = mapS ($ getPromise p) splices
+    chunks <- withLocalSplices splices' noSplices splice
+    return $ yieldRuntime $ do
+        items <- runtimeAction
+        res <- forM items $ \item -> putPromise p item >> codeGen chunks
+        return $ mconcat res
+
+
+------------------------------------------------------------------------------
 -- | Similar to 'mapSplices' in interpreted mode.  Gets a runtime list of
 -- items and applies a compiled runtime splice function to each element of the
 -- list.
@@ -618,22 +656,36 @@ deferMany f getItems = do
         return $ mconcat res
 
 
-contramapM :: Monad n
-           => (a -> RuntimeSplice n b)
-           -> (RuntimeSplice n b -> Splice n)
-           -> RuntimeSplice n a -> Splice n
-contramapM f pf n = do
+------------------------------------------------------------------------------
+-- | Saves the results of a runtme computation in a 'Promise' so they don't
+-- get recalculated if used more than once.
+deferMap :: Monad n
+         => (a -> RuntimeSplice n b)
+         -> (RuntimeSplice n b -> Splice n)
+         -> RuntimeSplice n a -> Splice n
+deferMap f pf n = do
     p2 <- newEmptyPromise
     let action = yieldRuntimeEffect $ putPromise p2 =<< f =<< n
     res <- pf $ getPromise p2
     return $ action `mappend` res
 
 
-mayContramapM :: Monad n
-              => (a -> RuntimeSplice n (Maybe b))
-              -> (RuntimeSplice n b -> Splice n)
-              -> RuntimeSplice n a -> Splice n
-mayContramapM f pf n = do
+------------------------------------------------------------------------------
+-- | Like deferMap, but only runs the result if a Maybe function of the
+-- runtime value returns Just.  If it returns Nothing, then no output is
+-- generated.
+-- 
+-- This is a good example of how to do more complex flow control with
+-- promises.  The generalization of this abstraction is too complex to be
+-- distilled to elegant high-level combinators.  If you need to implement your
+-- own special flow control, then you should use functions from the
+-- `Heist.Compiled.LowLevel` module similarly to how it is done in the
+-- implementation of this function.
+mayDeferMap :: Monad n
+            => (a -> RuntimeSplice n (Maybe b))
+            -> (RuntimeSplice n b -> Splice n)
+            -> RuntimeSplice n a -> Splice n
+mayDeferMap f pf n = do
     p2 <- newEmptyPromise
     action <- pf $ getPromise p2
     return $ yieldRuntime $ do
@@ -645,34 +697,13 @@ mayContramapM f pf n = do
             codeGen action
 
 
+------------------------------------------------------------------------------
+-- | Converts an RuntimeSplice into a Splice, given a helper function that
+-- generates a Builder.
 bindLater :: (Monad n)
           => (a -> RuntimeSplice n Builder)
-          -> RuntimeSplice n a -> Splice n
+          -> RuntimeSplice n a
+          -> Splice n
 bindLater f p = return $ yieldRuntime $ f =<< p
 
-
-withSplices :: Monad n
-            => Splice n
-            -> Splices (RuntimeSplice n a -> Splice n)
-            -> RuntimeSplice n a
-            -> Splice n
-withSplices splice splices runtimeAction =
-    withLocalSplices splices' noSplices splice
-  where
-    splices' = mapS ($runtimeAction) splices
-
-
-manyWithSplices :: Monad n
-                => Splice n
-                -> Splices (RuntimeSplice n a -> Splice n)
-                -> RuntimeSplice n [a]
-                -> Splice n
-manyWithSplices splice splices runtimeAction = do
-    p <- newEmptyPromise
-    let splices' = mapS ($ getPromise p) splices
-    chunks <- withLocalSplices splices' noSplices splice
-    return $ yieldRuntime $ do
-        items <- runtimeAction
-        res <- forM items $ \item -> putPromise p item >> codeGen chunks
-        return $ mconcat res
 
