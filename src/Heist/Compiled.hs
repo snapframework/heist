@@ -28,8 +28,8 @@ module Heist.Compiled
   , pureSplice
 
   , deferMany
-  , contramapM
-  , mayContramapM
+  , deferMap
+  , mayDeferMap
   , bindLater
   , withSplices
   , manyWithSplices
