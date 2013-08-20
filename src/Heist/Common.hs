@@ -7,12 +7,11 @@ module Heist.Common where
 import           Control.Applicative
 import           Control.Exception (SomeException)
 import           Control.Monad
-import           Control.Monad.CatchIO
+import           Control.Monad.CatchIO (catch)
 import qualified Data.Attoparsec.Text            as AP
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import           Data.Either
 import           Data.Hashable
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
@@ -20,7 +19,6 @@ import           Data.List
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text                       as T
-import           Prelude hiding (catch)
 import           System.FilePath
 import           Heist.SpliceAPI
 import           Heist.Types

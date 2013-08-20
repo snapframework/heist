@@ -19,7 +19,6 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Text (Text)
-import           Prelude hiding (catch)
 import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------

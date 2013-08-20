@@ -28,7 +28,6 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Vector                     as V
-import           Prelude                         hiding (catch)
 import qualified Text.XmlHtml                    as X
 import qualified Text.XmlHtml.HTML.Meta          as X
 ------------------------------------------------------------------------------

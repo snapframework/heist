@@ -26,7 +26,6 @@ import           Control.Monad
 import           Control.Monad.CatchIO
 import           Control.Monad.Trans
 import           Data.Typeable
-import           Prelude hiding (catch)
 import           System.Directory
 import           System.Exit
 import           System.FilePath.Posix

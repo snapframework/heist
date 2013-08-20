@@ -21,7 +21,8 @@ module Heist.Types where
 import           Blaze.ByteString.Builder
 import           Control.Applicative
 import           Control.Arrow
-import           Control.Monad.CatchIO
+import           Control.Monad.CatchIO (MonadCatchIO)
+import qualified Control.Monad.CatchIO as C
 import           Control.Monad.Cont
 import           Control.Monad.Error
 import           Control.Monad.Reader
@@ -37,7 +38,6 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding
 import           Data.Typeable
-import           Prelude hiding (catch)
 import qualified Text.XmlHtml as X
 
 import Debug.Trace
@@ -295,9 +295,9 @@ instance MonadTrans (HeistT n) where
 instance MonadCatchIO m => MonadCatchIO (HeistT n m) where
     catch (HeistT a) h = HeistT $ \r s -> do
        let handler e = runHeistT (h e) r s
-       catch (a r s) handler
-    block (HeistT m) = HeistT $ \r s -> block (m r s)
-    unblock (HeistT m) = HeistT $ \r s -> unblock (m r s)
+       C.catch (a r s) handler
+    block (HeistT m) = HeistT $ \r s -> C.block (m r s)
+    unblock (HeistT m) = HeistT $ \r s -> C.unblock (m r s)
 
 
 ------------------------------------------------------------------------------

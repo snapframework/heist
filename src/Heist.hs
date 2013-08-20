@@ -244,7 +244,7 @@ initHeist' :: Monad n
            -> HeistConfig n
            -> TemplateRepo
            -> EitherT [String] IO (HeistState n)
-initHeist' keyGen (HeistConfig i lt c a locations) repo = do
+initHeist' keyGen (HeistConfig i lt c a _) repo = do
     let empty = emptyHS keyGen
     tmap <- preproc keyGen lt repo
     let hs1 = empty { _spliceMap = Map.fromList $ splicesToList i
