@@ -7,7 +7,7 @@ module Heist.Common where
 import           Control.Applicative
 import           Control.Exception (SomeException)
 import           Control.Monad
-import           Control.Monad.CatchIO (catch)
+import qualified Control.Monad.CatchIO as C
 import qualified Data.Attoparsec.Text            as AP
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -238,7 +238,7 @@ type ParserFun = String -> ByteString -> Either String X.Document
 -- | Reads an HTML or XML template from disk.
 getDocWith :: ParserFun -> String -> IO (Either String DocumentFile)
 getDocWith parser f = do
-    bs <- catch (liftM Right $ B.readFile f)
+    bs <- C.catch (liftM Right $ B.readFile f)
                 (\(e::SomeException) -> return $ Left $ show e)
 
     let eitherDoc = either Left (parser f) bs
