@@ -61,9 +61,9 @@ infixr 0 $$
 
 ------------------------------------------------------------------------------
 -- | Inserts into the map only if the key does not exist.
-(??) :: Text -> s -> Splices s
-(??) tag splice = modify $ M.insertWith (const id) tag splice
-infixr 0 ??
+(?) :: Text -> s -> Splices s
+(?) tag splice = modify $ M.insertWith (const id) tag splice
+infixr 0 ?
 
 
 ------------------------------------------------------------------------------
