@@ -25,6 +25,7 @@ module Heist.SpliceAPI where
 import           Control.Monad.State
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 
@@ -33,6 +34,14 @@ import qualified Data.Text as T
 -- | A monad providing convenient syntax for defining splices.
 newtype SplicesM s a = SplicesM { unSplices :: State (Map Text s) a }
   deriving (Monad, MonadState (Map Text s))
+
+
+------------------------------------------------------------------------------
+-- | Monoid instance does a union of the two maps with the second map
+-- overwriting any duplicates.
+instance Monoid (Splices s) where
+  mempty = noSplices
+  mappend = unionWithS (\_ b -> b)
 
 
 ------------------------------------------------------------------------------
