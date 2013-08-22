@@ -7,10 +7,12 @@
 {-|
 
 An API implementing a convenient syntax for defining and manipulating splices.
-This module was born from the observation that a list of tuples syntax is
-inherently rather cumbersome and difficult to work with.  This API takes
-advantage of do notation to provide a very light syntax for defining splices
-while at the same time eliminating the semantic ambiguity of alists.
+This module was born from the observation that a list of tuples is
+semantically ambiguous about how duplicate keys should be handled.
+Additionally, the syntax is inherently rather cumbersome and difficult to work
+with.  This API takes advantage of do notation to provide a very light syntax
+for defining splices while at the same time eliminating the semantic ambiguity
+of alists.
 
 Here's how you can define splices:
 
