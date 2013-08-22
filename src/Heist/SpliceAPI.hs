@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoMonomorphismRestriction  #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 
 {-|
 
