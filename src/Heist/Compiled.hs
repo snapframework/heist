@@ -21,8 +21,6 @@ module Heist.Compiled
   , runChildren
 
   -- * Functions for manipulating lists of compiled splices
-  , mapS
-  , applyS
   , textSplice
   , nodeSplice
   , pureSplice
