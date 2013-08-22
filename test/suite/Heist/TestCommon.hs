@@ -8,7 +8,6 @@ import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import           Data.Maybe
 import           Data.Monoid
-import           Data.Text (Text)
 
 
 ------------------------------------------------------------------------------
@@ -29,27 +28,27 @@ doctype = B.concat
 
 loadT :: MonadIO m
       => FilePath
-      -> [(Text, I.Splice m)]
-      -> [(Text, I.Splice IO)]
-      -> [(Text, C.Splice m)]
-      -> [(Text, AttrSplice m)]
+      -> Splices (I.Splice m)
+      -> Splices (I.Splice IO)
+      -> Splices (C.Splice m)
+      -> Splices (AttrSplice m)
       -> IO (Either [String] (HeistState m))
 loadT baseDir a b c d = runEitherT $ do
-    let hc = HeistConfig (defaultInterpretedSplices ++ a)
-                         (defaultLoadTimeSplices ++ b) c d [loadTemplates baseDir]
+    let hc = HeistConfig (defaultInterpretedSplices `mappend` a)
+                         (defaultLoadTimeSplices `mappend` b) c d [loadTemplates baseDir]
     initHeist hc
 
 
 ------------------------------------------------------------------------------
 loadIO :: FilePath
-       -> [(Text, I.Splice IO)]
-       -> [(Text, I.Splice IO)]
-       -> [(Text, C.Splice IO)]
-       -> [(Text, AttrSplice IO)]
+       -> Splices (I.Splice IO)
+       -> Splices (I.Splice IO)
+       -> Splices (C.Splice IO)
+       -> Splices (AttrSplice IO)
        -> IO (Either [String] (HeistState IO))
 loadIO baseDir a b c d = runEitherT $ do
-    let hc = HeistConfig (defaultInterpretedSplices ++ a)
-                         (defaultLoadTimeSplices ++ b) c d [loadTemplates baseDir]
+    let hc = HeistConfig (defaultInterpretedSplices `mappend` a)
+                         (defaultLoadTimeSplices `mappend` b) c d [loadTemplates baseDir]
     initHeist hc
 
 
@@ -58,19 +57,19 @@ loadHS :: FilePath -> IO (HeistState IO)
 loadHS baseDir = do
     etm <- runEitherT $ do
         let hc = HeistConfig defaultInterpretedSplices
-                             defaultLoadTimeSplices [] [] [loadTemplates baseDir]
+                             defaultLoadTimeSplices mempty mempty [loadTemplates baseDir]
         initHeist hc
     either (error . concat) return etm
 
 
-loadEmpty :: [(Text, I.Splice IO)]
-          -> [(Text, I.Splice IO)]
-          -> [(Text, C.Splice IO)]
-          -> [(Text, AttrSplice IO)]
+loadEmpty :: Splices (I.Splice IO)
+          -> Splices (I.Splice IO)
+          -> Splices (C.Splice IO)
+          -> Splices (AttrSplice IO)
           -> IO (HeistState IO)
 loadEmpty a b c d = do
-    let hc = HeistConfig (defaultInterpretedSplices ++ a)
-                         (defaultLoadTimeSplices ++ b) c d mempty
+    let hc = HeistConfig (defaultInterpretedSplices `mappend` a)
+                         (defaultLoadTimeSplices `mappend` b) c d mempty
     res <- runEitherT $ initHeist hc
     either (error . concat) return res
 

@@ -14,6 +14,7 @@ import           Control.Exception (evaluate)
 import           Control.Monad
 import qualified Data.ByteString as B
 import qualified Data.DList as DL
+import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Text.Encoding
 import           Data.Time.Clock
@@ -31,7 +32,7 @@ import Heist.Types
 
 loadWithCache baseDir = do
     etm <- runEitherT $ do
-        let hc = HeistConfig [] defaultLoadTimeSplices [] [] [loadTemplates baseDir]
+        let hc = HeistConfig mempty defaultLoadTimeSplices mempty mempty [loadTemplates baseDir]
         initHeistWithCacheTag hc
     either (error . unlines) (return . fst) etm
 

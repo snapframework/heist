@@ -43,7 +43,7 @@ tests = [ testCase     "loadErrors"            loadErrorsTest
 -- | Tests that load fails correctly on errors.
 loadErrorsTest :: H.Assertion
 loadErrorsTest = do
-    ets <- loadIO "templates-bad" [] [] [] []
+    ets <- loadIO "templates-bad" mempty mempty mempty mempty
     either (H.assertEqual "load errors test" expected . sort)
            (const $ H.assertFailure "No failure when loading templates-bad")
            ets
@@ -58,7 +58,8 @@ loadErrorsTest = do
 
 attrSpliceTest :: IO ()
 attrSpliceTest = do
-    ehs <- loadT "templates" [] [] [] [("autocheck", lift . autocheckedSplice)]
+    ehs <- loadT "templates" mempty mempty mempty
+                 ("autocheck" ## lift . autocheckedSplice)
     let hs = either (error . show) id ehs
         runtime = fromJust $ C.renderTemplate hs "attr_splice"
 
@@ -89,9 +90,9 @@ fooSplice = do
 
 tdirCacheTest :: IO ()
 tdirCacheTest = do
-    let rSplices = [ ("foosplice", fooSplice) ]
-        dSplices = [ ("foosplice", stateSplice) ]
-        hc = HeistConfig rSplices [] dSplices [] mempty
+    let rSplices = ("foosplice" ## fooSplice)
+        dSplices = ("foosplice" ## stateSplice)
+        hc = HeistConfig rSplices mempty dSplices mempty mempty
     td <- newTemplateDirectory' "templates" hc
             
     [a,b,c,d] <- evalStateT (testInterpreted td) 5
@@ -140,7 +141,7 @@ tdirCacheTest = do
 
 headMergeTest :: IO ()
 headMergeTest = do
-    ehs <- loadT "templates" [] [(htmlTag, htmlImpl)] [] []
+    ehs <- loadT "templates" mempty (htmlTag ## htmlImpl) mempty mempty
     let hs = either (error . show) id ehs
         runtime = fromJust $ C.renderTemplate hs "head_merge/index"
     mres <- fst runtime

@@ -85,7 +85,7 @@ simpleBindTest = monadicIO $ forAllM arbitrary prop
         let result   = buildResult bind
 
         spliceResult <- run $ do
-            hs <- loadEmpty defaultLoadTimeSplices [] [] []
+            hs <- loadEmpty defaultLoadTimeSplices mempty mempty mempty
             evalHeistT (runNodeList template)
                        (X.TextNode "") hs
 
@@ -106,7 +106,7 @@ simpleApplyTest = monadicIO $ forAllM arbitrary prop
 ------------------------------------------------------------------------------
 addTest :: IO ()
 addTest = do
-    es <- loadEmpty [] [] [] []
+    es <- loadEmpty mempty mempty mempty mempty
     let hs = addTemplate "aoeu" [] Nothing es
     H.assertEqual "lookup test" (Just []) $
         fmap (X.docContent . dfDoc . fst) $
@@ -116,9 +116,9 @@ addTest = do
 ------------------------------------------------------------------------------
 hasTemplateTest :: H.Assertion
 hasTemplateTest = do
-    ets <- loadIO "templates" [] [] [] []
+    ets <- loadIO "templates" mempty mempty mempty mempty
     let tm = either (error "Error loading templates") _templateMap ets
-    hs <- loadEmpty [] [] [] []
+    hs <- loadEmpty mempty mempty mempty mempty
     let hs's = setTemplates tm hs
     H.assertBool "hasTemplate hs's" (hasTemplate "index" hs's)
 
@@ -135,7 +135,7 @@ getDocTest = do
 ------------------------------------------------------------------------------
 loadTest :: H.Assertion
 loadTest = do
-    ets <- loadIO "templates" [] [] [] []
+    ets <- loadIO "templates" mempty mempty mempty mempty
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
                       H.assertEqual "loadTest size" 37 $ Map.size tm
@@ -145,9 +145,9 @@ loadTest = do
 ------------------------------------------------------------------------------
 fsLoadTest :: H.Assertion
 fsLoadTest = do
-    ets <- loadIO "templates" [] [] [] []
+    ets <- loadIO "templates" mempty mempty mempty mempty
     let tm = either (error "Error loading templates") _templateMap ets
-    es <- loadEmpty [] [] [] []
+    es <- loadEmpty mempty mempty mempty mempty
     let hs = setTemplates tm es
     let f  = g hs
 
@@ -163,7 +163,7 @@ fsLoadTest = do
 ------------------------------------------------------------------------------
 renderNoNameTest :: H.Assertion
 renderNoNameTest = do
-    ets <- loadT "templates" [] [] [] []
+    ets <- loadT "templates" mempty mempty mempty mempty
     either (error "Error loading templates")
            (\ts -> do t <- renderTemplate ts ""
                       H.assertBool "renderNoName" $ isNothing t
@@ -173,7 +173,7 @@ renderNoNameTest = do
 ------------------------------------------------------------------------------
 doctypeTest :: H.Assertion
 doctypeTest = do
-    ets <- loadT "templates" [] [] [] []
+    ets <- loadT "templates" mempty mempty mempty mempty
     let ts = either (error "Error loading templates") id ets
     Just (indexDoc, _) <- renderTemplate ts "index"
     H.assertEqual "index doctype test" indexRes $ toByteString $ indexDoc
@@ -188,14 +188,14 @@ doctypeTest = do
 ------------------------------------------------------------------------------
 attrSubstTest :: H.Assertion
 attrSubstTest = do
-    ets <- loadT "templates" [] [] [] []
+    ets <- loadT "templates" mempty mempty mempty mempty
     let ts = either (error "Error loading templates") id ets
     check "attr subst 1" (bindSplices splices ts) out1
     check "attr subst 2" ts out2
 
   where
-    splices = defaultLoadTimeSplices ++
-        [("foo", return [X.TextNode "meaning_of_everything"])]
+    splices = defaultLoadTimeSplices `mappend`
+        ("foo" ## return [X.TextNode "meaning_of_everything"])
 
     check str ts expected = do
         Just (resDoc, _) <- renderTemplate ts "attrs"
@@ -216,7 +216,7 @@ attrSubstTest = do
 ------------------------------------------------------------------------------
 bindAttrTest :: H.Assertion
 bindAttrTest = do
-    ets <- loadT "templates" [] [] [] []
+    ets <- loadT "templates" mempty mempty mempty mempty
     let ts = either (error "Error loading templates") id ets
     check ts "<div id=\'zzzzz\'"
 
@@ -267,7 +267,7 @@ renderTest  :: ByteString   -- ^ template name
             -> ByteString   -- ^ expected result
             -> H.Assertion
 renderTest templateName expectedResult = do
-    ets <- loadT "templates" [] [] [] []
+    ets <- loadT "templates" mempty mempty mempty mempty
     let ts = either (error "Error loading templates") id ets
 
     check ts expectedResult
@@ -279,15 +279,15 @@ renderTest templateName expectedResult = do
         v = fromJust $ decode txt
 
     check ts0 str = do
-        let ts = bindSplices [
-                      ("json", bind "[\"<b>ok</b>\", 1, null, false, \"foo\"]")
-                    , ("jsonObject",
-                       bind $ mconcat [
+        let splices = do
+                "json" ## bind "[\"<b>ok</b>\", 1, null, false, \"foo\"]"
+                "jsonObject" ##
+                       (bind $ mconcat [
                                  "{\"foo\": 1, \"bar\": \"<b>ok</b>\", "
                                 , "\"baz\": { \"baz1\": 1, \"baz2\": 2 }, "
                                 , "\"quux\": \"quux\" }"
                                 ])
-                    ] ts0
+        let ts = bindSplices splices ts0
         Just (doc, _) <- renderTemplate ts templateName
         let result = B.filter (/= '\n') (toByteString doc)
         H.assertEqual ("Should match " ++ (show str)) str result
@@ -335,7 +335,7 @@ attrSpliceContext = renderTest "attrsubtest2"
 -- | Markdown test on supplied text
 markdownTextTest :: H.Assertion
 markdownTextTest = do
-    hs <- loadEmpty [] [] [] []
+    hs <- loadEmpty mempty mempty mempty mempty
     result <- evalHeistT markdownSplice
                          (X.TextNode "This *is* a test.")
                          hs
@@ -347,7 +347,7 @@ markdownTextTest = do
 ------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
-    es <- loadEmpty [] [] [] []
+    es <- loadEmpty mempty mempty mempty mempty
     res <- evalHeistT applyImpl
         (X.Element "apply" [("template", "nonexistant")] []) es
 
@@ -357,7 +357,7 @@ applyTest = do
 ------------------------------------------------------------------------------
 ignoreTest :: H.Assertion
 ignoreTest = do
-    es <- loadEmpty [] [] [] []
+    es <- loadEmpty mempty mempty mempty mempty
     res <- evalHeistT ignoreImpl
         (X.Element "ignore" [("tag", "ignorable")]
           [X.TextNode "This should be ignored"]) es
@@ -518,7 +518,7 @@ instance Show Bind where
     , L.unpack $ L.concat $ map formatNode $ buildResult b
     , "Splice result:"
     , L.unpack $ L.concat $ map formatNode $ unsafePerformIO $ do
-        hs <- loadEmpty [] [] [] []
+        hs <- loadEmpty mempty mempty mempty mempty
         evalHeistT (runNodeList $ buildBindTemplate b)
                           (X.TextNode "") hs
     , "Template:"
@@ -595,7 +595,7 @@ calcCorrect (Apply _ caller callee _ pos) = insertAt callee pos caller
 ------------------------------------------------------------------------------
 calcResult :: Apply -> IO [X.Node]
 calcResult apply@(Apply name _ callee _ _) = do
-    hs <- loadEmpty defaultLoadTimeSplices [] [] []
+    hs <- loadEmpty defaultLoadTimeSplices mempty mempty mempty
     let hs' = setTemplates (Map.singleton [T.encodeUtf8 $ unName name]
                            (DocumentFile (X.HtmlDocument X.UTF8 Nothing callee)
                                          Nothing)) hs

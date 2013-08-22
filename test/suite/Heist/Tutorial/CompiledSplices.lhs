@@ -27,6 +27,12 @@ buildbot.  So first we need to get some boilerplate and imports out of the way.
 > import qualified Heist.Compiled as C
 > import           Heist.Tutorial.Imports
 
+> import           Control.Applicative
+> import qualified Data.Text as T
+> import           Data.Text.Encoding
+> import qualified Heist.Compiled.LowLevel as C
+> import           Text.XmlHtml
+
 As a review, normal (interpreted) Heist splices are defined like this.
 
 < type Splice m = HeistT m m [Node]
@@ -103,11 +109,11 @@ directory with compiled splices.
 
 > load :: MonadIO n
 >      => FilePath
->      -> [(Text, C.Splice n)]
+>      -> Splices (C.Splice n)
 >      -> IO (HeistState n)
 > load baseDir splices = do
 >     tmap <- runEitherT $ do
->         let hc = HeistConfig [] defaultLoadTimeSplices splices []
+>         let hc = HeistConfig mempty defaultLoadTimeSplices splices mempty
 >                              [loadTemplates baseDir]
 >         initHeist hc
 >     either (error . concat) return tmap
@@ -117,7 +123,7 @@ Here's a function demonstrating all of this in action.
 > runWithStateSplice :: FilePath
 >                    -> IO ByteString
 > runWithStateSplice baseDir = do
->     hs <- load baseDir [ ("div", stateSplice) ]
+>     hs <- load baseDir ("div" ## stateSplice)
 >     let runtime = fromJust $ C.renderTemplate hs "index"
 >     builder <- evalStateT (fst runtime) 2
 >     return $ toByteString builder
@@ -139,19 +145,17 @@ structure with a compiled splice.
 >     , pAge       :: Int
 >     }
 > 
-> personSplice :: (Monad n)
->              => C.Promise Person
->              -> HeistT n IO (RuntimeSplice n Builder)
-> personSplice = C.promiseChildrenWithText
->     [ ("firstName", pFirstName)
->     , ("lastName", pLastName)
->     , ("age", pack . show . pAge)
->     ]
+> personSplices :: Monad n
+>              => Splices (RuntimeSplice n Person -> C.Splice n)
+> personSplices = mapS (C.pureSplice . C.textSplice) $ do
+>     "firstName" ## pFirstName
+>     "lastName" ## pLastName
+>     "age" ## pack . show . pAge
 > 
 > peopleSplice :: (Monad n)
 >              => RuntimeSplice n [Person]
 >              -> C.Splice n
-> peopleSplice getPeople = C.mapPromises personSplice getPeople
+> peopleSplice = C.manyWithSplices C.runChildren personSplices
 > 
 > allPeopleSplice :: C.Splice (StateT [Person] IO)
 > allPeopleSplice = peopleSplice (lift get)
@@ -159,7 +163,7 @@ structure with a compiled splice.
 > personListTest :: FilePath
 >                -> IO ByteString
 > personListTest baseDir = do
->     hs <- load baseDir [ ("people", allPeopleSplice) ]
+>     hs <- load baseDir ("people" ## allPeopleSplice)
 >     let runtime = fromJust $ C.renderTemplate hs "people"
 >     builder <- evalStateT (fst runtime)
 >                  [ Person "John" "Doe" 42
@@ -246,24 +250,25 @@ differently in the case of failure.
 < failingSplice = do
 <     children <- childNodes <$> getParamNode
 <     promise <- C.newEmptyPromise
-<     outputChildren <- C.promiseChildrenWithNodes splices promise
+<     outputChildren <- C.withSplices C.runChildren splices (C.getPromise promise)
 <     return $ C.yieldRuntime $ do         
 <         -- :: RuntimeSplice m Builder
 <         mname <- lift $ getParam "username"
 <         let err = return $ fromByteString "Must supply a username"
 <             single name = do          
-<                 euser <- liftIO $ lookupUser $ decodeUtf8 name
+<                 euser <- lift $ lookupUser name
 <                 either (return . fromByteString . encodeUtf8 . T.pack)
 <                        doUser euser
 <               where
 <                 doUser value = do
 <                   C.putPromise promise (name, value)
-<                   outputChildren
+<                   C.codeGen outputChildren
 <         maybe err single mname
 <   
 <   
-< splices :: [(Text, (Text, Text) -> [Node])]
-< splices = [ ("user", (:[]) . TextNode . T.pack . fst)
-<           , ("value", (:[]) . TextNode . T.pack . snd)
-<           ]                                                                                                                                             
+< splices :: Monad n
+<         => Splices (RuntimeSplice n (Text, Text) -> C.Splice n)
+< splices = mapS (C.pureSplice . C.nodeSplice) $ do
+<   "user"  ## (:[]) . TextNode . fst
+<   "value" ## (:[]) . TextNode . snd
 
