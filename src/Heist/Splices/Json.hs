@@ -163,8 +163,8 @@ explodeTag = ask >>= go
 
     --------------------------------------------------------------------------
     goText t = lift $ runChildrenWith $ do
-        "value"   ?! return [TextNode t]
-        "snippet" ?! asHtml t
+        "value"   ## return [TextNode t]
+        "snippet" ## asHtml t
 
     --------------------------------------------------------------------------
     goArray :: (Monad n) => V.Vector Value -> JsonMonad n n [Node]
@@ -206,9 +206,9 @@ explodeTag = ask >>= go
     --------------------------------------------------------------------------
     genericBindings :: Monad n => JsonMonad n n (Splices (Splice n))
     genericBindings = ask >>= \v -> return $ do
-        "with"     ?! varAttrTag v explodeTag
-        "snippet"  ?! varAttrTag v snippetTag
-        "value"    ?! varAttrTag v valueTag
+        "with"     ## varAttrTag v explodeTag
+        "snippet"  ## varAttrTag v snippetTag
+        "value"    ## varAttrTag v valueTag
         
 
     --------------------------------------------------------------------------
@@ -220,7 +220,7 @@ explodeTag = ask >>= go
     --------------------------------------------------------------------------
     bindKvp bindings k v =
         let newBindings = do
-                T.append "with:" k    ?! withValue v explodeTag
-                T.append "snippet:" k ?! withValue v snippetTag
-                T.append "value:" k   ?! withValue v valueTag
-        in  unionWith (\a _ -> a) newBindings bindings
+                T.append "with:" k    ## withValue v explodeTag
+                T.append "snippet:" k ## withValue v snippetTag
+                T.append "value:" k   ## withValue v valueTag
+        in  unionWithS (\a _ -> a) newBindings bindings

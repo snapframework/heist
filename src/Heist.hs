@@ -119,10 +119,10 @@ data HeistConfig m = HeistConfig
 instance Monoid (HeistConfig m) where
     mempty = HeistConfig (put mempty) (put mempty) (put mempty) (put mempty) mempty
     mappend (HeistConfig a b c d e) (HeistConfig a' b' c' d' e') =
-        HeistConfig (unionWith const a a')
-                    (unionWith const b b')
-                    (unionWith const c c')
-                    (unionWith const d d')
+        HeistConfig (unionWithS const a a')
+                    (unionWithS const b b')
+                    (unionWithS const c c')
+                    (unionWithS const d d')
                     (e `mappend` e')
 
 
@@ -135,7 +135,7 @@ instance Monoid (HeistConfig m) where
 defaultLoadTimeSplices :: MonadIO m => Splices (I.Splice m)
 defaultLoadTimeSplices =
     -- To be removed in later versions
-    insert "content" deprecatedContentCheck defaultInterpretedSplices
+    insertS "content" deprecatedContentCheck defaultInterpretedSplices
     
 
 
@@ -147,10 +147,10 @@ defaultLoadTimeSplices =
 -- 'deprecatedContentCheck' splice to the content tag as a load time splice.
 defaultInterpretedSplices :: MonadIO m => Splices (I.Splice m)
 defaultInterpretedSplices = do
-    applyTag ?! applyImpl
-    bindTag ?! bindImpl
-    ignoreTag ?! ignoreImpl
-    markdownTag ?! markdownSplice
+    applyTag ## applyImpl
+    bindTag ## bindImpl
+    ignoreTag ## ignoreImpl
+    markdownTag ## markdownSplice
 
 
 
@@ -306,10 +306,10 @@ initHeistWithCacheTag (HeistConfig i lt c a locations) = do
     -- has to happen for both interpreted and compiled templates, so we do it
     -- here by itself because interpreted templates don't get the same load
     -- time splices as compiled templates.
-    rawWithCache <- preproc keyGen (tag ?! ss) $ Map.unions repos
+    rawWithCache <- preproc keyGen (tag ## ss) $ Map.unions repos
 
-    let hc' = HeistConfig (insert tag (cacheImpl cts) i) lt
-                          (insert tag (cacheImplCompiled cts) c)
+    let hc' = HeistConfig (insertS tag (cacheImpl cts) i) lt
+                          (insertS tag (cacheImplCompiled cts) c)
                           a locations
     hs <- initHeist' keyGen hc' rawWithCache
     return (hs, cts)
