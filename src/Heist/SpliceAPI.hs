@@ -16,8 +16,8 @@ Here's how you can define splices:
 
 > mySplices :: Splices Text
 > mySplices = do
->   "firstName" \/ "John"
->   "lastName"  ? "Smith"
+>   "firstName" ## "John"
+>   "lastName"  ## "Smith"
 
 -}
 
