@@ -298,3 +298,10 @@ bindAttributeSplices ss hs =
                                     (_attrSpliceMap hs) }
 
 
+------------------------------------------------------------------------------
+-- | Mappends a doctype to the state.
+addDoctype :: Monad m => [X.DocType] -> HeistT n m ()
+addDoctype dt = do
+    modifyHS (\s -> s { _doctypes = _doctypes s `mappend` dt })
+
+

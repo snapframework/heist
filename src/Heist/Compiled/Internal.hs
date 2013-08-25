@@ -129,7 +129,7 @@ runSplice :: (Monad n)
           -> Splice n
           -> IO [Chunk n]
 runSplice node hs splice = do
-    (!a,_) <- runHeistT splice node hs
+    !a <- evalHeistT splice node hs
     return $! consolidate a
 
 
@@ -140,8 +140,12 @@ runDocumentFile :: Monad n
                 -> DocumentFile
                 -> Splice n
 runDocumentFile tpath df = do
+    addDoctype $ maybeToList $ X.docType $ dfDoc df
     modifyHS (setCurTemplateFile curPath .  setCurContext tpath)
-    runNodeList nodes
+    res <- runNodeList nodes
+    dt <- getsHS (listToMaybe . _doctypes)
+    let enc = X.docEncoding $ dfDoc df
+    return $! (yieldPure (X.renderDocType enc dt) `mappend` res)
   where
     curPath     = dfFile df
     nodes       = X.docContent $! dfDoc df

@@ -31,13 +31,6 @@ type Splice n = HeistT n n Template
 
 
 ------------------------------------------------------------------------------
--- | Mappends a doctype to the state.
-addDoctype :: Monad m => [X.DocType] -> HeistT n m ()
-addDoctype dt = do
-    modifyHS (\s -> s { _doctypes = _doctypes s `mappend` dt })
-
-
-------------------------------------------------------------------------------
 -- HeistState functions
 ------------------------------------------------------------------------------
 
@@ -390,9 +383,6 @@ callTemplateWithText :: Monad n
                      -> Splices Text -- ^ Splices to call the template with
                      -> HeistT n n Template
 callTemplateWithText name splices = callTemplate name $ mapS textSplice splices
--- FIXME
---    modifyHS $ bindStrings splices
---    liftM (maybe [] id) $ evalTemplate name
 
 
 ------------------------------------------------------------------------------

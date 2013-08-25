@@ -9,6 +9,7 @@ import qualified Test.HUnit as H
 
 ------------------------------------------------------------------------------
 import           Heist.Tutorial.CompiledSplices
+import           Heist.TestCommon
 
 -- NOTE: We can't test compiled templates on the templates directory as it
 -- stands today because that directory contains some error conditions such as
@@ -26,7 +27,7 @@ simpleCompiledTest = do
     H.assertEqual "compiled state splice" expected res
   where
     expected =
-      "&#10;<html>&#10;3&#10;</html>&#10;"
+      "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n&#10;<html>&#10;3&#10;</html>&#10;"
 
 peopleTest :: IO ()
 peopleTest = do
