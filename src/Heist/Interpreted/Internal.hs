@@ -16,7 +16,6 @@ import           Data.List
 import qualified Data.HashMap.Strict as Map
 import qualified Data.HeterogeneousEnvironment   as HE
 import           Data.Maybe
-import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Text (Text)
 import qualified Text.XmlHtml as X

@@ -51,7 +51,6 @@ module Heist.Compiled
   ) where
 
 import Heist.Compiled.Internal
-import Heist.SpliceAPI
 
 -- $yieldOverview
 -- The internals of the Chunk data type are deliberately not exported because
