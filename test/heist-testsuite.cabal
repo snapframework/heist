@@ -35,7 +35,7 @@ Executable testsuite
     transformers               >= 0.2     && < 0.4,
     unordered-containers       >= 0.1.4   && < 0.3,
     vector                     >= 0.9     && < 0.11,
-    xmlhtml                    >= 0.2.1   && < 0.3
+    xmlhtml                    >= 0.2.2   && < 0.3
 
 
   ghc-options: -O2 -Wall -fhpc -fwarn-tabs -funbox-strict-fields -threaded
@@ -76,7 +76,7 @@ Executable benchmark
     transformers               >= 0.2     && < 0.4,
     unordered-containers       >= 0.1.4   && < 0.3,
     vector                     >= 0.9     && < 0.11,
-    xmlhtml                    >= 0.2.1   && < 0.3
+    xmlhtml                    >= 0.2.2   && < 0.3
 
   ghc-options: -O2 -Wall -fwarn-tabs -funbox-strict-fields -threaded
                -fno-warn-unused-do-bind -rtsopts
