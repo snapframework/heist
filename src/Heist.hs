@@ -63,8 +63,7 @@ module Heist
   ) where
 
 import           Control.Error
-import           Control.Exception (SomeException)
-import           Control.Monad.CatchIO
+import           Control.Exception.Lifted
 import           Control.Monad.State
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B

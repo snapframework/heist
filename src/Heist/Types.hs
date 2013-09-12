@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-|
@@ -21,12 +22,13 @@ module Heist.Types where
 import           Blaze.ByteString.Builder
 import           Control.Applicative
 import           Control.Arrow
-import           Control.Monad.CatchIO (MonadCatchIO)
-import qualified Control.Monad.CatchIO as C
+--import qualified Control.Monad.Trans.Control as C
+import           Control.Monad.Base
 import           Control.Monad.Cont
 import           Control.Monad.Error
 import           Control.Monad.Reader
 import           Control.Monad.State.Strict
+import           Control.Monad.Trans.Control
 import           Data.ByteString.Char8 (ByteString)
 import           Data.DList                      (DList)
 import qualified Data.HashMap.Strict as H
@@ -290,14 +292,26 @@ instance MonadTrans (HeistT n) where
         return (a, s)
 
 
-------------------------------------------------------------------------------
--- | MonadCatchIO instance
-instance MonadCatchIO m => MonadCatchIO (HeistT n m) where
-    catch (HeistT a) h = HeistT $ \r s -> do
-       let handler e = runHeistT (h e) r s
-       C.catch (a r s) handler
-    block (HeistT m) = HeistT $ \r s -> C.block (m r s)
-    unblock (HeistT m) = HeistT $ \r s -> C.unblock (m r s)
+instance MonadBase b m => MonadBase b (HeistT n m) where
+    liftBase = lift . liftBase
+
+
+instance MonadTransControl (HeistT n) where
+    newtype StT (HeistT n) a = StHeistT {unStHeistT :: (a, HeistState n)}
+    liftWith f = HeistT $ \n s -> do
+        res <- f $ \(HeistT g) -> liftM StHeistT $ g n s
+        return (res, s)
+    restoreT k = HeistT $ \_ _ -> liftM unStHeistT k
+    {-# INLINE liftWith #-}
+    {-# INLINE restoreT #-}
+
+
+instance MonadBaseControl b m => MonadBaseControl b (HeistT n m) where
+     newtype StM (HeistT n m) a = StMHeist {unStMHeist :: ComposeSt (HeistT n) m a}
+     liftBaseWith = defaultLiftBaseWith StMHeist
+     restoreM = defaultRestoreM unStMHeist
+     {-# INLINE liftBaseWith #-}
+     {-# INLINE restoreM #-}
 
 
 ------------------------------------------------------------------------------

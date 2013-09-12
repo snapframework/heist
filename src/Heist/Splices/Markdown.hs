@@ -21,9 +21,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Maybe
 import           Control.Concurrent
-import           Control.Exception (throwIO)
+import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.CatchIO
 import           Control.Monad.Trans
 import           Data.Typeable
 import           System.Directory

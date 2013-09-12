@@ -6,8 +6,8 @@ module Heist.Common where
 
 import           Control.Applicative
 import           Control.Exception (SomeException)
+import qualified Control.Exception.Lifted as C
 import           Control.Monad
-import qualified Control.Monad.CatchIO as C
 import qualified Data.Attoparsec.Text            as AP
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
