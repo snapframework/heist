@@ -25,7 +25,7 @@ Here's how you can define splices:
 
 module Heist.SpliceAPI where
 
-import           Control.Monad.State
+import           Control.Monad.State (State, MonadState, execState, modify)
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Monoid
@@ -81,7 +81,7 @@ infixr 0 #?
 ------------------------------------------------------------------------------
 -- | A `Splices` with nothing in it.
 noSplices :: Splices s
-noSplices = put M.empty
+noSplices = return ()
 
 
 ------------------------------------------------------------------------------
@@ -97,9 +97,15 @@ splicesToList = M.toList . runSplices
 
 
 ------------------------------------------------------------------------------
+-- | Internal helper function for adding a map.
+add :: Map Text s -> Splices s
+add m = modify (\s -> M.unionWith (\_ b -> b) s m)
+
+
+------------------------------------------------------------------------------
 -- | Maps a function over all the splices.
 mapS :: (a -> b) -> Splices a -> Splices b
-mapS f ss = put $ M.map f $ runSplices ss 
+mapS f ss = add $ M.map f $ runSplices ss 
 
 
 ------------------------------------------------------------------------------
@@ -117,13 +123,13 @@ insertS = insertWithS const
 ------------------------------------------------------------------------------
 -- | Inserts a splice with a function combining new value and old value.
 insertWithS :: (s -> s -> s) -> Text -> s -> SplicesM s a2 -> SplicesM s ()
-insertWithS f k v b = put $ M.insertWith f k v (runSplices b)
+insertWithS f k v b = add $ M.insertWith f k v (runSplices b)
 
 
 ------------------------------------------------------------------------------
 -- | Union of `Splices` with a combining function.
 unionWithS :: (s -> s -> s) -> SplicesM s a1 -> SplicesM s a2 -> SplicesM s ()
-unionWithS f a b = put $ M.unionWith f (runSplices a) (runSplices b)
+unionWithS f a b = add $ M.unionWith f (runSplices a) (runSplices b)
 
 
 ------------------------------------------------------------------------------
@@ -136,7 +142,7 @@ infixr 0 $$
 ------------------------------------------------------------------------------
 -- | Maps a function over all the splice names.
 mapNames :: (Text -> Text) -> Splices a -> Splices a
-mapNames f = put . M.mapKeys f . runSplices
+mapNames f = add . M.mapKeys f . runSplices
 
 
 -- The following two functions are formulated as functions of Splices instead
