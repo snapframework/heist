@@ -98,7 +98,10 @@ findExpr t = go (T.split (=='.') t)
     go (x:xs) !value = findIn value >>= go xs
       where
         findIn (Object obj) = Map.lookup x obj
+        findIn (Array arr)  = tryReadIndex >>= \i -> arr V.!? i
         findIn _            = Nothing
+
+        tryReadIndex = fmap fst . listToMaybe . reads . T.unpack $ x
 
 
 ------------------------------------------------------------------------------
