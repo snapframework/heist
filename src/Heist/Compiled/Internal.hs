@@ -11,7 +11,7 @@ module Heist.Compiled.Internal where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
-import           Blaze.ByteString.Builder.Char8
+import           Blaze.ByteString.Builder.Char.Utf8
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.RWS.Strict
