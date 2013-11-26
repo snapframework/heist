@@ -241,7 +241,11 @@ compiledSpliceNames ts = H.keys $ _compiledSpliceMap ts
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateStateTyCon :: TyCon
+#if MIN_VERSION_base(4,7,0)
 templateStateTyCon = mkTyCon3 "heist" "Heist" "HeistState"
+#else
+templateStateTyCon = mkTyCon "Heist.HeistState"
+#endif
 {-# NOINLINE templateStateTyCon #-}
 
 ------------------------------------------------------------------------------
@@ -389,7 +393,11 @@ instance (MonadCont m) => MonadCont (HeistT n m) where
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateMonadTyCon :: TyCon
+#if MIN_VERSION_base(4,7,0)
 templateMonadTyCon = mkTyCon3  "heist" "Heist" "HeistT"
+#else
+templateMonadTyCon = mkTyCon "Heist.HeistT"
+#endif
 {-# NOINLINE templateMonadTyCon #-}
 
 #if !MIN_VERSION_base(4,7,0)
