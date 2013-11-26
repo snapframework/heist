@@ -2,13 +2,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP #-}
 
 {-|
 
-This module contains the core Heist data types.  
+This module contains the core Heist data types.
 
 Edward Kmett wrote most of the HeistT monad code and associated instances,
 liberating us from the unused writer portion of RWST.
@@ -175,9 +175,13 @@ data HeistState m = HeistState {
     -- | This is needed because compiled templates are generated with a bunch
     -- of calls to renderFragment rather than a single call to render.
     , _curMarkup           :: Markup
+#if MIN_VERSION_base(4,7,0)
+} deriving (Typeable)
+#else
 }
+#endif
 
-
+#if !MIN_VERSION_base(4,7,0)
 -- NOTE: We got rid of the Monoid instance because it is absolutely not safe
 -- to combine two compiledTemplateMaps.  All compiled templates must be known
 -- at load time and processed in a single call to initHeist/loadTemplates or
@@ -186,6 +190,7 @@ data HeistState m = HeistState {
 instance (Typeable1 m) => Typeable (HeistState m) where
     typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
 
+#endif
 
 ------------------------------------------------------------------------------
 -- | HeistT is the monad transformer used for splice processing.  HeistT
@@ -236,7 +241,7 @@ compiledSpliceNames ts = H.keys $ _compiledSpliceMap ts
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateStateTyCon :: TyCon
-templateStateTyCon = mkTyCon "Heist.HeistState"
+templateStateTyCon = mkTyCon3 "heist" "Heist" "HeistState"
 {-# NOINLINE templateStateTyCon #-}
 
 ------------------------------------------------------------------------------
@@ -384,11 +389,13 @@ instance (MonadCont m) => MonadCont (HeistT n m) where
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateMonadTyCon :: TyCon
-templateMonadTyCon = mkTyCon "Heist.HeistT"
+templateMonadTyCon = mkTyCon3  "heist" "Heist" "HeistT"
 {-# NOINLINE templateMonadTyCon #-}
 
+#if !MIN_VERSION_base(4,7,0)
 instance (Typeable1 m) => Typeable1 (HeistT n m) where
     typeOf1 _ = mkTyConApp templateMonadTyCon [typeOf1 (undefined :: m ())]
+#endif
 
 
 ------------------------------------------------------------------------------
@@ -409,7 +416,7 @@ instance (Typeable1 m) => Typeable1 (HeistT n m) where
 -- Hamlet's speech.  @liftM (getAttribute \"author\") getParamNode@ would
 -- return @Just "Shakespeare"@.
 getParamNode :: Monad m => HeistT n m X.Node
-getParamNode = HeistT $ \r s -> return (r,s)
+getParamNode = HeistT $ curry return
 {-# INLINE getParamNode #-}
 
 
