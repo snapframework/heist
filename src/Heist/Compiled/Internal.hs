@@ -606,31 +606,56 @@ pureSplice f n = return $ yieldRuntime (return . f =<< n)
 
 
 ------------------------------------------------------------------------------
--- | Runs a splice, but first binds splices given by splice functions that
--- need some runtime data.
+-- | Higher level version of withSplices' that caches its runtime action to
+-- make sure it only runs once.
 withSplices :: Monad n
             => Splice n
             -- ^ Splice to be run
             -> Splices (RuntimeSplice n a -> Splice n)
             -- ^ Splices to be bound first
-            -> RuntimeSplice n a
+            -> n a
             -- ^ Runtime data needed by the above splices
             -> Splice n
-withSplices splice splices runtimeAction =
+withSplices splice splices = cache $ withSplices' splice splices
+
+
+------------------------------------------------------------------------------
+-- | Runs a splice, but first binds splices given by splice functions that
+-- need some runtime data.
+withSplices' :: Monad n
+             => Splice n
+             -- ^ Splice to be run
+             -> Splices (RuntimeSplice n a -> Splice n)
+             -- ^ Splices to be bound first
+             -> RuntimeSplice n a
+             -- ^ Runtime data needed by the above splices
+             -> Splice n
+withSplices' splice splices runtimeAction =
     withLocalSplices splices' noSplices splice
   where
     splices' = mapS ($runtimeAction) splices
 
 
 ------------------------------------------------------------------------------
--- | Like withSplices, but evaluates the splice repeatedly for each element in
--- a list generated at runtime.
+-- | Higher level version of manyWithSplices' that caches its runtime action
+-- to make sure it only runs once.
 manyWithSplices :: Monad n
                 => Splice n
                 -> Splices (RuntimeSplice n a -> Splice n)
-                -> RuntimeSplice n [a]
+                -> n [a]
                 -> Splice n
-manyWithSplices splice splices runtimeAction = do
+manyWithSplices splice splices = cache $ manyWithSplices' splice splices
+
+
+------------------------------------------------------------------------------
+-- | Like withSplices, but evaluates the splice repeatedly for each element in
+-- a list generated at runtime.
+manyWithSplices' :: Monad n
+                 => Splice n
+                 -> Splices (RuntimeSplice n a -> Splice n)
+                 -> RuntimeSplice n [a]
+                 -> Splice n
+manyWithSplices' splice splices runtimeAction = do
     p <- newEmptyPromise
     let splices' = mapS ($ getPromise p) splices
     chunks <- withLocalSplices splices' noSplices splice
@@ -638,6 +663,20 @@ manyWithSplices splice splices runtimeAction = do
         items <- runtimeAction
         res <- forM items $ \item -> putPromise p item >> codeGen chunks
         return $ mconcat res
+
+
+------------------------------------------------------------------------------
+-- | Promotes an uncached runtime action into a cached RuntimeSplice action.
+-- This saves the result of a runtme computation in a 'Promise' so it doesn't
+-- get recalculated if used more than once.
+cache :: Monad n
+      => (RuntimeSplice n a -> Splice n)
+      -> n a -> Splice n
+cache pf n = do
+    p2 <- newEmptyPromise
+    let action = yieldRuntimeEffect $ putPromise p2 =<< lift n
+    res <- pf $ getPromise p2
+    return $ action `mappend` res
 
 
 ------------------------------------------------------------------------------
@@ -698,15 +737,5 @@ mayDeferMap f pf n = do
           Just b -> do
             putPromise p2 b
             codeGen action
-
-
-------------------------------------------------------------------------------
--- | Converts an RuntimeSplice into a Splice, given a helper function that
--- generates a Builder.
-bindLater :: (Monad n)
-          => (a -> RuntimeSplice n Builder)
-          -> RuntimeSplice n a
-          -> Splice n
-bindLater f p = return $ yieldRuntime $ f =<< p
 
 
