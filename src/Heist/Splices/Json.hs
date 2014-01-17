@@ -8,7 +8,6 @@ module Heist.Splices.Json (
 ------------------------------------------------------------------------------
 import           Control.Monad.Reader
 import           Data.Aeson
-import           Data.Attoparsec.Number
 import qualified Data.ByteString.Char8       as S
 import qualified Data.ByteString.Lazy.Char8  as L
 import qualified Data.HashMap.Strict         as Map
@@ -86,7 +85,7 @@ boolToText b = if b then "true" else "false"
 
 
 ------------------------------------------------------------------------------
-numToText :: Number -> Text
+numToText :: ToJSON a => a -> Text
 numToText = T.decodeUtf8 . S.concat . L.toChunks . encode
 
 
