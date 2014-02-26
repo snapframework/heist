@@ -641,6 +641,26 @@ manyWithSplices splice splices runtimeAction = do
 
 
 ------------------------------------------------------------------------------
+-- | More powerful version of manyWithSplices that lets you also define
+-- attribute splices.
+manyWith :: (Monad n)
+         => Splice n
+         -> Splices (RuntimeSplice n a -> Splice n)
+         -> Splices (RuntimeSplice n a -> AttrSplice n)
+         -> RuntimeSplice n [a]
+         -> Splice n
+manyWith splice splices attrSplices runtimeAction = do
+    p <- newEmptyPromise
+    let splices' = mapS ($ getPromise p) splices
+    let attrSplices' = mapS ($ getPromise p) attrSplices
+    chunks <- withLocalSplices splices' attrSplices' splice
+    return $ yieldRuntime $ do
+        items <- runtimeAction
+        res <- forM items $ \item -> putPromise p item >> codeGen chunks
+        return $ mconcat res
+
+
+------------------------------------------------------------------------------
 -- | Similar to 'mapSplices' in interpreted mode.  Gets a runtime list of
 -- items and applies a compiled runtime splice function to each element of the
 -- list.
