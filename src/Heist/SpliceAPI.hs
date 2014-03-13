@@ -25,6 +25,7 @@ Here's how you can define splices:
 
 module Heist.SpliceAPI where
 
+import           Control.Applicative
 import           Control.Monad.State (State, MonadState, execState, modify)
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -36,7 +37,7 @@ import qualified Data.Text as T
 ------------------------------------------------------------------------------
 -- | A monad providing convenient syntax for defining splices.
 newtype SplicesM s a = SplicesM { unSplices :: State (Map Text s) a }
-  deriving (Monad, MonadState (Map Text s))
+  deriving (Functor, Applicative, Monad, MonadState (Map Text s))
 
 
 ------------------------------------------------------------------------------
