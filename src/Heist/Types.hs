@@ -68,7 +68,11 @@ type TPath = [ByteString]
 data DocumentFile = DocumentFile
     { dfDoc  :: X.Document
     , dfFile :: Maybe FilePath
-    } deriving (Eq)
+    } deriving ( Eq
+#if MIN_VERSION_base(4,7,0)
+               , Typeable
+#endif
+               )
 
 
 ------------------------------------------------------------------------------
@@ -85,7 +89,11 @@ newtype RuntimeSplice m a = RuntimeSplice {
                , Monad
                , MonadIO
                , MonadState HeterogeneousEnvironment
-               , MonadTrans )
+               , MonadTrans
+#if MIN_VERSION_base(4,7,0)
+               , Typeable
+#endif
+               )
 
 
 ------------------------------------------------------------------------------
@@ -106,7 +114,9 @@ data Chunk m = Pure !ByteString
                -- ^ output computed at run time
              | RuntimeAction !(RuntimeSplice m ())
                -- ^ runtime action used only for its side-effect
-
+#if MIN_VERSION_base(4,7,0)
+             deriving Typeable
+#endif
 
 instance Show (Chunk m) where
     show (Pure _) = "Pure"
@@ -210,7 +220,11 @@ newtype HeistT n m a = HeistT {
     runHeistT :: X.Node
               -> HeistState n
               -> m (a, HeistState n)
+#if MIN_VERSION_base(4,7,0)
+} deriving Typeable
+#else
 }
+#endif
 
 
 ------------------------------------------------------------------------------
@@ -237,16 +251,15 @@ compiledSpliceNames :: HeistState m -> [Text]
 compiledSpliceNames ts = H.keys $ _compiledSpliceMap ts
 
 
+#if !MIN_VERSION_base(4,7,0)
 ------------------------------------------------------------------------------
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateStateTyCon :: TyCon
-#if MIN_VERSION_base(4,7,0)
-templateStateTyCon = mkTyCon3 "heist" "Heist" "HeistState"
-#else
 templateStateTyCon = mkTyCon "Heist.HeistState"
-#endif
 {-# NOINLINE templateStateTyCon #-}
+#endif
+
 
 ------------------------------------------------------------------------------
 -- | Evaluates a template monad as a computation in the underlying monad.
@@ -389,18 +402,14 @@ instance (MonadCont m) => MonadCont (HeistT n m) where
     callCC = liftCallCC callCC
 
 
+#if !MIN_VERSION_base(4,7,0)
 ------------------------------------------------------------------------------
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateMonadTyCon :: TyCon
-#if MIN_VERSION_base(4,7,0)
-templateMonadTyCon = mkTyCon3  "heist" "Heist" "HeistT"
-#else
 templateMonadTyCon = mkTyCon "Heist.HeistT"
-#endif
 {-# NOINLINE templateMonadTyCon #-}
 
-#if !MIN_VERSION_base(4,7,0)
 instance (Typeable1 m) => Typeable1 (HeistT n m) where
     typeOf1 _ = mkTyConApp templateMonadTyCon [typeOf1 (undefined :: m ())]
 #endif
