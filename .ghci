@@ -3,3 +3,4 @@
 :set -isrc
 :set -itest/suite
 :set -hide-package MonadCatchIO-mtl
+:set -hide-package monads-tf

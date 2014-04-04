@@ -2,14 +2,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP #-}
 
 {-|
 
-This module contains the core Heist data types.  
+This module contains the core Heist data types.
 
 Edward Kmett wrote most of the HeistT monad code and associated instances,
 liberating us from the unused writer portion of RWST.
@@ -70,7 +70,11 @@ type TPath = [ByteString]
 data DocumentFile = DocumentFile
     { dfDoc  :: X.Document
     , dfFile :: Maybe FilePath
-    } deriving (Eq)
+    } deriving ( Eq
+#if MIN_VERSION_base(4,7,0)
+               , Typeable
+#endif
+               )
 
 
 ------------------------------------------------------------------------------
@@ -87,7 +91,11 @@ newtype RuntimeSplice m a = RuntimeSplice {
                , Monad
                , MonadIO
                , MonadState HeterogeneousEnvironment
-               , MonadTrans )
+               , MonadTrans
+#if MIN_VERSION_base(4,7,0)
+               , Typeable
+#endif
+               )
 
 
 ------------------------------------------------------------------------------
@@ -108,7 +116,9 @@ data Chunk m = Pure !ByteString
                -- ^ output computed at run time
              | RuntimeAction !(RuntimeSplice m ())
                -- ^ runtime action used only for its side-effect
-
+#if MIN_VERSION_base(4,7,0)
+             deriving Typeable
+#endif
 
 instance Show (Chunk m) where
     show (Pure _) = "Pure"
@@ -177,9 +187,13 @@ data HeistState m = HeistState {
     -- | This is needed because compiled templates are generated with a bunch
     -- of calls to renderFragment rather than a single call to render.
     , _curMarkup           :: Markup
+#if MIN_VERSION_base(4,7,0)
+} deriving (Typeable)
+#else
 }
+#endif
 
-
+#if !MIN_VERSION_base(4,7,0)
 -- NOTE: We got rid of the Monoid instance because it is absolutely not safe
 -- to combine two compiledTemplateMaps.  All compiled templates must be known
 -- at load time and processed in a single call to initHeist/loadTemplates or
@@ -188,6 +202,7 @@ data HeistState m = HeistState {
 instance (Typeable1 m) => Typeable (HeistState m) where
     typeOf _ = mkTyConApp templateStateTyCon [typeOf1 (undefined :: m ())]
 
+#endif
 
 ------------------------------------------------------------------------------
 -- | HeistT is the monad transformer used for splice processing.  HeistT
@@ -207,7 +222,11 @@ newtype HeistT n m a = HeistT {
     runHeistT :: X.Node
               -> HeistState n
               -> m (a, HeistState n)
+#if MIN_VERSION_base(4,7,0)
+} deriving Typeable
+#else
 }
+#endif
 
 
 ------------------------------------------------------------------------------
@@ -234,12 +253,15 @@ compiledSpliceNames :: HeistState m -> [Text]
 compiledSpliceNames ts = H.keys $ _compiledSpliceMap ts
 
 
+#if !MIN_VERSION_base(4,7,0)
 ------------------------------------------------------------------------------
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
 templateStateTyCon :: TyCon
 templateStateTyCon = mkTyCon "Heist.HeistState"
 {-# NOINLINE templateStateTyCon #-}
+#endif
+
 
 ------------------------------------------------------------------------------
 -- | Evaluates a template monad as a computation in the underlying monad.
@@ -394,6 +416,7 @@ instance (MonadCont m) => MonadCont (HeistT n m) where
     callCC = liftCallCC callCC
 
 
+#if !MIN_VERSION_base(4,7,0)
 ------------------------------------------------------------------------------
 -- | The Typeable instance is here so Heist can be dynamically executed with
 -- Hint.
@@ -403,6 +426,7 @@ templateMonadTyCon = mkTyCon "Heist.HeistT"
 
 instance (Typeable1 m) => Typeable1 (HeistT n m) where
     typeOf1 _ = mkTyConApp templateMonadTyCon [typeOf1 (undefined :: m ())]
+#endif
 
 
 ------------------------------------------------------------------------------
@@ -423,7 +447,7 @@ instance (Typeable1 m) => Typeable1 (HeistT n m) where
 -- Hamlet's speech.  @liftM (getAttribute \"author\") getParamNode@ would
 -- return @Just "Shakespeare"@.
 getParamNode :: Monad m => HeistT n m X.Node
-getParamNode = HeistT $ \r s -> return (r,s)
+getParamNode = HeistT $ curry return
 {-# INLINE getParamNode #-}
 
 

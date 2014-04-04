@@ -11,7 +11,7 @@ module Heist.Compiled.Internal where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
-import           Blaze.ByteString.Builder.Char8
+import           Blaze.ByteString.Builder.Char.Utf8
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.RWS.Strict
@@ -634,6 +634,26 @@ manyWithSplices splice splices runtimeAction = do
     p <- newEmptyPromise
     let splices' = mapS ($ getPromise p) splices
     chunks <- withLocalSplices splices' noSplices splice
+    return $ yieldRuntime $ do
+        items <- runtimeAction
+        res <- forM items $ \item -> putPromise p item >> codeGen chunks
+        return $ mconcat res
+
+
+------------------------------------------------------------------------------
+-- | More powerful version of manyWithSplices that lets you also define
+-- attribute splices.
+manyWith :: (Monad n)
+         => Splice n
+         -> Splices (RuntimeSplice n a -> Splice n)
+         -> Splices (RuntimeSplice n a -> AttrSplice n)
+         -> RuntimeSplice n [a]
+         -> Splice n
+manyWith splice splices attrSplices runtimeAction = do
+    p <- newEmptyPromise
+    let splices' = mapS ($ getPromise p) splices
+    let attrSplices' = mapS ($ getPromise p) attrSplices
+    chunks <- withLocalSplices splices' attrSplices' splice
     return $ yieldRuntime $ do
         items <- runtimeAction
         res <- forM items $ \item -> putPromise p item >> codeGen chunks

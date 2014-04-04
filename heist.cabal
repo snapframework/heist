@@ -1,5 +1,5 @@
 name:           heist
-version:        0.13.0
+version:        0.13.1
 synopsis:       An Haskell template system supporting both HTML5 and XML.
 description:
     Heist is a powerful template system that supports both HTML5 and XML.
@@ -138,25 +138,25 @@ Library
     Heist.Types
 
   build-depends:
-    aeson                      >= 0.6     && < 0.7,
-    attoparsec                 >= 0.10    && < 0.11,
+    aeson                      >= 0.6     && < 0.8,
+    attoparsec                 >= 0.10    && < 0.12,
     base                       >= 4       && < 5,
     blaze-builder              >= 0.2     && < 0.4,
-    blaze-html                 >= 0.4     && < 0.7,
+    blaze-html                 >= 0.4     && < 0.8,
     bytestring                 >= 0.9     && < 0.11,
     containers                 >= 0.2     && < 0.6,
     directory                  >= 1.1     && < 1.3,
     directory-tree             >= 0.10    && < 0.12,
-    dlist                      >= 0.5     && < 0.6,
+    dlist                      >= 0.5     && < 0.8,
     errors                     >= 1.4     && < 1.5,
     filepath                   >= 1.3     && < 1.4,
     hashable                   >= 1.1     && < 1.3,
     lifted-base                >= 0.2     && < 0.3,
     monad-control              >= 0.3     && < 0.4,
     mtl                        >= 2.0     && < 2.2,
-    process                    >= 1.1     && < 1.2,
+    process                    >= 1.1     && < 1.3,
     random                     >= 1.0.1.0 && < 1.1,
-    text                       >= 0.10    && < 0.12,
+    text                       >= 0.10    && < 1.2,
     time                       >= 1.1     && < 1.5,
     transformers               >= 0.3     && < 0.4,
     transformers-base          >= 0.4     && < 0.5,
