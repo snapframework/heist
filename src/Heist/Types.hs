@@ -1,11 +1,11 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 {-|
 
@@ -19,33 +19,35 @@ liberating us from the unused writer portion of RWST.
 module Heist.Types where
 
 ------------------------------------------------------------------------------
-import           Blaze.ByteString.Builder
-import           Control.Applicative
-import           Control.Arrow
---import qualified Control.Monad.Trans.Control as C
+import           Blaze.ByteString.Builder      (Builder)
+import           Control.Applicative           (Alternative (..),
+                                                Applicative (..), (<$>))
+import           Control.Arrow                 (first)
+import           Control.Monad                 (MonadPlus (..), ap, liftM)
 import           Control.Monad.Base
-import           Control.Monad.Cont
-import           Control.Monad.Error
-import           Control.Monad.Reader
-import           Control.Monad.State.Strict
+import           Control.Monad.Cont            (MonadCont (..))
+import           Control.Monad.Error           (MonadError (..))
+import           Control.Monad.Fix             (MonadFix (..))
+import           Control.Monad.Reader          (MonadReader (..))
+import           Control.Monad.State.Strict    (MonadState (..), StateT)
+import           Control.Monad.Trans           (MonadIO (..), MonadTrans (..))
 import           Control.Monad.Trans.Control
-import           Data.ByteString.Char8 (ByteString)
-import           Data.DList                      (DList)
-import qualified Data.HashMap.Strict as H
-import           Data.HashMap.Strict (HashMap)
-import           Data.HeterogeneousEnvironment   (HeterogeneousEnvironment)
+import           Data.ByteString.Char8         (ByteString)
+import           Data.DList                    (DList)
+import           Data.HashMap.Strict           (HashMap)
+import qualified Data.HashMap.Strict           as H
+import           Data.HeterogeneousEnvironment (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment as HE
-import           Data.Monoid
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           Data.Text.Encoding
-import           Data.Typeable
-import qualified Text.XmlHtml as X
+import           Data.Monoid                   (Monoid(..))
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
+import           Data.Text.Encoding            (decodeUtf8)
+import           Data.Typeable                 (TyCon, Typeable(..),
+                                                Typeable1(..), mkTyCon,
+                                                mkTyConApp)
+import qualified Text.XmlHtml                  as X
+------------------------------------------------------------------------------
 
-import Debug.Trace
-
-tr :: Show a => String -> a -> a
-tr s x = trace (s++show x) x
 
 ------------------------------------------------------------------------------
 -- | A 'Template' is a forest of XML nodes.  Here we deviate from the \"single
