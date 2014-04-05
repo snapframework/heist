@@ -9,7 +9,7 @@ module Heist.Splices
   , module Heist.Splices.Markdown
   ) where
 
-import           Data.Monoid
+import           Data.Monoid (Monoid(..))
 import qualified Heist.Compiled as C
 import qualified Heist.Interpreted as I
 import           Heist.Splices.Apply

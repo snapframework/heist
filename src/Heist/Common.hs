@@ -1,28 +1,29 @@
-{-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Heist.Common where
 
-import           Control.Applicative
-import           Control.Exception (SomeException)
-import           Control.Monad
-import qualified Control.Monad.CatchIO as C
-import qualified Data.Attoparsec.Text            as AP
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as B
+import           Control.Applicative   (Alternative (..), Applicative (..),
+                                        (<$>))
+import           Control.Exception     (SomeException)
+import           Control.Monad         (liftM, mplus)
+import qualified Control.Monad.CatchIO as C (catch)
+import qualified Data.Attoparsec.Text  as AP
+import           Data.ByteString       (ByteString)
+import qualified Data.ByteString       as B
 import qualified Data.ByteString.Char8 as BC
-import           Data.Hashable
-import           Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as Map
-import           Data.List
-import           Data.Maybe
-import           Data.Monoid
-import qualified Data.Text                       as T
-import           System.FilePath
-import           Heist.SpliceAPI
+import           Data.Hashable         (Hashable)
+import           Data.HashMap.Strict   (HashMap)
+import qualified Data.HashMap.Strict   as Map
+import           Data.List             (isSuffixOf)
+import           Data.Maybe            (isJust)
+import           Data.Monoid           (Monoid (..))
+import qualified Data.Text             as T
+import           Heist.SpliceAPI       (Splices, splicesToList)
 import           Heist.Types
-import qualified Text.XmlHtml as X
+import           System.FilePath       (pathSeparator)
+import qualified Text.XmlHtml          as X
 
 
 ------------------------------------------------------------------------------

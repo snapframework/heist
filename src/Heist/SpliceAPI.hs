@@ -25,13 +25,13 @@ Here's how you can define splices:
 
 module Heist.SpliceAPI where
 
-import           Control.Applicative
-import           Control.Monad.State (State, MonadState, execState, modify)
-import           Data.Map (Map)
-import qualified Data.Map as M
-import           Data.Monoid
-import           Data.Text (Text)
-import qualified Data.Text as T
+import           Control.Applicative (Applicative)
+import           Control.Monad.State (MonadState, State, execState, modify)
+import           Data.Map            (Map)
+import qualified Data.Map            as M
+import           Data.Monoid         (Monoid (..))
+import           Data.Text           (Text)
+import qualified Data.Text           as T
 
 
 ------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ add m = modify (\s -> M.unionWith (\_ b -> b) s m)
 ------------------------------------------------------------------------------
 -- | Maps a function over all the splices.
 mapS :: (a -> b) -> Splices a -> Splices b
-mapS f ss = add $ M.map f $ runSplices ss 
+mapS f ss = add $ M.map f $ runSplices ss
 
 
 ------------------------------------------------------------------------------
