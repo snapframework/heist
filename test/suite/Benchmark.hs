@@ -98,7 +98,7 @@ cmdLineTemplate dir page = do
 --        putStrLn "Template rendered correctly"
 
     defaultMain [
-         bench (page++"-speed") action
+         bench (page++"-speed") (whnfIO action)
        ]
 
 
