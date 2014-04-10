@@ -42,7 +42,7 @@ data PandocMissingException = PandocMissingException
 
 instance Show PandocMissingException where
     show PandocMissingException =
-        "Cannot find the \"pandoc\" executable; is it on your $PATH?"
+        "Cannot find the \"pandoc\" executable.  If you have Haskell, then install it with \"cabal install\".  Otherwise you can download it from http://johnmacfarlane.net/pandoc/installing.html.  Then make sure it is in your $PATH."
 
 instance Exception PandocMissingException
 
