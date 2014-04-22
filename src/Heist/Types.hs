@@ -43,8 +43,12 @@ import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Text.Encoding            (decodeUtf8)
 import           Data.Typeable                 (TyCon, Typeable(..),
-                                                Typeable1(..), mkTyCon,
-                                                mkTyConApp)
+                                                Typeable1(..), mkTyConApp)
+#if MIN_VERSION_base (4,7,0)
+import           Data.Typeable.Internal        (mkTyCon)
+#else
+import           Data.Typeable                 (mkTyCon)
+#endif
 import qualified Text.XmlHtml                  as X
 ------------------------------------------------------------------------------
 
