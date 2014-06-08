@@ -1,4 +1,5 @@
 :set -XOverloadedStrings
+:set -XCPP
 :set -Wall
 :set -isrc
 :set -itest/suite

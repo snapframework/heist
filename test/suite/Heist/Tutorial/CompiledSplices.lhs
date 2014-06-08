@@ -28,6 +28,7 @@ buildbot.  So first we need to get some boilerplate and imports out of the way.
 > import           Heist.Tutorial.Imports
 
 > import           Control.Applicative
+> import           Data.Map.Syntax
 > import qualified Data.Text as T
 > import           Data.Text.Encoding
 > import qualified Heist.Compiled.LowLevel as C

@@ -5,27 +5,54 @@
 module Heist.Common where
 
 ------------------------------------------------------------------------------
-import           Control.Applicative   (Alternative (..), Applicative (..),
-                                        (<$>))
-import           Control.Exception     (SomeException)
+import           Control.Applicative      (Alternative (..), Applicative (..), (<$>))
+import           Control.Error
+import           Control.Exception        (SomeException)
 import qualified Control.Exception.Lifted as C
-import           Control.Monad         (liftM, mplus)
-import qualified Data.Attoparsec.Text  as AP
-import           Data.ByteString       (ByteString)
-import qualified Data.ByteString       as B
-import qualified Data.ByteString.Char8 as BC
-import           Data.Hashable         (Hashable)
-import           Data.HashMap.Strict   (HashMap)
-import qualified Data.HashMap.Strict   as Map
-import           Data.List             (isSuffixOf)
-import           Data.Maybe            (isJust)
-import           Data.Monoid           (Monoid (..))
-import qualified Data.Text             as T
-import           Heist.SpliceAPI       (Splices, splicesToList)
+import           Control.Monad            (liftM, mplus)
+import qualified Data.Attoparsec.Text     as AP
+import           Data.ByteString          (ByteString)
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Char8    as BC
+import           Data.Hashable            (Hashable)
+import           Data.HashMap.Strict      (HashMap)
+import qualified Data.HashMap.Strict      as Map
+import           Data.List                (isSuffixOf)
+import           Data.Map.Syntax
+import           Data.Monoid              (Monoid (..), (<>))
+import qualified Data.Text                as T
 import           Heist.Types
-import           System.FilePath       (pathSeparator)
-import qualified Text.XmlHtml          as X
+import           System.FilePath          (pathSeparator)
+import qualified Text.XmlHtml             as X
 ------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+type Splices s = MapSyntax T.Text s
+
+
+runHashMap
+    :: (Monad m)
+    => Splices s
+    -> EitherT [String] m (HashMap T.Text s)
+runHashMap ms =
+    case runMapSyntax Map.lookup Map.insert ms of
+      Left keys -> left $ map (T.unpack . mkMsg) keys
+      Right hm -> right $ hm
+  where
+    mkMsg k = "You tried to bind "<>k<>" more than once!"
+
+
+------------------------------------------------------------------------------
+runMapNoErrors :: (Eq k, Hashable k) => MapSyntaxM k v a -> HashMap k v
+runMapNoErrors = either (const mempty) id .
+    runMapSyntax' (\_ new _ -> Just new) Map.lookup Map.insert
+
+
+------------------------------------------------------------------------------
+mapS :: (a -> b) -> Splices a -> Splices b
+mapS = mapV
+{-# DEPRECATED mapS "Use mapV instead" #-}
 
 
 ------------------------------------------------------------------------------
@@ -297,7 +324,7 @@ bindAttributeSplices :: Splices (AttrSplice n) -- ^ splices to bind
                      -> HeistState n           -- ^ start state
                      -> HeistState n
 bindAttributeSplices ss hs =
-    hs { _attrSpliceMap = Map.union (Map.fromList $ splicesToList ss)
+    hs { _attrSpliceMap = Map.union (runMapNoErrors ss)
                                     (_attrSpliceMap hs) }
 
 

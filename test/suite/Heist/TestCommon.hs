@@ -4,18 +4,19 @@ module Heist.TestCommon where
 import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Monad.Trans
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
+import           Data.ByteString.Char8      (ByteString)
+import qualified Data.ByteString.Char8      as B
+import           Data.Map.Syntax
 import           Data.Maybe
 import           Data.Monoid
 
 
 ------------------------------------------------------------------------------
 import           Heist
-import qualified Heist.Compiled as C
-import qualified Heist.Interpreted as I
+import qualified Heist.Compiled             as C
+import qualified Heist.Interpreted          as I
 import qualified Heist.Interpreted.Internal as I
-import qualified Text.XmlHtml        as X
+import qualified Text.XmlHtml               as X
 
 
 ------------------------------------------------------------------------------
@@ -47,8 +48,9 @@ loadIO :: FilePath
        -> Splices (AttrSplice IO)
        -> IO (Either [String] (HeistState IO))
 loadIO baseDir a b c d = runEitherT $ do
-    let hc = HeistConfig (defaultInterpretedSplices `mappend` a)
-                         (defaultLoadTimeSplices `mappend` b) c d [loadTemplates baseDir]
+    let hc = HeistConfig (defaultInterpretedSplices >> a)
+                         (defaultLoadTimeSplices >> b) c d
+                         [loadTemplates baseDir]
     initHeist hc
 
 
