@@ -11,20 +11,21 @@ import           Data.Aeson
 import qualified Data.ByteString.Char8       as S
 import qualified Data.ByteString.Lazy.Char8  as L
 import qualified Data.HashMap.Strict         as Map
+import           Data.Map.Syntax
 import           Data.Maybe
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import qualified Data.Text.Encoding          as T
 import qualified Data.Vector                 as V
-import qualified Text.Blaze.Html5            as B
 import           Text.Blaze.Html5            ((!))
+import qualified Text.Blaze.Html5            as B
 import           Text.Blaze.Renderer.XmlHtml
 import           Text.XmlHtml
 ------------------------------------------------------------------------------
-
+import           Heist.Common
 import           Heist.Interpreted.Internal
-import           Heist.SpliceAPI
 import           Heist.Types
+------------------------------------------------------------------------------
 
                                  ------------
                                  -- public --
@@ -208,7 +209,7 @@ explodeTag = ask >>= go
         "with"     ## varAttrTag v explodeTag
         "snippet"  ## varAttrTag v snippetTag
         "value"    ## varAttrTag v valueTag
-        
+
 
     --------------------------------------------------------------------------
     goObject obj = do
@@ -222,4 +223,4 @@ explodeTag = ask >>= go
                 T.append "with:" k    ## withValue v explodeTag
                 T.append "snippet:" k ## withValue v snippetTag
                 T.append "value:" k   ## withValue v valueTag
-        in  unionWithS (\a _ -> a) newBindings bindings
+        in  bindings >> newBindings

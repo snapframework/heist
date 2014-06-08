@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PackageImports             #-}
@@ -10,20 +9,20 @@ module Heist.Interpreted.Internal where
 import           Blaze.ByteString.Builder
 import           Control.Monad
 import           Control.Monad.State.Strict
-import qualified Data.Attoparsec.Text as AP
-import           Data.ByteString (ByteString)
+import qualified Data.Attoparsec.Text          as AP
+import           Data.ByteString               (ByteString)
+import qualified Data.HashMap.Strict           as Map
+import qualified Data.HeterogeneousEnvironment as HE
 import           Data.List
-import qualified Data.HashMap.Strict as Map
-import qualified Data.HeterogeneousEnvironment   as HE
+import           Data.Map.Syntax
 import           Data.Maybe
-import qualified Data.Text as T
-import           Data.Text (Text)
-import qualified Text.XmlHtml as X
-
+import           Data.Text                     (Text)
+import qualified Data.Text                     as T
+import qualified Text.XmlHtml                  as X
 ------------------------------------------------------------------------------
 import           Heist.Common
-import           Heist.SpliceAPI
 import           Heist.Types
+------------------------------------------------------------------------------
 
 
 type Splice n = HeistT n n Template
@@ -48,9 +47,8 @@ bindSplice n v hs = hs {_spliceMap = Map.insert n v (_spliceMap hs)}
 bindSplices :: Splices (Splice n) -- ^ splices to bind
             -> HeistState n       -- ^ start state
             -> HeistState n
-bindSplices ss hs = foldl' (flip id) hs acts
-  where
-    acts = map (uncurry bindSplice) $ splicesToList ss
+bindSplices ss hs =
+    hs { _spliceMap = Map.union (runMapNoErrors ss) (_spliceMap hs) }
 
 
 ------------------------------------------------------------------------------
@@ -88,7 +86,7 @@ runChildrenWithTrans :: (Monad n)
           -> Splices b
           -- ^ List of tuples to be bound
           -> Splice n
-runChildrenWithTrans f = runChildrenWith . mapS f
+runChildrenWithTrans f = runChildrenWith . mapV f
 
 
 ------------------------------------------------------------------------------
@@ -288,7 +286,7 @@ recurseSplice node splice = do
         ,"<"++(T.unpack $ X.elementTag node)++">.  You"
         ,"probably have infinite splice recursion!"
         ]
-               
+
 
 
 ------------------------------------------------------------------------------
@@ -347,7 +345,7 @@ bindStrings :: Monad n
             => Splices Text
             -> HeistState n
             -> HeistState n
-bindStrings splices hs = foldr (uncurry bindString) hs $ splicesToList splices
+bindStrings splices = bindSplices (mapV textSplice splices)
 
 
 ------------------------------------------------------------------------------
@@ -381,7 +379,7 @@ callTemplateWithText :: Monad n
                      => ByteString     -- ^ The name of the template
                      -> Splices Text -- ^ Splices to call the template with
                      -> HeistT n n Template
-callTemplateWithText name splices = callTemplate name $ mapS textSplice splices
+callTemplateWithText name splices = callTemplate name $ mapV textSplice splices
 
 
 ------------------------------------------------------------------------------

@@ -57,33 +57,36 @@ module Heist
   , getDoc
   , getXMLDoc
   , orError
-
-  -- * Splice API
-  , module Heist.SpliceAPI
+  , Splices
+  , mapS
   ) where
 
+
+------------------------------------------------------------------------------
 import           Control.Error
 import           Control.Exception (SomeException)
 import           Control.Monad.CatchIO
 import           Control.Monad.State
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.Foldable as F
-import qualified Data.HeterogeneousEnvironment   as HE
-import           Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as Map
+import           Data.ByteString               (ByteString)
+import qualified Data.ByteString               as B
+import qualified Data.Foldable                 as F
+import           Data.HashMap.Strict           (HashMap)
+import qualified Data.HashMap.Strict           as Map
+import qualified Data.HeterogeneousEnvironment as HE
+import           Data.Map.Syntax
 import           Data.Monoid
 import           System.Directory.Tree
-import qualified Text.XmlHtml                    as X
-
+import qualified Text.XmlHtml                  as X
+------------------------------------------------------------------------------
 import           Heist.Common
-import qualified Heist.Compiled.Internal as C
-import qualified Heist.Interpreted.Internal as I
-import           Heist.SpliceAPI
+import qualified Heist.Compiled.Internal       as C
+import qualified Heist.Interpreted.Internal    as I
 import           Heist.Splices
 import           Heist.Types
+------------------------------------------------------------------------------
 
 
+------------------------------------------------------------------------------
 type TemplateRepo = HashMap TPath DocumentFile
 
 
@@ -94,36 +97,37 @@ type TemplateRepo = HashMap TPath DocumentFile
 type TemplateLocation = EitherT [String] IO TemplateRepo
 
 
+------------------------------------------------------------------------------
 data HeistConfig m = HeistConfig
     { hcInterpretedSplices :: Splices (I.Splice m)
-        -- ^ Interpreted splices are the splices that Heist has always had.  They
-        -- return a list of nodes and are processed at runtime.
+        -- ^ Interpreted splices are the splices that Heist has always had.
+        -- They return a list of nodes and are processed at runtime.
     , hcLoadTimeSplices    :: Splices (I.Splice IO)
-        -- ^ Load time splices are like interpreted splices because they return a
-        -- list of nodes.  But they are like compiled splices because they are
-        -- processed once at load time.  All of Heist's built-in splices should be
-        -- used as load time splices.
+        -- ^ Load time splices are like interpreted splices because they
+        -- return a list of nodes.  But they are like compiled splices because
+        -- they are processed once at load time.  All of Heist's built-in
+        -- splices should be used as load time splices.
     , hcCompiledSplices    :: Splices (C.Splice m)
-        -- ^ Compiled splices return a DList of Chunks and are processed at load
-        -- time to generate a runtime monad action that will be used to render the
-        -- template.
+        -- ^ Compiled splices return a DList of Chunks and are processed at
+        -- load time to generate a runtime monad action that will be used to
+        -- render the template.
     , hcAttributeSplices   :: Splices (AttrSplice m)
-        -- ^ Attribute splices are bound to attribute names and return a list of
-        -- attributes.
+        -- ^ Attribute splices are bound to attribute names and return a list
+        -- of attributes.
     , hcTemplateLocations  :: [TemplateLocation]
         -- ^ A list of all the locations that Heist should get its templates
-        -- from.  
+        -- from.
     }
 
 
 instance Monoid (HeistConfig m) where
-    mempty = HeistConfig (put mempty) (put mempty) (put mempty) (put mempty) mempty
+    mempty = HeistConfig mempty mempty mempty mempty mempty
     mappend (HeistConfig a b c d e) (HeistConfig a' b' c' d' e') =
-        HeistConfig (unionWithS const a a')
-                    (unionWithS const b b')
-                    (unionWithS const c c')
-                    (unionWithS const d d')
-                    (e `mappend` e')
+        HeistConfig (a <> a')
+                    (b <> b')
+                    (c <> c')
+                    (d <> d')
+                    (e <> e')
 
 
 ------------------------------------------------------------------------------
@@ -133,10 +137,11 @@ instance Monoid (HeistConfig m) where
 -- old content tag, which has now been moved to two separate tags called
 -- apply-content and bind-content.
 defaultLoadTimeSplices :: MonadIO m => Splices (I.Splice m)
-defaultLoadTimeSplices =
+defaultLoadTimeSplices = do
     -- To be removed in later versions
-    insertS "content" deprecatedContentCheck defaultInterpretedSplices
-    
+    defaultInterpretedSplices
+    "content" #! deprecatedContentCheck
+
 
 
 ------------------------------------------------------------------------------
@@ -247,10 +252,13 @@ initHeist' :: Monad n
 initHeist' keyGen (HeistConfig i lt c a _) repo = do
     let empty = emptyHS keyGen
     tmap <- preproc keyGen lt repo
-    let hs1 = empty { _spliceMap = Map.fromList $ splicesToList i
+    is <- runHashMap i
+    cs <- runHashMap c
+    as <- runHashMap a
+    let hs1 = empty { _spliceMap = is
                     , _templateMap = tmap
-                    , _compiledSpliceMap = Map.fromList $ splicesToList c
-                    , _attrSpliceMap = Map.fromList $ splicesToList a
+                    , _compiledSpliceMap = cs
+                    , _attrSpliceMap = as
                     }
     lift $ C.compileTemplates hs1
 
@@ -262,7 +270,8 @@ preproc :: HE.KeyGen
         -> TemplateRepo
         -> EitherT [String] IO TemplateRepo
 preproc keyGen splices templates = do
-    let hs = (emptyHS keyGen) { _spliceMap = Map.fromList $ splicesToList splices
+    sm <- runHashMap splices
+    let hs = (emptyHS keyGen) { _spliceMap = sm
                               , _templateMap = templates
                               , _preprocessingMode = True }
     let eval a = evalHeistT a (X.TextNode "") hs
@@ -308,8 +317,8 @@ initHeistWithCacheTag (HeistConfig i lt c a locations) = do
     -- time splices as compiled templates.
     rawWithCache <- preproc keyGen (tag ## ss) $ Map.unions repos
 
-    let hc' = HeistConfig (insertS tag (cacheImpl cts) i) lt
-                          (insertS tag (cacheImplCompiled cts) c)
+    let hc' = HeistConfig (i <> (tag #! cacheImpl cts)) lt
+                          (c <> (tag #! cacheImplCompiled cts))
                           a locations
     hs <- initHeist' keyGen hc' rawWithCache
     return (hs, cts)

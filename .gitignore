@@ -12,3 +12,4 @@ cabal-dev/
 .DS_Store
 **/.DS_Store
 docs/out
+tags

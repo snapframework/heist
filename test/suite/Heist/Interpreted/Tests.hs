@@ -14,20 +14,21 @@ import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Monad.State
 import           Data.Aeson
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
-import qualified Data.ByteString.Lazy.Char8 as L
-import qualified Data.HashMap.Strict as Map
+import           Data.ByteString.Char8                (ByteString)
+import qualified Data.ByteString.Char8                as B
+import qualified Data.ByteString.Lazy.Char8           as L
+import qualified Data.HashMap.Strict                  as Map
+import           Data.Map.Syntax
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import           Data.Text (Text)
+import           Data.Text                            (Text)
+import qualified Data.Text                            as T
+import qualified Data.Text.Encoding                   as T
 import           System.IO.Unsafe
-import           Test.Framework (Test)
+import           Test.Framework                       (Test)
 import           Test.Framework.Providers.HUnit
 import           Test.Framework.Providers.QuickCheck2
-import qualified Test.HUnit as H
+import qualified Test.HUnit                           as H
 import           Test.QuickCheck
 import           Test.QuickCheck.Monadic
 
@@ -42,8 +43,8 @@ import           Heist.Splices.Json
 import           Heist.Splices.Markdown
 import           Heist.TestCommon
 import           Heist.Types
-import qualified Text.XmlHtml        as X
-import qualified Text.XmlHtml.Cursor as X
+import qualified Text.XmlHtml                         as X
+import qualified Text.XmlHtml.Cursor                  as X
 
 
 ------------------------------------------------------------------------------

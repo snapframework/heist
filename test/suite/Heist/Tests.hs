@@ -7,25 +7,26 @@ module Heist.Tests
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Monad.State
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Char8           as B
 import           Data.List
+import           Data.Map.Syntax
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Text as T
-import           Test.Framework (Test)
+import qualified Data.Text                       as T
+import           Test.Framework                  (Test)
 import           Test.Framework.Providers.HUnit
-import qualified Test.HUnit as H
+import qualified Test.HUnit                      as H
 
 
 ------------------------------------------------------------------------------
 import           Heist
-import qualified Heist.Compiled as C
-import           Heist.Tutorial.AttributeSplices
-import           Heist.Tutorial.CompiledSplices
-import qualified Heist.Interpreted as I
+import qualified Heist.Compiled                  as C
+import qualified Heist.Interpreted               as I
 import           Heist.Splices.Cache
 import           Heist.Splices.Html
 import           Heist.TemplateDirectory
+import           Heist.Tutorial.AttributeSplices
+import           Heist.Tutorial.CompiledSplices
 
 import           Heist.TestCommon
 
@@ -34,8 +35,8 @@ tests = [ testCase     "loadErrors"            loadErrorsTest
         , testCase     "attrsplice/autocheck"  attrSpliceTest
         , testCase     "tdirCache"             tdirCacheTest
         , testCase     "headMerge"             headMergeTest
-        , testCase     "bindApplyInteraction"  bindApplyInteractionTest 
-        , testCase     "backslashHandling"     backslashHandlingTest 
+        , testCase     "bindApplyInteraction"  bindApplyInteractionTest
+        , testCase     "backslashHandling"     backslashHandlingTest
         ]
 
 
@@ -94,7 +95,7 @@ tdirCacheTest = do
         dSplices = ("foosplice" ## stateSplice)
         hc = HeistConfig rSplices mempty dSplices mempty mempty
     td <- newTemplateDirectory' "templates" hc
-            
+
     [a,b,c,d] <- evalStateT (testInterpreted td) 5
     H.assertBool "interpreted doesn't cache" $ a == b
     H.assertBool "interpreted doesn't clear" $ b /= c

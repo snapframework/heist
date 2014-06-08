@@ -16,23 +16,23 @@ import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict
-import qualified Data.Attoparsec.Text            as AP
-import           Data.ByteString (ByteString)
-import           Data.DList                      (DList)
-import qualified Data.DList                      as DL
-import qualified Data.HashMap.Strict             as H
-import qualified Data.HashSet                    as S
-import qualified Data.HeterogeneousEnvironment   as HE
+import qualified Data.Attoparsec.Text               as AP
+import           Data.ByteString                    (ByteString)
+import           Data.DList                         (DList)
+import qualified Data.DList                         as DL
+import qualified Data.HashMap.Strict                as H
+import qualified Data.HashSet                       as S
+import qualified Data.HeterogeneousEnvironment      as HE
+import           Data.Map.Syntax
 import           Data.Maybe
-import           Data.Text                       (Text)
-import qualified Data.Text                       as T
-import qualified Data.Text.Encoding              as T
-import qualified Data.Vector                     as V
-import qualified Text.XmlHtml                    as X
-import qualified Text.XmlHtml.HTML.Meta          as X
+import           Data.Text                          (Text)
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as T
+import qualified Data.Vector                        as V
+import qualified Text.XmlHtml                       as X
+import qualified Text.XmlHtml.HTML.Meta             as X
 ------------------------------------------------------------------------------
 import           Heist.Common
-import           Heist.SpliceAPI
 import           Heist.Types
 ------------------------------------------------------------------------------
 
@@ -205,29 +205,29 @@ consolidate = consolidateL . DL.toList
       where
         ----------------------------------------------------------------------
         go soFar x [] = x : soFar
-    
+
         go soFar (Pure a) ((Pure b) : xs) =
             go soFar (Pure $! a `mappend` b) xs
-    
+
         go soFar (RuntimeHtml a) ((RuntimeHtml b) : xs) =
             go soFar (RuntimeHtml $! a `mappend` b) xs
-    
+
         go soFar (RuntimeHtml a) ((RuntimeAction b) : xs) =
             go soFar (RuntimeHtml $! a >>= \x -> b >> return x) xs
-    
+
         go soFar (RuntimeAction a) ((RuntimeHtml b) : xs) =
             go soFar (RuntimeHtml $! a >> b) xs
-    
+
         go soFar (RuntimeAction a) ((RuntimeAction b) : xs) =
             go soFar (RuntimeAction $! a >> b) xs
-    
+
         go soFar a (b : xs) = go (a : soFar) b xs
-    
+
         ----------------------------------------------------------------------
         boilDown soFar []              = soFar
-    
+
         boilDown soFar ((Pure h) : xs) = boilDown ((Pure $! h) : soFar) xs
-    
+
         boilDown soFar (x : xs) = boilDown (x : soFar) xs
 
 
@@ -429,7 +429,7 @@ attrToChunk !k !v = do
     DL.concat
         [ DL.singleton $! pureTextChunk $! T.concat [" ", k, "=\""]
         , v, DL.singleton $! pureTextChunk "\"" ]
-    
+
 
 attrToBuilder :: (Text, Text) -> Builder
 attrToBuilder (k,v)
@@ -538,7 +538,9 @@ bindSplice n v ts =
 bindSplices :: Splices (Splice n)  -- ^ splices to bind
             -> HeistState n        -- ^ source state
             -> HeistState n
-bindSplices ss ts = foldr (uncurry bindSplice) ts $ splicesToList ss
+bindSplices ss hs =
+    hs { _compiledSpliceMap = H.union (runMapNoErrors ss)
+                                      (_compiledSpliceMap hs) }
 
 
 ------------------------------------------------------------------------------
@@ -617,9 +619,9 @@ withSplices :: Monad n
             -- ^ Runtime data needed by the above splices
             -> Splice n
 withSplices splice splices runtimeAction =
-    withLocalSplices splices' noSplices splice
+    withLocalSplices splices' mempty splice
   where
-    splices' = mapS ($runtimeAction) splices
+    splices' = mapV ($runtimeAction) splices
 
 
 ------------------------------------------------------------------------------
@@ -632,8 +634,8 @@ manyWithSplices :: Monad n
                 -> Splice n
 manyWithSplices splice splices runtimeAction = do
     p <- newEmptyPromise
-    let splices' = mapS ($ getPromise p) splices
-    chunks <- withLocalSplices splices' noSplices splice
+    let splices' = mapV ($ getPromise p) splices
+    chunks <- withLocalSplices splices' mempty splice
     return $ yieldRuntime $ do
         items <- runtimeAction
         res <- forM items $ \item -> putPromise p item >> codeGen chunks
@@ -651,8 +653,8 @@ manyWith :: (Monad n)
          -> Splice n
 manyWith splice splices attrSplices runtimeAction = do
     p <- newEmptyPromise
-    let splices' = mapS ($ getPromise p) splices
-    let attrSplices' = mapS ($ getPromise p) attrSplices
+    let splices' = mapV ($ getPromise p) splices
+    let attrSplices' = mapV ($ getPromise p) attrSplices
     chunks <- withLocalSplices splices' attrSplices' splice
     return $ yieldRuntime $ do
         items <- runtimeAction
@@ -697,7 +699,7 @@ deferMap f pf n = do
 -- | Like deferMap, but only runs the result if a Maybe function of the
 -- runtime value returns Just.  If it returns Nothing, then no output is
 -- generated.
--- 
+--
 -- This is a good example of how to do more complex flow control with
 -- promises.  The generalization of this abstraction is too complex to be
 -- distilled to elegant high-level combinators.  If you need to implement your
