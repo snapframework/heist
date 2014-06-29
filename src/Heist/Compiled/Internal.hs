@@ -158,6 +158,7 @@ compileTemplate :: Monad n
                 -> DocumentFile
                 -> IO [Chunk n]
 compileTemplate hs tpath df = do
+    liftIO $ putStrLn $ "Compiling template " ++ show tpath
     let markup = case dfDoc df of
                    X.XmlDocument _ _ _ -> Xml
                    X.HtmlDocument _ _ _ -> Html
@@ -174,8 +175,6 @@ compileTemplates :: Monad n => HeistState n -> IO (HeistState n)
 compileTemplates hs = do
     ctm <- compileTemplates' hs
     return $! hs { _compiledTemplateMap = ctm }
---    let f = flip evalStateT HE.empty . unRT . codeGen
---    return $! hs { _compiledTemplateMap = H.map (first f) ctm }
 
 
 ------------------------------------------------------------------------------
@@ -248,7 +247,12 @@ codeGen l = V.foldr mappend mempty $!
 ------------------------------------------------------------------------------
 -- | Looks up a splice in the compiled splice map.
 lookupSplice :: Text -> HeistT n IO (Maybe (Splice n))
-lookupSplice nm = getsHS (H.lookup nm . _compiledSpliceMap)
+lookupSplice nm = do
+    pre <- getsHS _splicePrefix
+    let noNamespace = if T.isPrefixOf pre nm
+                        then T.drop (T.length pre) nm
+                        else nm
+    getsHS (H.lookup noNamespace . _compiledSpliceMap)
 
 
 ------------------------------------------------------------------------------
@@ -317,9 +321,29 @@ hasAttributeSubstitutions txt = any isIdent ast
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
 -- generate html at runtime.
 compileNode :: Monad n => X.Node -> Splice n
-compileNode (X.Element nm attrs ch) =
-    -- Is this node a splice, or does it merely contain splices?
-    lookupSplice nm >>= fromMaybe compileStaticElement
+compileNode (X.Element nm attrs ch) = do
+    pre <- getsHS _splicePrefix
+    msplice <- lookupSplice nm
+    liftIO $ putStrLn $ "Compiling node " ++ show nm
+    case (T.isPrefixOf pre nm, msplice) of
+      (True, Nothing) -> do
+          liftIO $ putStrLn "Here A"
+          tellSpliceError $ mconcat ["splice '", nm, "' not bound!"]
+          return mempty
+      (True, Just sp) -> do
+          liftIO $ putStrLn "Here B"
+          sp
+      (False, Nothing) -> do
+          liftIO $ putStrLn "Here C"
+          compileStaticElement
+      (False, Just sp) -> do
+          liftIO $ putStrLn "Here D"
+          run <- getsHS _errorNoNamespace
+          if run
+            then sp
+            else do tellSpliceError $ mconcat
+                      ["splice '", nm, "' needs the heist namespace!"]
+                    return mempty
   where
     tag0 = T.append "<" nm
     end = T.concat [ "</" , nm , ">"]

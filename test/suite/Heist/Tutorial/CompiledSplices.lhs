@@ -115,7 +115,7 @@ directory with compiled splices.
 > load baseDir splices = do
 >     tmap <- runEitherT $ do
 >         let hc = HeistConfig mempty defaultLoadTimeSplices splices mempty
->                              [loadTemplates baseDir]
+>                              [loadTemplates baseDir] "" False
 >         initHeist hc
 >     either (error . concat) return tmap
 
