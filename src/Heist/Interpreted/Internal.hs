@@ -13,7 +13,6 @@ import qualified Data.Attoparsec.Text          as AP
 import           Data.ByteString               (ByteString)
 import qualified Data.HashMap.Strict           as Map
 import qualified Data.HeterogeneousEnvironment as HE
-import           Data.List
 import           Data.Map.Syntax
 import           Data.Maybe
 import           Data.Text                     (Text)
