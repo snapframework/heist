@@ -15,7 +15,7 @@ the resulting xhtml would be
 Likewise, if you need to add text to an attribute,
 
     <bind tag="special">special-id</bind>
-    <div id="$(special)">very special</div>
+    <div id="${special}">very special</div>
 
 gives you
 
