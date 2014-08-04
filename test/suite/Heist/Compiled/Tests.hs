@@ -1,13 +1,22 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Heist.Compiled.Tests
   ( tests
   ) where
 
+import           Blaze.ByteString.Builder
+import           Control.Error
+import           Control.Monad.Trans
+import           Data.Map.Syntax
+import           Data.Monoid
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
 import qualified Test.HUnit as H
 
 
 ------------------------------------------------------------------------------
+import           Heist
+import           Heist.Compiled
 import           Heist.Tutorial.CompiledSplices
 import           Heist.TestCommon
 
@@ -19,6 +28,11 @@ import           Heist.TestCommon
 tests :: [Test]
 tests = [ testCase     "compiled/simple"       simpleCompiledTest
         , testCase     "compiled/people"       peopleTest
+        , testCase     "compiled/namespace1"    namespaceTest1
+        , testCase     "compiled/namespace2"    namespaceTest2
+        , testCase     "compiled/namespace3"    namespaceTest3
+        , testCase     "compiled/namespace4"    namespaceTest4
+        , testCase     "compiled/namespace5"    namespaceTest5
         ]
 
 simpleCompiledTest :: IO ()
@@ -27,7 +41,7 @@ simpleCompiledTest = do
     H.assertEqual "compiled state splice" expected res
   where
     expected =
-      "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>\n&#10;<html>&#10;3&#10;</html>&#10;"
+      mappend doctype "\n&#10;<html>&#10;3&#10;</html>&#10;"
 
 peopleTest :: IO ()
 peopleTest = do
@@ -35,5 +49,87 @@ peopleTest = do
     H.assertEqual "people splice" expected res
   where
     expected =
-      "&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
+      mappend doctype "\n&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
+
+templateHC :: HeistConfig IO
+templateHC =
+    emptyHC { hcLoadTimeSplices = defaultLoadTimeSplices
+            , hcCompiledSplices = "foo" ## return (yieldPureText "aoeu")
+            , hcTemplateLocations = [loadTemplates "templates"]
+            , hcNamespace = ""
+            , hcErrorNotBound = False
+            }
+
+namespaceTest1 :: IO ()
+namespaceTest1 = do
+    res <- runEitherT $ do
+        hs <- initHeist templateHC
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "namespaces"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace test" (Right expected) res
+  where
+    expected = mappend doctype "\nAlpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
+
+
+namespaceTest2 :: IO ()
+namespaceTest2 = do
+    res <- runEitherT $ do
+        hs <- initHeist $ templateHC { hcErrorNotBound = True }
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "namespaces"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace test" (Right expected) res
+  where
+    expected = mappend doctype "\nAlpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
+
+
+namespaceTest3 :: IO ()
+namespaceTest3 = do
+    res <- runEitherT $ do
+        hs <- initHeist templateHC { hcNamespace = "h" }
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "namespaces"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace test" (Right expected) res
+  where
+    expected = mappend doctype "\nAlpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
+
+
+namespaceTest4 :: IO ()
+namespaceTest4 = do
+    res <- runEitherT $ do
+        hs <- initHeist $ templateHC { hcNamespace = "h"
+                                     , hcErrorNotBound = True }
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "namespaces"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace test" (Right expected) res
+  where
+    expected = mappend doctype "\nAlpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
+
+
+namespaceTest5 :: IO ()
+namespaceTest5 = do
+    res <- runEitherT $ do
+        hs <- initHeist $ templateHC { hcNamespace = "h"
+                                     , hcCompiledSplices = mempty
+                                     , hcErrorNotBound = True }
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "namespaces"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace test" (Left ["templates/namespaces.tpl: No splice bound for h:foo"]) res
+  where
+    expected = mappend doctype "\nAlpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
+
 

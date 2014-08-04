@@ -20,6 +20,7 @@ import qualified Data.HashMap.Strict      as Map
 import           Data.List                (isSuffixOf)
 import           Data.Map.Syntax
 import           Data.Monoid              (Monoid (..), (<>))
+import           Data.Text                (Text)
 import qualified Data.Text                as T
 import           Heist.Types
 import           System.FilePath          (pathSeparator)
@@ -67,8 +68,26 @@ orError :: Monad m => HeistT n m b -> String -> HeistT n m b
 orError silent msg = do
     hs <- getHS
     if _preprocessingMode hs
-      then error $ (maybe "" (++": ") $ _curTemplateFile hs) ++ msg
+      then do fullMsg <- heistErrMsg (T.pack msg)
+              error $ T.unpack fullMsg
       else silent
+
+
+------------------------------------------------------------------------------
+-- | Prepends the location of the template currently being processed to an
+-- error message.
+heistErrMsg :: Monad m => Text -> HeistT n m Text
+heistErrMsg msg = do
+    tf <- getsHS _curTemplateFile
+    return $ (maybe "" ((`mappend` ": ") . T.pack) tf) `mappend` msg
+
+
+------------------------------------------------------------------------------
+-- | Adds an error message to the list of splice processing errors.
+tellSpliceError :: Monad m => Text -> HeistT n m ()
+tellSpliceError msg = do
+    fullMsg <- heistErrMsg msg
+    modifyHS (\hs -> hs { _spliceErrors = fullMsg : _spliceErrors hs })
 
 
 ------------------------------------------------------------------------------
@@ -76,6 +95,9 @@ orError silent msg = do
 showTPath :: TPath -> String
 showTPath = BC.unpack . (`BC.append` ".tpl") . tpathName
 
+
+------------------------------------------------------------------------------
+-- | Convert a TPath into a ByteString path.
 tpathName :: TPath -> ByteString
 tpathName = BC.intercalate "/" . reverse
 

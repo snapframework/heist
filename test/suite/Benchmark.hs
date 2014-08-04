@@ -5,34 +5,36 @@ module Main where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
-import           Criterion
-import           Criterion.Main
-import           Criterion.Measurement hiding (getTime)
 import           Control.Concurrent
 import           Control.Error
-import           Control.Exception (evaluate)
+import           Control.Exception        (evaluate)
 import           Control.Monad
-import qualified Data.ByteString as B
-import qualified Data.DList as DL
+import           Criterion
+import           Criterion.Main
+import           Criterion.Measurement    hiding (getTime)
+import qualified Data.ByteString          as B
+import qualified Data.DList               as DL
+import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Text as T
+import qualified Data.Text                as T
 import           Data.Text.Encoding
 import           Data.Time.Clock
-import           Data.Maybe
-import qualified Text.XmlHtml as X
 import           System.Environment
-
-import Heist
-import Heist.Common
-import qualified Heist.Compiled as C
-import qualified Heist.Compiled.Internal as CI
-import qualified Heist.Interpreted as I
-import Heist.TestCommon
-import Heist.Types
+import qualified Text.XmlHtml             as X
+------------------------------------------------------------------------------
+import           Heist
+import           Heist.Common
+import qualified Heist.Compiled           as C
+import qualified Heist.Compiled.Internal  as CI
+import qualified Heist.Interpreted        as I
+import           Heist.TestCommon
+import           Heist.Types
+------------------------------------------------------------------------------
 
 loadWithCache baseDir = do
     etm <- runEitherT $ do
-        let hc = HeistConfig mempty defaultLoadTimeSplices mempty mempty [loadTemplates baseDir]
+        let hc = HeistConfig mempty defaultLoadTimeSplices mempty mempty
+                             [loadTemplates baseDir] "" False
         initHeistWithCacheTag hc
     either (error . unlines) (return . fst) etm
 
@@ -103,7 +105,7 @@ cmdLineTemplate dir page = do
 
 
 testNode =
-  X.Element "div" [("foo", "aoeu"), ("bar", "euid")] 
+  X.Element "div" [("foo", "aoeu"), ("bar", "euid")]
     [X.Element "b" [] [X.TextNode "bolded text"]
     ,X.TextNode " not bolded"
     ,X.Element "a" [("href", "/path/to/page")] [X.TextNode "link"]

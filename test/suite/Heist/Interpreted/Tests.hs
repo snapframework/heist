@@ -118,7 +118,7 @@ addTest = do
 hasTemplateTest :: H.Assertion
 hasTemplateTest = do
     ets <- loadIO "templates" mempty mempty mempty mempty
-    let tm = either (error "Error loading templates") _templateMap ets
+    let tm = either (error . unlines) _templateMap ets
     hs <- loadEmpty mempty mempty mempty mempty
     let hs's = setTemplates tm hs
     H.assertBool "hasTemplate hs's" (hasTemplate "index" hs's)
@@ -139,7 +139,7 @@ loadTest = do
     ets <- loadIO "templates" mempty mempty mempty mempty
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertEqual "loadTest size" 37 $ Map.size tm
+                      H.assertEqual "loadTest size" 38 $ Map.size tm
            ) ets
 
 
