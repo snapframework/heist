@@ -57,6 +57,7 @@ module Heist
   , localHS
   , getDoc
   , getXMLDoc
+  , tellSpliceError
   , orError
   , Splices
   , mapS
@@ -120,7 +121,11 @@ data HeistConfig m = HeistConfig
         -- ^ A list of all the locations that Heist should get its templates
         -- from.
     , hcNamespace          :: Text
-    , hcErrorNoNamespace   :: Bool
+
+        -- | Whether to throw an error when a tag wih the heist namespace does
+        -- not correspond to a bound splice.  When not using a namespace, this
+        -- flag is ignored.
+    , hcErrorNotBound      :: Bool
     }
 
 
@@ -258,23 +263,24 @@ initHeist' :: Monad n
 initHeist' keyGen (HeistConfig i lt c a _ ns enn) repo = do
     let empty = emptyHS keyGen
     tmap <- preproc keyGen lt repo ns
-    is <- runHashMap i
-    cs <- runHashMap c
-    as <- runHashMap a
+    let prefix = mkSplicePrefix ns
+    is <- runHashMap $ mapK (prefix<>) i
+    cs <- runHashMap $ mapK (prefix<>) c
+    as <- runHashMap $ mapK (prefix<>) a
     let hs1 = empty { _spliceMap = is
                     , _templateMap = tmap
                     , _compiledSpliceMap = cs
                     , _attrSpliceMap = as
-                    , _splicePrefix = mkSplicePrefix ns
-                    , _errorNoNamespace = enn
+                    , _splicePrefix = prefix
+                    , _errorNotBound = enn
                     }
-    hs2 <- lift $ C.compileTemplates hs1
-    liftIO $ do
-        putStrLn "Finished compiling..."
-        print $ _spliceErrors hs2
-    case _spliceErrors hs2 of
-      [] -> return hs2
-      es -> left $ map T.unpack es
+    EitherT $ C.compileTemplates hs1
+--    liftIO $ when (not $ null $ _spliceErrors hs2) $ do
+--        putStrLn "Finished compiling with errors..."
+--        mapM_ T.putStrLn $ _spliceErrors hs2
+--    case _spliceErrors hs2 of
+--      [] -> return hs2
+--      es -> left $ map T.unpack es
 
 
 ------------------------------------------------------------------------------

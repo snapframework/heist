@@ -122,24 +122,16 @@ runNodeList = mapSplices runNode
 
 
 ------------------------------------------------------------------------------
--- | Runs a single splice and returns the builder computation.
-runSplice :: (Monad n)
-          => X.Node
-          -> HeistState n
-          -> Splice n
-          -> IO [Chunk n]
-runSplice node hs splice = do
-    !a <- evalHeistT splice node hs
-    return $! consolidate a
-
-
-------------------------------------------------------------------------------
 -- | Runs a DocumentFile with the appropriate template context set.
 runDocumentFile :: Monad n
                 => TPath
                 -> DocumentFile
                 -> Splice n
 runDocumentFile tpath df = do
+    let markup = case dfDoc df of
+                   X.XmlDocument _ _ _ -> Xml
+                   X.HtmlDocument _ _ _ -> Html
+    modifyHS (\hs -> hs { _curMarkup = markup })
     addDoctype $ maybeToList $ X.docType $ dfDoc df
     modifyHS (setCurTemplateFile curPath .  setCurContext tpath)
     res <- runNodeList nodes
@@ -152,45 +144,41 @@ runDocumentFile tpath df = do
 
 
 ------------------------------------------------------------------------------
-compileTemplate :: Monad n
-                => HeistState n
-                -> TPath
-                -> DocumentFile
-                -> IO [Chunk n]
-compileTemplate hs tpath df = do
-    liftIO $ putStrLn $ "Compiling template " ++ show tpath
-    let markup = case dfDoc df of
-                   X.XmlDocument _ _ _ -> Xml
-                   X.HtmlDocument _ _ _ -> Html
-        hs' = hs { _curMarkup = markup }
-    !chunks <- runSplice nullNode hs' $! runDocumentFile tpath df
-    return chunks
-  where
-    -- This gets overwritten in runDocumentFile
-    nullNode = X.TextNode ""
+compileTemplate
+    :: Monad n
+    => TPath
+    -> DocumentFile
+    -> HeistT n IO [Chunk n]
+compileTemplate tpath df = do
+    !chunks <- runDocumentFile tpath df
+    return $! consolidate chunks
 
 
 ------------------------------------------------------------------------------
-compileTemplates :: Monad n => HeistState n -> IO (HeistState n)
+compileTemplates
+    :: Monad n
+    => HeistState n
+    -> IO (Either [String] (HeistState n))
 compileTemplates hs = do
-    ctm <- compileTemplates' hs
-    return $! hs { _compiledTemplateMap = ctm }
+    (tmap, hs') <- runHeistT compileTemplates' (X.TextNode "") hs
+    return $ case _spliceErrors hs' of
+               [] -> Right $! hs { _compiledTemplateMap = tmap }
+               es -> Left $ map T.unpack es
 
 
 ------------------------------------------------------------------------------
-compileTemplates' :: Monad n
-                  => HeistState n
-                  -> IO (H.HashMap TPath ([Chunk n], MIMEType))
-compileTemplates' hs = do
-    ctm <- foldM runOne H.empty tpathDocfiles
-    return $! ctm
+compileTemplates'
+    :: Monad n
+    => HeistT n IO (H.HashMap TPath ([Chunk n], MIMEType))
+compileTemplates' = do
+    hs <- getHS
+    let tpathDocfiles :: [(TPath, DocumentFile)]
+        tpathDocfiles = map (\(a,b) -> (a, b))
+                            (H.toList $ _templateMap hs)
+    foldM runOne H.empty tpathDocfiles
   where
-    tpathDocfiles :: [(TPath, DocumentFile)]
-    tpathDocfiles = map (\(a,b) -> (a, b))
-                        (H.toList $ _templateMap hs)
-
     runOne tmap (tpath, df) = do
-        !mHtml <- compileTemplate hs tpath df
+        !mHtml <- compileTemplate tpath df
         return $! H.insert tpath (mHtml, mimeType $! dfDoc df) tmap
 
 
@@ -249,10 +237,14 @@ codeGen l = V.foldr mappend mempty $!
 lookupSplice :: Text -> HeistT n IO (Maybe (Splice n))
 lookupSplice nm = do
     pre <- getsHS _splicePrefix
-    let noNamespace = if T.isPrefixOf pre nm
-                        then T.drop (T.length pre) nm
-                        else nm
-    getsHS (H.lookup noNamespace . _compiledSpliceMap)
+    res <- getsHS (H.lookup nm . _compiledSpliceMap)
+    canError <- getsHS _errorNotBound
+    if isNothing res && T.isPrefixOf pre nm && not (T.null pre)
+      then do
+          when canError $
+            tellSpliceError $ "No splice bound for " `mappend` nm
+          return Nothing
+      else return res
 
 
 ------------------------------------------------------------------------------
@@ -322,28 +314,8 @@ hasAttributeSubstitutions txt = any isIdent ast
 -- generate html at runtime.
 compileNode :: Monad n => X.Node -> Splice n
 compileNode (X.Element nm attrs ch) = do
-    pre <- getsHS _splicePrefix
     msplice <- lookupSplice nm
-    liftIO $ putStrLn $ "Compiling node " ++ show nm
-    case (T.isPrefixOf pre nm, msplice) of
-      (True, Nothing) -> do
-          liftIO $ putStrLn "Here A"
-          tellSpliceError $ mconcat ["splice '", nm, "' not bound!"]
-          return mempty
-      (True, Just sp) -> do
-          liftIO $ putStrLn "Here B"
-          sp
-      (False, Nothing) -> do
-          liftIO $ putStrLn "Here C"
-          compileStaticElement
-      (False, Just sp) -> do
-          liftIO $ putStrLn "Here D"
-          run <- getsHS _errorNoNamespace
-          if run
-            then sp
-            else do tellSpliceError $ mconcat
-                      ["splice '", nm, "' needs the heist namespace!"]
-                    return mempty
+    fromMaybe compileStaticElement msplice
   where
     tag0 = T.append "<" nm
     end = T.concat [ "</" , nm , ">"]

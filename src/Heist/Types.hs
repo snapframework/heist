@@ -201,7 +201,10 @@ data HeistState m = HeistState {
     -- | List of errors encountered during splice processing.
     , _spliceErrors        :: [Text]
 
-    , _errorNoNamespace    :: Bool
+    -- | Whether to throw an error when a tag wih the heist namespace does not
+    -- correspond to a bound splice.  When not using a namespace, this flag is
+    -- ignored.
+    , _errorNotBound       :: Bool
 #if MIN_VERSION_base(4,7,0)
 } deriving (Typeable)
 #else

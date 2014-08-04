@@ -86,7 +86,6 @@ heistErrMsg msg = do
 -- | Adds an error message to the list of splice processing errors.
 tellSpliceError :: Monad m => Text -> HeistT n m ()
 tellSpliceError msg = do
-    liftIO $ putStrLn "Returning a splice error"
     fullMsg <- heistErrMsg msg
     modifyHS (\hs -> hs { _spliceErrors = fullMsg : _spliceErrors hs })
 
