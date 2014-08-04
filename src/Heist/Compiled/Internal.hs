@@ -33,6 +33,7 @@ import qualified Text.XmlHtml                       as X
 import qualified Text.XmlHtml.HTML.Meta             as X
 ------------------------------------------------------------------------------
 import           Heist.Common
+import           Heist.SpliceAPI
 import           Heist.Types
 ------------------------------------------------------------------------------
 

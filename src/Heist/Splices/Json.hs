@@ -24,6 +24,7 @@ import           Text.XmlHtml
 ------------------------------------------------------------------------------
 import           Heist.Common
 import           Heist.Interpreted.Internal
+import           Heist.SpliceAPI
 import           Heist.Types
 ------------------------------------------------------------------------------
 

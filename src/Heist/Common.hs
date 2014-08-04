@@ -22,6 +22,7 @@ import           Data.Map.Syntax
 import           Data.Monoid              (Monoid (..), (<>))
 import           Data.Text                (Text)
 import qualified Data.Text                as T
+import           Heist.SpliceAPI
 import           Heist.Types
 import           System.FilePath          (pathSeparator)
 import qualified Text.XmlHtml             as X
@@ -29,9 +30,6 @@ import qualified Text.XmlHtml             as X
 
 
 ------------------------------------------------------------------------------
-type Splices s = MapSyntax T.Text s
-
-
 runHashMap
     :: (Monad m)
     => Splices s

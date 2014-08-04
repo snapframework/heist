@@ -59,8 +59,8 @@ module Heist
   , getXMLDoc
   , tellSpliceError
   , orError
-  , Splices
   , mapS
+  , module Heist.SpliceAPI
   ) where
 
 
@@ -85,6 +85,7 @@ import qualified Text.XmlHtml                  as X
 import           Heist.Common
 import qualified Heist.Compiled.Internal       as C
 import qualified Heist.Interpreted.Internal    as I
+import           Heist.SpliceAPI
 import           Heist.Splices
 import           Heist.Types
 ------------------------------------------------------------------------------
