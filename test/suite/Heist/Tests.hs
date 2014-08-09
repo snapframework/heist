@@ -93,7 +93,8 @@ tdirCacheTest :: IO ()
 tdirCacheTest = do
     let rSplices = ("foosplice" ## fooSplice)
         dSplices = ("foosplice" ## stateSplice)
-        hc = HeistConfig rSplices mempty dSplices mempty mempty "" False
+        sc = SpliceConfig rSplices mempty dSplices mempty mempty
+        hc = HeistConfig sc "" False
     td <- newTemplateDirectory' "templates" hc
 
     [a,b,c,d] <- evalStateT (testInterpreted td) 5

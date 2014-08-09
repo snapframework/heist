@@ -22,7 +22,6 @@ import           Data.Map.Syntax
 import           Data.Monoid              (Monoid (..), (<>))
 import           Data.Text                (Text)
 import qualified Data.Text                as T
-import           Heist.SpliceAPI
 import           Heist.Types
 import           System.FilePath          (pathSeparator)
 import qualified Text.XmlHtml             as X
@@ -46,12 +45,6 @@ runHashMap ms =
 runMapNoErrors :: (Eq k, Hashable k) => MapSyntaxM k v a -> HashMap k v
 runMapNoErrors = either (const mempty) id .
     runMapSyntax' (\_ new _ -> Just new) Map.lookup Map.insert
-
-
-------------------------------------------------------------------------------
-mapS :: (a -> b) -> Splices a -> Splices b
-mapS = mapV
-{-# DEPRECATED mapS "Use mapV instead" #-}
 
 
 ------------------------------------------------------------------------------

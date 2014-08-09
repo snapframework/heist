@@ -52,13 +52,12 @@ peopleTest = do
       mappend doctype "\n&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
 
 templateHC :: HeistConfig IO
-templateHC =
-    emptyHC { hcLoadTimeSplices = defaultLoadTimeSplices
-            , hcCompiledSplices = "foo" ## return (yieldPureText "aoeu")
-            , hcTemplateLocations = [loadTemplates "templates"]
-            , hcNamespace = ""
-            , hcErrorNotBound = False
-            }
+templateHC = HeistConfig sc "" False
+  where
+    sc = mempty { scLoadTimeSplices = defaultLoadTimeSplices
+                , scCompiledSplices = "foo" ## return (yieldPureText "aoeu")
+                , scTemplateLocations = [loadTemplates "templates"]
+                }
 
 namespaceTest1 :: IO ()
 namespaceTest1 = do
@@ -120,8 +119,9 @@ namespaceTest4 = do
 namespaceTest5 :: IO ()
 namespaceTest5 = do
     res <- runEitherT $ do
+        let sc = (hcSpliceConfig templateHC) { scCompiledSplices = mempty }
         hs <- initHeist $ templateHC { hcNamespace = "h"
-                                     , hcCompiledSplices = mempty
+                                     , hcSpliceConfig = sc
                                      , hcErrorNotBound = True }
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"

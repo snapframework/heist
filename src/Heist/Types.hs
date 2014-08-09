@@ -25,7 +25,7 @@ import           Control.Arrow
 import           Control.Monad.CatchIO (MonadCatchIO)
 import qualified Control.Monad.CatchIO as C
 import           Control.Monad.Cont
-import           Control.Monad.Error
+import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State.Strict
 import           Data.ByteString.Char8 (ByteString)
@@ -34,6 +34,7 @@ import qualified Data.HashMap.Strict as H
 import           Data.HashMap.Strict (HashMap)
 import           Data.HeterogeneousEnvironment   (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment as HE
+import           Data.Map.Syntax
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -45,6 +46,12 @@ import Debug.Trace
 
 tr :: Show a => String -> a -> a
 tr s x = trace (s++show x) x
+
+
+------------------------------------------------------------------------------
+-- | Convenient type alies for splices.
+type Splices s = MapSyntax Text s
+
 
 ------------------------------------------------------------------------------
 -- | A 'Template' is a forest of XML nodes.  Here we deviate from the \"single

@@ -37,12 +37,15 @@ data TemplateDirectory n
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory' wrapped in an Either for
 -- error handling.
-newTemplateDirectory :: MonadIO n
-                     => FilePath
-                     -> HeistConfig n
-                     -> EitherT [String] IO (TemplateDirectory n)
+newTemplateDirectory
+    :: MonadIO n
+    => FilePath
+    -> HeistConfig n
+    -- namespaced tag.
+    -> EitherT [String] IO (TemplateDirectory n)
 newTemplateDirectory dir hc = do
-    let hc' = hc { hcTemplateLocations = [loadTemplates dir] }
+    let sc = (hcSpliceConfig hc) { scTemplateLocations = [loadTemplates dir] }
+    let hc' = hc { hcSpliceConfig = sc }
     (hs,cts) <- initHeistWithCacheTag hc'
     tsMVar <- liftIO $ newMVar hs
     ctsMVar <- liftIO $ newMVar cts
@@ -52,10 +55,11 @@ newTemplateDirectory dir hc = do
 ------------------------------------------------------------------------------
 -- | Creates and returns a new 'TemplateDirectory', using the monad's fail
 -- function on error.
-newTemplateDirectory' :: MonadIO n
-                      => FilePath
-                      -> HeistConfig n
-                      -> IO (TemplateDirectory n)
+newTemplateDirectory'
+    :: MonadIO n
+    => FilePath
+    -> HeistConfig n
+    -> IO (TemplateDirectory n)
 newTemplateDirectory' dir hc = do
     res <- runEitherT $ newTemplateDirectory dir hc
     either (error . concat) return res
@@ -83,7 +87,8 @@ reloadTemplateDirectory :: (MonadIO n)
                         -> IO (Either String ())
 reloadTemplateDirectory (TemplateDirectory p hc tsMVar ctsMVar) = do
     ehs <- runEitherT $ do
-        initHeistWithCacheTag (hc { hcTemplateLocations = [loadTemplates p] })
+        let sc = (hcSpliceConfig hc) { scTemplateLocations = [loadTemplates p] }
+        initHeistWithCacheTag (hc { hcSpliceConfig = sc })
     leftPass ehs $ \(hs,cts) -> do
         modifyMVar_ tsMVar (const $ return hs)
         modifyMVar_ ctsMVar (const $ return cts)

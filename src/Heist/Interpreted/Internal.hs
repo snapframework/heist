@@ -20,7 +20,6 @@ import qualified Data.Text                     as T
 import qualified Text.XmlHtml                  as X
 ------------------------------------------------------------------------------
 import           Heist.Common
-import           Heist.SpliceAPI
 import           Heist.Types
 ------------------------------------------------------------------------------
 

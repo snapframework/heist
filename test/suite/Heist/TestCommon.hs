@@ -35,10 +35,10 @@ loadT :: MonadIO m
       -> Splices (AttrSplice m)
       -> IO (Either [String] (HeistState m))
 loadT baseDir a b c d = runEitherT $ do
-    let hc = HeistConfig (defaultInterpretedSplices `mappend` a)
-                         (defaultLoadTimeSplices `mappend` b) c d
-                         [loadTemplates baseDir] "" False
-    initHeist hc
+    let sc = SpliceConfig (defaultInterpretedSplices `mappend` a)
+                          (defaultLoadTimeSplices `mappend` b) c d
+                          [loadTemplates baseDir]
+    initHeist $ HeistConfig sc "" False
 
 
 ------------------------------------------------------------------------------
@@ -49,20 +49,20 @@ loadIO :: FilePath
        -> Splices (AttrSplice IO)
        -> IO (Either [String] (HeistState IO))
 loadIO baseDir a b c d = runEitherT $ do
-    let hc = HeistConfig (defaultInterpretedSplices >> a)
-                         (defaultLoadTimeSplices >> b) c d
-                         [loadTemplates baseDir] "" False
-    initHeist hc
+    let sc = SpliceConfig (defaultInterpretedSplices >> a)
+                          (defaultLoadTimeSplices >> b) c d
+                          [loadTemplates baseDir]
+    initHeist $ HeistConfig sc "" False
 
 
 ------------------------------------------------------------------------------
 loadHS :: FilePath -> IO (HeistState IO)
 loadHS baseDir = do
     etm <- runEitherT $ do
-        let hc = HeistConfig defaultInterpretedSplices
-                             defaultLoadTimeSplices mempty mempty
-                             [loadTemplates baseDir] "" False
-        initHeist hc
+        let sc = SpliceConfig defaultInterpretedSplices
+                              defaultLoadTimeSplices mempty mempty
+                              [loadTemplates baseDir]
+        initHeist $ HeistConfig sc "" False
     either (error . concat) return etm
 
 
@@ -72,10 +72,9 @@ loadEmpty :: Splices (I.Splice IO)
           -> Splices (AttrSplice IO)
           -> IO (HeistState IO)
 loadEmpty a b c d = do
-    let hc = HeistConfig (defaultInterpretedSplices `mappend` a)
-                         (defaultLoadTimeSplices `mappend` b) c d mempty
-                         "" False
-    res <- runEitherT $ initHeist hc
+    let sc = SpliceConfig (defaultInterpretedSplices `mappend` a)
+                          (defaultLoadTimeSplices `mappend` b) c d mempty
+    res <- runEitherT $ initHeist $ HeistConfig sc "" False
     either (error . concat) return res
 
 

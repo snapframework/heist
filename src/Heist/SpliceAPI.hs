@@ -28,38 +28,37 @@ module Heist.SpliceAPI
   ( SplicesM
   , Splices
   , noSplices
+  , mapS
+  , applyS
   , mapNames
   , prefixSplices
   , namespaceSplices
   , module Data.Map.Syntax
   ) where
 
-import           Control.Applicative
-import           Control.Monad.State (State, MonadState, execState, modify)
-import           Data.Map (Map)
-import qualified Data.Map as M
 import           Data.Map.Syntax
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Heist.Types (Splices)
 
 
 
-{-# DEPRECATED SplicesM, Splices, noSplices, mapS, applyS, ($$), mapNames
- "Use Data.Map.Syntax from the map-syntax package instead" #-}
+{-# DEPRECATED SplicesM, applyS, ($$)
+ "Use functions from the map-syntax package instead" #-}
 
 type SplicesM s a = MapSyntaxM Text s a
 
-type Splices s = MapSyntax Text s
-
 noSplices :: Splices s
 noSplices = mempty
+{-# DEPRECATED noSplices "Use mempty instead" #-}
 
 
 ------------------------------------------------------------------------------
 -- | Maps a function over all the splices.
 mapS :: (a -> b) -> Splices a -> Splices b
 mapS = mapV
+{-# DEPRECATED mapS "Use mapV from the map-syntax package instead" #-}
 
 
 ------------------------------------------------------------------------------
@@ -79,6 +78,7 @@ infixr 0 $$
 -- | Maps a function over all the splice names.
 mapNames :: (Text -> Text) -> Splices a -> Splices a
 mapNames = mapK
+{-# DEPRECATED mapNames "Use mapK from the map-syntax package instead" #-}
 
 
 ------------------------------------------------------------------------------
