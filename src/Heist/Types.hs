@@ -29,6 +29,8 @@ import           Control.Monad.Base
 import           Control.Monad.Cont            (MonadCont (..))
 #if MIN_VERSION_mtl(2,2,1)
 import           Control.Monad.Except          (MonadError (..))
+#else
+import           Control.Monad.Error           (MonadError (..))
 #endif
 import           Control.Monad.Fix             (MonadFix (..))
 import           Control.Monad.Reader          (MonadReader (..))
@@ -411,13 +413,12 @@ liftCatch ce m h =
         (\e -> runHeistT (h e) r s))
 
 
-#if MIN_VERSION_mtl(2,2,1)
 ------------------------------------------------------------------------------
 -- | MonadError passthrough instance
 instance (MonadError e m) => MonadError e (HeistT n m) where
     throwError = lift . throwError
     catchError = liftCatch catchError
-#endif
+
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadCont instance.
