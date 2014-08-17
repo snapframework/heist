@@ -28,7 +28,7 @@ import qualified Heist.Compiled           as C
 import qualified Heist.Compiled.Internal  as CI
 import qualified Heist.Interpreted        as I
 import           Heist.TestCommon
-import           Heist.Types
+import           Heist.Internal.Types
 ------------------------------------------------------------------------------
 
 loadWithCache baseDir = do

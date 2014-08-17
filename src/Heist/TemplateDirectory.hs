@@ -44,8 +44,8 @@ newTemplateDirectory
     -- namespaced tag.
     -> EitherT [String] IO (TemplateDirectory n)
 newTemplateDirectory dir hc = do
-    let sc = (hcSpliceConfig hc) { scTemplateLocations = [loadTemplates dir] }
-    let hc' = hc { hcSpliceConfig = sc }
+    let sc = (_hcSpliceConfig hc) { _scTemplateLocations = [loadTemplates dir] }
+    let hc' = hc { _hcSpliceConfig = sc }
     (hs,cts) <- initHeistWithCacheTag hc'
     tsMVar <- liftIO $ newMVar hs
     ctsMVar <- liftIO $ newMVar cts
@@ -87,8 +87,8 @@ reloadTemplateDirectory :: (MonadIO n)
                         -> IO (Either String ())
 reloadTemplateDirectory (TemplateDirectory p hc tsMVar ctsMVar) = do
     ehs <- runEitherT $ do
-        let sc = (hcSpliceConfig hc) { scTemplateLocations = [loadTemplates p] }
-        initHeistWithCacheTag (hc { hcSpliceConfig = sc })
+        let sc = (_hcSpliceConfig hc) { _scTemplateLocations = [loadTemplates p] }
+        initHeistWithCacheTag (hc { _hcSpliceConfig = sc })
     leftPass ehs $ \(hs,cts) -> do
         modifyMVar_ tsMVar (const $ return hs)
         modifyMVar_ ctsMVar (const $ return cts)

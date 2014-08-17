@@ -23,7 +23,7 @@ import           Text.Blaze.Renderer.XmlHtml
 import           Text.XmlHtml
 ------------------------------------------------------------------------------
 import           Heist.Interpreted.Internal
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 ------------------------------------------------------------------------------
 
                                  ------------

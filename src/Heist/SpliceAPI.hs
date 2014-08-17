@@ -30,18 +30,20 @@ module Heist.SpliceAPI
   , noSplices
   , mapS
   , applyS
+  , ($$)
   , mapNames
   , prefixSplices
   , namespaceSplices
   , module Data.Map.Syntax
   ) where
 
+------------------------------------------------------------------------------
 import           Data.Map.Syntax
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Heist.Types (Splices)
-
+import           Heist.Internal.Types.HeistState (Splices)
+------------------------------------------------------------------------------
 
 
 {-# DEPRECATED SplicesM, applyS, ($$)

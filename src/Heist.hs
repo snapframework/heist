@@ -38,12 +38,29 @@ module Heist
   , RuntimeSplice
   , Chunk
   , HeistState
+  , HeistT
+
+  -- * Lenses (can be used with lens or lens-family)
+  , scInterpretedSplices
+  , scLoadTimeSplices
+  , scCompiledSplices
+  , scAttributeSplices
+  , scTemplateLocations
+  , hcSpliceConfig
+  , hcNamespace
+  , hcErrorNotBound
+  , hcInterpretedSplices
+  , hcLoadTimeSplices
+  , hcCompiledSplices
+  , hcAttributeSplices
+  , hcTemplateLocations
+
+  -- * HeistT functions
   , templateNames
   , compiledTemplateNames
   , hasTemplate
   , spliceNames
   , compiledSpliceNames
-  , HeistT
   , evalHeistT
   , getParamNode
   , getContext
@@ -86,64 +103,8 @@ import qualified Heist.Compiled.Internal       as C
 import qualified Heist.Interpreted.Internal    as I
 import           Heist.SpliceAPI
 import           Heist.Splices
-import           Heist.Types
+import           Heist.Internal.Types
 ------------------------------------------------------------------------------
-
-
-------------------------------------------------------------------------------
-type TemplateRepo = HashMap TPath DocumentFile
-
-
-------------------------------------------------------------------------------
--- | An IO action for getting a template repo from this location.  By not just
--- using a directory path here, we support templates loaded from a database,
--- retrieved from the network, or anything else you can think of.
-type TemplateLocation = EitherT [String] IO TemplateRepo
-
-
-------------------------------------------------------------------------------
--- | The splices and templates Heist will use.  To bind a splice simply
--- include it in the appropriate place here.
-data SpliceConfig m = SpliceConfig
-    { scInterpretedSplices :: Splices (I.Splice m)
-        -- ^ Interpreted splices are the splices that Heist has always had.
-        -- They return a list of nodes and are processed at runtime.
-    , scLoadTimeSplices    :: Splices (I.Splice IO)
-        -- ^ Load time splices are like interpreted splices because they
-        -- return a list of nodes.  But they are like compiled splices because
-        -- they are processed once at load time.  All of Heist's built-in
-        -- splices should be used as load time splices.
-    , scCompiledSplices    :: Splices (C.Splice m)
-        -- ^ Compiled splices return a DList of Chunks and are processed at
-        -- load time to generate a runtime monad action that will be used to
-        -- render the template.
-    , scAttributeSplices   :: Splices (AttrSplice m)
-        -- ^ Attribute splices are bound to attribute names and return a list
-        -- of attributes.
-    , scTemplateLocations  :: [TemplateLocation]
-        -- ^ A list of all the locations that Heist should get its templates
-        -- from.
-    }
-
-
-instance Monoid (SpliceConfig m) where
-    mempty = SpliceConfig mempty mempty mempty mempty mempty
-    mappend (SpliceConfig a1 b1 c1 d1 e1) (SpliceConfig a2 b2 c2 d2 e2) =
-      SpliceConfig (mappend a1 a2) (mappend b1 b2) (mappend c1 c2)
-                   (mappend d1 d2) (mappend e1 e2)
-
-
-data HeistConfig m = HeistConfig
-    { hcSpliceConfig  :: SpliceConfig m
-        -- ^ Splices and templates
-    , hcNamespace     :: Text
-        -- ^ A namespace to use for all tags that are bound to splices.  Use
-        -- empty string for no namespace.
-    , hcErrorNotBound :: Bool
-        -- ^ Whether to throw an error when a tag wih the heist namespace does
-        -- not correspond to a bound splice.  When not using a namespace, this
-        -- flag is ignored.
-    }
 
 
 ------------------------------------------------------------------------------
@@ -257,7 +218,7 @@ initHeist :: Monad n
           -> EitherT [String] IO (HeistState n)
 initHeist hc = do
     keyGen <- lift HE.newKeyGen
-    repos <- sequence $ scTemplateLocations $ hcSpliceConfig hc
+    repos <- sequence $ _scTemplateLocations $ _hcSpliceConfig hc
     initHeist' keyGen hc (Map.unions repos)
 
 
@@ -347,7 +308,7 @@ initHeistWithCacheTag (HeistConfig sc ns enn) = do
     let tag = "cache"
     keyGen <- lift HE.newKeyGen
 
-    repos <- sequence $ scTemplateLocations sc
+    repos <- sequence $ _scTemplateLocations sc
     -- We have to do one preprocessing pass with the cache setup splice.  This
     -- has to happen for both interpreted and compiled templates, so we do it
     -- here by itself because interpreted templates don't get the same load

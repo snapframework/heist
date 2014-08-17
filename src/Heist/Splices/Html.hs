@@ -7,7 +7,7 @@ import qualified Text.XmlHtml as X
 
 ------------------------------------------------------------------------------
 import           Heist.Interpreted.Internal
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 
 
 ------------------------------------------------------------------------------

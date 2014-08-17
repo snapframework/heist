@@ -22,7 +22,7 @@ import           Data.Map.Syntax
 import           Data.Monoid              (Monoid (..), (<>))
 import           Data.Text                (Text)
 import qualified Data.Text                as T
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 import           System.FilePath          (pathSeparator)
 import qualified Text.XmlHtml             as X
 ------------------------------------------------------------------------------
