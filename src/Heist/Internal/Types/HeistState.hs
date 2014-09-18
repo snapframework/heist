@@ -25,7 +25,11 @@ import           Control.Arrow
 import           Control.Monad.CatchIO (MonadCatchIO)
 import qualified Control.Monad.CatchIO as C
 import           Control.Monad.Cont
-import           Control.Monad.Except
+#if MIN_VERSION_mtl(2,2,1)
+import           Control.Monad.Except          (MonadError (..))
+#else
+import           Control.Monad.Error           (MonadError (..))
+#endif
 import           Control.Monad.Reader
 import           Control.Monad.State.Strict
 import           Data.ByteString.Char8 (ByteString)
