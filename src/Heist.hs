@@ -132,6 +132,17 @@ data HeistConfig m = HeistConfig
 emptyHC :: HeistConfig m
 emptyHC = HeistConfig mempty mempty mempty mempty mempty "" False
 
+instance Monoid (HeistConfig m) where
+  mempty      = emptyHC
+  mappend (HeistConfig a b c d e f g) (HeistConfig a' b' c' d' e' f' g') =
+    HeistConfig (a <> a')
+                (b <> b')
+                (c <> c')
+                (d <> d')
+                (e <> e')
+                -- NB: using Last-like behaviour for 'hcNamespace'.
+                (if T.null f' then f else f')
+                (g || g')
 
 ------------------------------------------------------------------------------
 -- | The built-in set of splices that you should use in compiled splice mode.
