@@ -75,6 +75,8 @@ data SpliceConfig m = SpliceConfig
     }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (SpliceConfig m) (Splices (I.Splice m))
 scInterpretedSplices
     :: Functor f
     => (Splices (I.Splice m) -> f (Splices (I.Splice m)))
@@ -84,6 +86,8 @@ scInterpretedSplices = lens _scInterpretedSplices setter
     setter sc v = sc { _scInterpretedSplices = v }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (SpliceConfig m) (Splices (I.Splice IO))
 scLoadTimeSplices
     :: Functor f
     => (Splices (I.Splice IO) -> f (Splices (I.Splice IO)))
@@ -93,6 +97,8 @@ scLoadTimeSplices = lens _scLoadTimeSplices setter
     setter sc v = sc { _scLoadTimeSplices = v }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (SpliceConfig m) (Splices (C.Splice m))
 scCompiledSplices
     :: Functor f
     => (Splices (C.Splice m) -> f (Splices (C.Splice m)))
@@ -102,6 +108,8 @@ scCompiledSplices = lens _scCompiledSplices setter
     setter sc v = sc { _scCompiledSplices = v }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (SpliceConfig m) (Splices (AttrSplice m))
 scAttributeSplices
     :: Functor f
     => (Splices (AttrSplice m) -> f (Splices (AttrSplice m)))
@@ -111,6 +119,8 @@ scAttributeSplices = lens _scAttributeSplices setter
     setter sc v = sc { _scAttributeSplices = v }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (SpliceConfig m) [TemplateLocation]
 scTemplateLocations
     :: Functor f
     => ([TemplateLocation] -> f [TemplateLocation])
@@ -140,6 +150,8 @@ data HeistConfig m = HeistConfig
     }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) (SpliceConfig m)
 hcSpliceConfig
     :: Functor f
     => ((SpliceConfig m) -> f (SpliceConfig m))
@@ -149,6 +161,8 @@ hcSpliceConfig = lens _hcSpliceConfig setter
     setter hc v = hc { _hcSpliceConfig = v }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) Text
 hcNamespace
     :: Functor f
     => (Text -> f Text)
@@ -158,6 +172,8 @@ hcNamespace = lens _hcNamespace setter
     setter hc v = hc { _hcNamespace = v }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) Bool
 hcErrorNotBound
     :: Functor f
     => (Bool -> f Bool)
@@ -167,6 +183,8 @@ hcErrorNotBound = lens _hcErrorNotBound setter
     setter hc v = hc { _hcErrorNotBound = v }
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) (Splices (I.Splice m))
 hcInterpretedSplices
     :: Functor f
     => (Splices (I.Splice m) -> f (Splices (I.Splice m)))
@@ -174,6 +192,8 @@ hcInterpretedSplices
 hcInterpretedSplices = hcSpliceConfig . scInterpretedSplices
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) (Splices (I.Splice IO))
 hcLoadTimeSplices
     :: Functor f
     => (Splices (I.Splice IO) -> f (Splices (I.Splice IO)))
@@ -181,6 +201,8 @@ hcLoadTimeSplices
 hcLoadTimeSplices = hcSpliceConfig . scLoadTimeSplices 
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) (Splices (C.Splice m))
 hcCompiledSplices
     :: Functor f
     => (Splices (C.Splice m) -> f (Splices (C.Splice m)))
@@ -188,6 +210,8 @@ hcCompiledSplices
 hcCompiledSplices = hcSpliceConfig . scCompiledSplices 
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) (Splices (AttrSplice m))
 hcAttributeSplices
     :: Functor f
     => (Splices (AttrSplice m) -> f (Splices (AttrSplice m)))
@@ -195,6 +219,8 @@ hcAttributeSplices
 hcAttributeSplices = hcSpliceConfig . scAttributeSplices 
 
 
+------------------------------------------------------------------------------
+-- | :: Simple Lens (HeistConfig m) [TemplateLocation]
 hcTemplateLocations
     :: Functor f
     => ([TemplateLocation] -> f [TemplateLocation])
