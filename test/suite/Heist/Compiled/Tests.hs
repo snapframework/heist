@@ -18,6 +18,7 @@ import qualified Test.HUnit as H
 ------------------------------------------------------------------------------
 import           Heist
 import           Heist.Compiled
+import           Heist.Internal.Types
 import           Heist.Tutorial.CompiledSplices
 import           Heist.TestCommon
 

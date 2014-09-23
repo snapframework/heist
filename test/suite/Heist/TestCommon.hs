@@ -14,6 +14,7 @@ import           Data.Monoid
 ------------------------------------------------------------------------------
 import           Heist
 import qualified Heist.Compiled             as C
+import           Heist.Internal.Types
 import qualified Heist.Interpreted          as I
 import qualified Heist.Interpreted.Internal as I
 import qualified Text.XmlHtml               as X
