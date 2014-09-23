@@ -24,10 +24,11 @@ module Heist
   , initHeistWithCacheTag
   , defaultInterpretedSplices
   , defaultLoadTimeSplices
+  , emptyHeistConfig
 
   -- * Core Heist data types
-  , SpliceConfig(..)
-  , HeistConfig(..)
+  , SpliceConfig
+  , HeistConfig
   , TemplateRepo
   , TemplateLocation
   , Template
@@ -135,6 +136,13 @@ defaultInterpretedSplices = do
     ignoreTag ## ignoreImpl
     markdownTag ## markdownSplice
 
+
+
+------------------------------------------------------------------------------
+-- | An empty HeistConfig that uses the \"h\" namespace with error checking
+-- turned on.
+emptyHeistConfig :: HeistConfig m
+emptyHeistConfig = HeistConfig mempty "h" True
 
 
 allErrors :: [Either String (TPath, v)]

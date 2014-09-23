@@ -21,6 +21,7 @@ import           Control.Error
 import           Control.Monad
 import           Control.Monad.Trans
 import           Heist
+import           Heist.Internal.Types
 import           Heist.Splices.Cache
 
 
