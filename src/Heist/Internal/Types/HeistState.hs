@@ -17,7 +17,7 @@ liberating us from the unused writer portion of RWST.
 
 -}
 
-module Heist.Types where
+module Heist.Internal.Types.HeistState where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder      (Builder)
@@ -43,6 +43,7 @@ import           Data.HashMap.Strict           (HashMap)
 import qualified Data.HashMap.Strict           as H
 import           Data.HeterogeneousEnvironment (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment as HE
+import           Data.Map.Syntax
 import           Data.Monoid                   (Monoid(..))
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
@@ -56,6 +57,11 @@ import           Data.Typeable                 (mkTyCon)
 #endif
 import qualified Text.XmlHtml                  as X
 ------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+-- | Convenient type alies for splices.
+type Splices s = MapSyntax Text s
 
 
 ------------------------------------------------------------------------------
@@ -401,13 +407,14 @@ instance MonadReader r m => MonadReader r (HeistT n m) where
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadError instance.
-liftCatch :: (m (a,HeistState n)
-              -> (e -> m (a,HeistState n))
-              -> m (a,HeistState n))
-          -> HeistT n m a
-          -> (e -> HeistT n m a)
-          -> HeistT n m a
-liftCatch ce m h =
+_liftCatch
+    :: (m (a,HeistState n)
+        -> (e -> m (a,HeistState n))
+        -> m (a,HeistState n))
+    -> HeistT n m a
+    -> (e -> HeistT n m a)
+    -> HeistT n m a
+_liftCatch ce m h =
     HeistT $ \r s ->
         (runHeistT m r s `ce`
         (\e -> runHeistT (h e) r s))
@@ -417,17 +424,18 @@ liftCatch ce m h =
 -- | MonadError passthrough instance
 instance (MonadError e m) => MonadError e (HeistT n m) where
     throwError = lift . throwError
-    catchError = liftCatch catchError
+    catchError = _liftCatch catchError
 
 
 ------------------------------------------------------------------------------
 -- | Helper for MonadCont instance.
-liftCallCC :: ((((a,HeistState n) -> m (b, HeistState n))
-                  -> m (a, HeistState n))
-                -> m (a, HeistState n))
-           -> ((a -> HeistT n m b) -> HeistT n m a)
-           -> HeistT n m a
-liftCallCC ccc f = HeistT $ \r s ->
+_liftCallCC
+    :: ((((a,HeistState n) -> m (b, HeistState n))
+           -> m (a, HeistState n))
+         -> m (a, HeistState n))
+    -> ((a -> HeistT n m b) -> HeistT n m a)
+    -> HeistT n m a
+_liftCallCC ccc f = HeistT $ \r s ->
     ccc $ \c ->
     runHeistT (f (\a -> HeistT $ \_ _ -> c (a, s))) r s
 
@@ -435,7 +443,7 @@ liftCallCC ccc f = HeistT $ \r s ->
 ------------------------------------------------------------------------------
 -- | MonadCont passthrough instance
 instance (MonadCont m) => MonadCont (HeistT n m) where
-    callCC = liftCallCC callCC
+    callCC = _liftCallCC callCC
 
 
 #if !MIN_VERSION_base(4,7,0)

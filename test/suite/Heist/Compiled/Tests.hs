@@ -6,6 +6,7 @@ module Heist.Compiled.Tests
 
 import           Blaze.ByteString.Builder
 import           Control.Error
+import           Control.Lens
 import           Control.Monad.Trans
 import           Data.Map.Syntax
 import           Data.Monoid
@@ -17,6 +18,7 @@ import qualified Test.HUnit as H
 ------------------------------------------------------------------------------
 import           Heist
 import           Heist.Compiled
+import           Heist.Internal.Types
 import           Heist.Tutorial.CompiledSplices
 import           Heist.TestCommon
 
@@ -52,13 +54,11 @@ peopleTest = do
       mappend doctype "\n&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
 
 templateHC :: HeistConfig IO
-templateHC =
-    emptyHC { hcLoadTimeSplices = defaultLoadTimeSplices
-            , hcCompiledSplices = "foo" ## return (yieldPureText "aoeu")
-            , hcTemplateLocations = [loadTemplates "templates"]
-            , hcNamespace = ""
-            , hcErrorNotBound = False
-            }
+templateHC = HeistConfig sc "" False
+  where
+    sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
+                & scCompiledSplices .~ ("foo" ## return (yieldPureText "aoeu"))
+                & scTemplateLocations .~ [loadTemplates "templates"]
 
 namespaceTest1 :: IO ()
 namespaceTest1 = do
@@ -77,7 +77,7 @@ namespaceTest1 = do
 namespaceTest2 :: IO ()
 namespaceTest2 = do
     res <- runEitherT $ do
-        hs <- initHeist $ templateHC { hcErrorNotBound = True }
+        hs <- initHeist $ templateHC & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
         b <- lift $ fst runner
@@ -91,7 +91,7 @@ namespaceTest2 = do
 namespaceTest3 :: IO ()
 namespaceTest3 = do
     res <- runEitherT $ do
-        hs <- initHeist templateHC { hcNamespace = "h" }
+        hs <- initHeist $ templateHC & hcNamespace .~ "h"
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
         b <- lift $ fst runner
@@ -105,8 +105,8 @@ namespaceTest3 = do
 namespaceTest4 :: IO ()
 namespaceTest4 = do
     res <- runEitherT $ do
-        hs <- initHeist $ templateHC { hcNamespace = "h"
-                                     , hcErrorNotBound = True }
+        hs <- initHeist $ templateHC & hcNamespace .~ "h"
+                                     & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
         b <- lift $ fst runner
@@ -120,16 +120,12 @@ namespaceTest4 = do
 namespaceTest5 :: IO ()
 namespaceTest5 = do
     res <- runEitherT $ do
-        hs <- initHeist $ templateHC { hcNamespace = "h"
-                                     , hcCompiledSplices = mempty
-                                     , hcErrorNotBound = True }
+        hs <- initHeist $ templateHC & hcNamespace .~ "h"
+                                     & hcCompiledSplices .~ mempty
+                                     & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
         b <- lift $ fst runner
         return $ toByteString b
 
     H.assertEqual "namespace test" (Left ["templates/namespaces.tpl: No splice bound for h:foo"]) res
-  where
-    expected = mappend doctype "\nAlpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
-
-

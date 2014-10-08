@@ -22,9 +22,8 @@ import qualified Text.Blaze.Html5            as B
 import           Text.Blaze.Renderer.XmlHtml
 import           Text.XmlHtml
 ------------------------------------------------------------------------------
-import           Heist.Common
 import           Heist.Interpreted.Internal
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 ------------------------------------------------------------------------------
 
                                  ------------

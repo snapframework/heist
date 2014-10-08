@@ -42,7 +42,7 @@ import           Heist.Splices.Ignore
 import           Heist.Splices.Json
 import           Heist.Splices.Markdown
 import           Heist.TestCommon
-import           Heist.Types
+import           Heist.Internal.Types
 import qualified Text.XmlHtml                         as X
 import qualified Text.XmlHtml.Cursor                  as X
 

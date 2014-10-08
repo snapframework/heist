@@ -35,7 +35,7 @@ import           Text.XmlHtml
 ------------------------------------------------------------------------------
 import           Heist.Common
 import           Heist.Interpreted.Internal
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 
 data PandocMissingException = PandocMissingException
    deriving (Typeable)
