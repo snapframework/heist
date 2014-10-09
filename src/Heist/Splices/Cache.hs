@@ -43,7 +43,7 @@ import           Text.XmlHtml
 ------------------------------------------------------------------------------
 import qualified Heist.Compiled.Internal as C
 import           Heist.Interpreted.Internal
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 
 
 ------------------------------------------------------------------------------

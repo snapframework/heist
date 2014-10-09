@@ -24,10 +24,11 @@ module Heist
   , initHeistWithCacheTag
   , defaultInterpretedSplices
   , defaultLoadTimeSplices
+  , emptyHeistConfig
 
   -- * Core Heist data types
-  , HeistConfig(..)
-  , emptyHC
+  , SpliceConfig
+  , HeistConfig
   , TemplateRepo
   , TemplateLocation
   , Template
@@ -38,12 +39,29 @@ module Heist
   , RuntimeSplice
   , Chunk
   , HeistState
+  , HeistT
+
+  -- * Lenses (can be used with lens or lens-family)
+  , scInterpretedSplices
+  , scLoadTimeSplices
+  , scCompiledSplices
+  , scAttributeSplices
+  , scTemplateLocations
+  , hcSpliceConfig
+  , hcNamespace
+  , hcErrorNotBound
+  , hcInterpretedSplices
+  , hcLoadTimeSplices
+  , hcCompiledSplices
+  , hcAttributeSplices
+  , hcTemplateLocations
+
+  -- * HeistT functions
   , templateNames
   , compiledTemplateNames
   , hasTemplate
   , spliceNames
   , compiledSpliceNames
-  , HeistT
   , evalHeistT
   , getParamNode
   , getContext
@@ -60,7 +78,6 @@ module Heist
   , tellSpliceError
   , orError
   , Splices
-  , mapS
   ) where
 
 
@@ -85,64 +102,9 @@ import           Heist.Common
 import qualified Heist.Compiled.Internal       as C
 import qualified Heist.Interpreted.Internal    as I
 import           Heist.Splices
-import           Heist.Types
+import           Heist.Internal.Types
 ------------------------------------------------------------------------------
 
-
-------------------------------------------------------------------------------
-type TemplateRepo = HashMap TPath DocumentFile
-
-
-------------------------------------------------------------------------------
--- | An IO action for getting a template repo from this location.  By not just
--- using a directory path here, we support templates loaded from a database,
--- retrieved from the network, or anything else you can think of.
-type TemplateLocation = EitherT [String] IO TemplateRepo
-
-
-------------------------------------------------------------------------------
-data HeistConfig m = HeistConfig
-    { hcInterpretedSplices :: Splices (I.Splice m)
-        -- ^ Interpreted splices are the splices that Heist has always had.
-        -- They return a list of nodes and are processed at runtime.
-    , hcLoadTimeSplices    :: Splices (I.Splice IO)
-        -- ^ Load time splices are like interpreted splices because they
-        -- return a list of nodes.  But they are like compiled splices because
-        -- they are processed once at load time.  All of Heist's built-in
-        -- splices should be used as load time splices.
-    , hcCompiledSplices    :: Splices (C.Splice m)
-        -- ^ Compiled splices return a DList of Chunks and are processed at
-        -- load time to generate a runtime monad action that will be used to
-        -- render the template.
-    , hcAttributeSplices   :: Splices (AttrSplice m)
-        -- ^ Attribute splices are bound to attribute names and return a list
-        -- of attributes.
-    , hcTemplateLocations  :: [TemplateLocation]
-        -- ^ A list of all the locations that Heist should get its templates
-        -- from.
-    , hcNamespace          :: Text
-
-        -- | Whether to throw an error when a tag wih the heist namespace does
-        -- not correspond to a bound splice.  When not using a namespace, this
-        -- flag is ignored.
-    , hcErrorNotBound      :: Bool
-    }
-
-
-emptyHC :: HeistConfig m
-emptyHC = HeistConfig mempty mempty mempty mempty mempty "" False
-
-instance Monoid (HeistConfig m) where
-  mempty      = emptyHC
-  mappend (HeistConfig a b c d e f g) (HeistConfig a' b' c' d' e' f' g') =
-    HeistConfig (a <> a')
-                (b <> b')
-                (c <> c')
-                (d <> d')
-                (e <> e')
-                -- NB: using Last-like behaviour for 'hcNamespace'.
-                (if T.null f' then f else f')
-                (g || g')
 
 ------------------------------------------------------------------------------
 -- | The built-in set of splices that you should use in compiled splice mode.
@@ -161,9 +123,10 @@ defaultLoadTimeSplices = do
 ------------------------------------------------------------------------------
 -- | The built-in set of static splices.  All the splices that used to be
 -- enabled by default are included here.  To get the normal Heist behavior you
--- should include these in the hcLoadTimeSplices list in your HeistConfig.  If
--- you are using interpreted splice mode, then you might also want to bind the
--- 'deprecatedContentCheck' splice to the content tag as a load time splice.
+-- should include these in the scLoadTimeSplices list in your SpliceConfig.
+-- If you are using interpreted splice mode, then you might also want to bind
+-- the 'deprecatedContentCheck' splice to the content tag as a load time
+-- splice.
 defaultInterpretedSplices :: MonadIO m => Splices (I.Splice m)
 defaultInterpretedSplices = do
     applyTag ## applyImpl
@@ -171,6 +134,13 @@ defaultInterpretedSplices = do
     ignoreTag ## ignoreImpl
     markdownTag ## markdownSplice
 
+
+
+------------------------------------------------------------------------------
+-- | An empty HeistConfig that uses the \"h\" namespace with error checking
+-- turned on.
+emptyHeistConfig :: HeistConfig m
+emptyHeistConfig = HeistConfig mempty "h" True
 
 
 allErrors :: [Either String (TPath, v)]
@@ -254,7 +224,7 @@ initHeist :: Monad n
           -> EitherT [String] IO (HeistState n)
 initHeist hc = do
     keyGen <- lift HE.newKeyGen
-    repos <- sequence $ hcTemplateLocations hc
+    repos <- sequence $ _scTemplateLocations $ _hcSpliceConfig hc
     initHeist' keyGen hc (Map.unions repos)
 
 
@@ -271,8 +241,10 @@ initHeist' :: Monad n
            -> HeistConfig n
            -> TemplateRepo
            -> EitherT [String] IO (HeistState n)
-initHeist' keyGen (HeistConfig i lt c a _ ns enn) repo = do
+
+initHeist' keyGen (HeistConfig sc ns enn) repo = do
     let empty = emptyHS keyGen
+    let (SpliceConfig i lt c a _) = sc
     tmap <- preproc keyGen lt repo ns
     let prefix = mkSplicePrefix ns
     is <- runHashMap $ mapK (prefix<>) i
@@ -338,21 +310,20 @@ preprocess (tpath, docFile) = do
 initHeistWithCacheTag :: MonadIO n
                       => HeistConfig n
                       -> EitherT [String] IO (HeistState n, CacheTagState)
-initHeistWithCacheTag (HeistConfig i lt c a locations ns enn) = do
+initHeistWithCacheTag (HeistConfig sc ns enn) = do
     (ss, cts) <- liftIO mkCacheTag
     let tag = "cache"
     keyGen <- lift HE.newKeyGen
 
-    repos <- sequence locations
+    repos <- sequence $ _scTemplateLocations sc
     -- We have to do one preprocessing pass with the cache setup splice.  This
     -- has to happen for both interpreted and compiled templates, so we do it
     -- here by itself because interpreted templates don't get the same load
     -- time splices as compiled templates.
     rawWithCache <- preproc keyGen (tag ## ss) (Map.unions repos) ns
-
-    let hc' = HeistConfig (i <> (tag #! cacheImpl cts)) lt
-                          (c <> (tag #! cacheImplCompiled cts))
-                          a locations ns enn
-    hs <- initHeist' keyGen hc' rawWithCache
+    let sc' = SpliceConfig (tag #! cacheImpl cts) mempty
+                           (tag #! cacheImplCompiled cts) mempty mempty
+    let hc = HeistConfig (mappend sc sc') ns enn
+    hs <- initHeist' keyGen hc rawWithCache
     return (hs, cts)
 

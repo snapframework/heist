@@ -11,7 +11,7 @@ import           Heist.Common
 import           Heist.Interpreted.Internal
 import           Heist.Splices.Apply
 import           Heist.Splices.Bind
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 
 -- | Default name for the bind splice.
 bindStrictTag :: Text

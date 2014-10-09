@@ -21,6 +21,7 @@ import qualified Test.HUnit                      as H
 ------------------------------------------------------------------------------
 import           Heist
 import qualified Heist.Compiled                  as C
+import           Heist.Internal.Types
 import qualified Heist.Interpreted               as I
 import           Heist.Splices.Cache
 import           Heist.Splices.Html
@@ -93,7 +94,8 @@ tdirCacheTest :: IO ()
 tdirCacheTest = do
     let rSplices = ("foosplice" ## fooSplice)
         dSplices = ("foosplice" ## stateSplice)
-        hc = HeistConfig rSplices mempty dSplices mempty mempty "" False
+        sc = SpliceConfig rSplices mempty dSplices mempty mempty
+        hc = HeistConfig sc "" False
     td <- newTemplateDirectory' "templates" hc
 
     [a,b,c,d] <- evalStateT (testInterpreted td) 5

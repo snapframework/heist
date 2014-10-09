@@ -18,7 +18,7 @@ import           Heist.Splices.Cache
 import           Heist.Splices.Html
 import           Heist.Splices.Ignore
 import           Heist.Splices.Markdown
-import           Heist.Types
+import           Heist.Internal.Types.HeistState
 
 ------------------------------------------------------------------------------
 -- | Run the splice contents if given condition is True, make splice disappear

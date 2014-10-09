@@ -28,14 +28,14 @@ import qualified Heist.Compiled           as C
 import qualified Heist.Compiled.Internal  as CI
 import qualified Heist.Interpreted        as I
 import           Heist.TestCommon
-import           Heist.Types
+import           Heist.Internal.Types
 ------------------------------------------------------------------------------
 
 loadWithCache baseDir = do
     etm <- runEitherT $ do
-        let hc = HeistConfig mempty defaultLoadTimeSplices mempty mempty
-                             [loadTemplates baseDir] "" False
-        initHeistWithCacheTag hc
+        let sc = SpliceConfig mempty defaultLoadTimeSplices mempty mempty
+                              [loadTemplates baseDir]
+        initHeistWithCacheTag $ HeistConfig sc "" False
     either (error . unlines) (return . fst) etm
 
 main = do
