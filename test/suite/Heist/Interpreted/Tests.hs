@@ -36,13 +36,13 @@ import           Test.QuickCheck.Monadic
 ------------------------------------------------------------------------------
 import           Heist
 import           Heist.Common
+import           Heist.Internal.Types
 import           Heist.Interpreted.Internal
 import           Heist.Splices.Apply
 import           Heist.Splices.Ignore
 import           Heist.Splices.Json
 import           Heist.Splices.Markdown
 import           Heist.TestCommon
-import           Heist.Internal.Types
 import qualified Text.XmlHtml                         as X
 import qualified Text.XmlHtml.Cursor                  as X
 
@@ -61,6 +61,8 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/attributeSubstitution" attrSubstTest
         , testCase     "heist/bindAttribute"         bindAttrTest
         , testCase     "heist/markdown"              markdownTest
+        , testCase     "heist/pandoc"                pandocTest
+        , testCase     "heist/pandoc_div"            pandocDivTest
         , testCase     "heist/title_expansion"       titleExpansion
         , testCase     "heist/textarea_expansion"    textareaExpansion
         , testCase     "heist/div_expansion"         divExpansion
@@ -139,7 +141,7 @@ loadTest = do
     ets <- loadIO "templates" mempty mempty mempty mempty
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertEqual "loadTest size" 38 $ Map.size tm
+                      H.assertEqual "loadTest size" 40 $ Map.size tm
            ) ets
 
 
@@ -240,6 +242,31 @@ markdownHtmlExpected =
 markdownTest :: H.Assertion
 markdownTest = renderTest "markdown" markdownHtmlExpected
 
+-----------------------------------------------------------------------------
+
+-- | Pandoc test on a file
+pandocTest :: H.Assertion
+pandocTest = renderTest "pandoc" pandocNoDivHtmlExpected
+
+pandocDivTest :: H.Assertion
+pandocDivTest = renderTest "pandocdiv" pandocDivHtmlExpected
+
+pandocNoDivHtmlExpected :: ByteString
+pandocNoDivHtmlExpected = "<p>This <em>is</em> a test.</p>"
+
+pandocDivHtmlExpected :: ByteString
+pandocDivHtmlExpected =
+  "<div class='foo test' id='pandoc'><p>This <em>is</em> a test.</p></div>"
+  -- Implementaton dependent. Class is prepended in current implementation,
+  -- it will be first attribute
+
+pandocTestSplices :: Splices (Splice IO)
+pandocTestSplices = do
+    "pandocnodiv" ## pandocSplice optsNoDiv
+    "pandocdiv"   ## pandocSplice optsDiv
+  where
+    optsNoDiv = setPandocWrapDiv Nothing defaultPandocOptions
+    optsDiv = setPandocWrapDiv (Just "test") defaultPandocOptions
 
 ------------------------------------------------------------------------------
 jsonValueTest :: H.Assertion
@@ -268,7 +295,7 @@ renderTest  :: ByteString   -- ^ template name
             -> ByteString   -- ^ expected result
             -> H.Assertion
 renderTest templateName expectedResult = do
-    ets <- loadT "templates" mempty mempty mempty mempty
+    ets <- loadT "templates" mempty pandocTestSplices mempty mempty
     let ts = either (error "Error loading templates") id ets
 
     check ts expectedResult
