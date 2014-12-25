@@ -347,19 +347,19 @@ instance MonadBase b m => MonadBase b (HeistT n m) where
 
 
 instance MonadTransControl (HeistT n) where
-    newtype StT (HeistT n) a = StHeistT {unStHeistT :: (a, HeistState n)}
+    type StT (HeistT n) a = (a, HeistState n)
     liftWith f = HeistT $ \n s -> do
-        res <- f $ \(HeistT g) -> liftM StHeistT $ g n s
+        res <- f $ \(HeistT g) -> g n s
         return (res, s)
-    restoreT k = HeistT $ \_ _ -> liftM unStHeistT k
+    restoreT k = HeistT $ \_ _ -> k
     {-# INLINE liftWith #-}
     {-# INLINE restoreT #-}
 
 
 instance MonadBaseControl b m => MonadBaseControl b (HeistT n m) where
-     newtype StM (HeistT n m) a = StMHeist {unStMHeist :: ComposeSt (HeistT n) m a}
-     liftBaseWith = defaultLiftBaseWith StMHeist
-     restoreM = defaultRestoreM unStMHeist
+     type StM (HeistT n m) a = ComposeSt (HeistT n) m a
+     liftBaseWith = defaultLiftBaseWith
+     restoreM = defaultRestoreM
      {-# INLINE liftBaseWith #-}
      {-# INLINE restoreM #-}
 
