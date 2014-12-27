@@ -1,7 +1,6 @@
 module Heist.Splices.BindStrict where
 
 ------------------------------------------------------------------------------
-import           Control.Monad.Trans
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Text.XmlHtml as X
@@ -20,7 +19,7 @@ bindStrictTag = "bindStrict"
 
 ------------------------------------------------------------------------------
 -- | Implementation of the bind splice.
-bindStrictImpl :: MonadIO n => Splice n
+bindStrictImpl :: Monad n => Splice n
 bindStrictImpl = do
     node <- getParamNode
     cs <- runChildren

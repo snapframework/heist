@@ -3,7 +3,6 @@
 module Heist.Splices.Apply where
 
 ------------------------------------------------------------------------------
-import           Control.Monad.Trans
 import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -68,7 +67,7 @@ rawApply paramTag calledNodes templateFile newContext paramNodes = do
 ------------------------------------------------------------------------------
 -- | Applies a template as if the supplied nodes were the children of the
 -- <apply> tag.
-applyNodes :: MonadIO n => Template -> Text -> Splice n
+applyNodes :: Monad n => Template -> Text -> Splice n
 applyNodes nodes template = do
     hs <- getHS
     maybe (return [] `orError` err)
@@ -83,7 +82,7 @@ applyNodes nodes template = do
 
 ------------------------------------------------------------------------------
 -- | Implementation of the apply splice.
-applyImpl :: MonadIO n => Splice n
+applyImpl :: Monad n => Splice n
 applyImpl = do
     node <- getParamNode
     let err = "must supply \"" ++ T.unpack applyAttr ++
