@@ -345,7 +345,24 @@ instance MonadTrans (HeistT n) where
 instance MonadBase b m => MonadBase b (HeistT n m) where
     liftBase = lift . liftBase
 
+#if MIN_VERSION_monad_control(1,0,0)
+instance MonadTransControl (HeistT n) where
+    type StT (HeistT n) a = (a, HeistState n)
+    liftWith f = HeistT $ \n s -> do
+        res <- f $ \(HeistT g) -> g n s
+        return (res, s)
+    restoreT k = HeistT $ \_ _ -> k
+    {-# INLINE liftWith #-}
+    {-# INLINE restoreT #-}
 
+
+instance MonadBaseControl b m => MonadBaseControl b (HeistT n m) where
+     type StM (HeistT n m) a = ComposeSt (HeistT n) m a
+     liftBaseWith = defaultLiftBaseWith
+     restoreM = defaultRestoreM
+     {-# INLINE liftBaseWith #-}
+     {-# INLINE restoreM #-}
+#else
 instance MonadTransControl (HeistT n) where
     newtype StT (HeistT n) a = StHeistT {unStHeistT :: (a, HeistState n)}
     liftWith f = HeistT $ \n s -> do
@@ -362,7 +379,7 @@ instance MonadBaseControl b m => MonadBaseControl b (HeistT n m) where
      restoreM = defaultRestoreM unStMHeist
      {-# INLINE liftBaseWith #-}
      {-# INLINE restoreM #-}
-
+#endif
 
 ------------------------------------------------------------------------------
 -- | MonadFix passthrough instance
