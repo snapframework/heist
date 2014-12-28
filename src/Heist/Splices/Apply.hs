@@ -55,7 +55,7 @@ rawApply paramTag calledNodes templateFile newContext paramNodes = do
               (return []) `orError` err
   where
     err = "template recursion exceeded max depth, "++
-          "you probably have infinite splice recursion!"
+          "you probably have infinite splice recursion!" :: String
     treeMap :: [X.Node] -> X.Node -> [X.Node]
     treeMap ns n@(X.Element nm _ cs)
       | nm == paramTag = ns

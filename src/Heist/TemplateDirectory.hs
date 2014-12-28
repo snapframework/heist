@@ -101,4 +101,4 @@ leftPass :: Monad m => Either [String] b -> (b -> m c) -> m (Either String c)
 leftPass e m = either (return . Left . loadError . concat)
                       (liftM Right . m) e
   where
-    loadError = (++) "Error loading templates: "
+    loadError = (++) ("Error loading templates: " :: String)
