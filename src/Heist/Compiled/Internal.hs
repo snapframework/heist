@@ -597,6 +597,20 @@ nodeSplice f = X.renderHtmlFragment X.UTF8 . f
 
 
 ------------------------------------------------------------------------------
+-- | Converts a pure XML Node splice function to a pure Builder splice
+-- function.
+xmlNodeSplice :: (a -> [X.Node]) -> a -> Builder
+xmlNodeSplice f = X.renderXmlFragment X.UTF8 . f
+
+
+------------------------------------------------------------------------------
+-- | Converts a pure HTML Node splice function to a pure Builder splice
+-- function.
+htmlNodeSplice :: (a -> [X.Node]) -> a -> Builder
+htmlNodeSplice f = X.renderHtmlFragment X.UTF8 . f
+
+
+------------------------------------------------------------------------------
 -- | Converts a pure Builder splice function into a monadic splice function
 -- of a RuntimeSplice.
 pureSplice :: Monad n => (a -> Builder) -> RuntimeSplice n a -> Splice n

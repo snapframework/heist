@@ -23,6 +23,8 @@ module Heist.Compiled
   -- * Functions for manipulating lists of compiled splices
   , textSplice
   , nodeSplice
+  , xmlNodeSplice
+  , htmlNodeSplice
   , pureSplice
 
   , deferMany
