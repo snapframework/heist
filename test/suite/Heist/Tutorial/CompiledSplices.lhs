@@ -273,7 +273,7 @@ differently in the case of failure.
 <   
 < splices :: Monad n
 <         => Splices (RuntimeSplice n (Text, Text) -> C.Splice n)
-< splices = mapS (C.pureSplice . C.nodeSplice) $ do
+< splices = mapS (C.pureSplice . C.htmlNodeSplice) $ do
 <   "user"  ## (:[]) . TextNode . fst
 <   "value" ## (:[]) . TextNode . snd
 

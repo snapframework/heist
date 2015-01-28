@@ -591,9 +591,25 @@ textSplice f = fromText . f
 
 
 ------------------------------------------------------------------------------
--- | Converts a pure Node splice function to a pure Builder splice function.
+-- | This is the same as htmlNodeSplice.  
 nodeSplice :: (a -> [X.Node]) -> a -> Builder
 nodeSplice f = X.renderHtmlFragment X.UTF8 . f
+{-# DEPRECATED nodeSplice
+   "Use xmlNodeSplice or htmlNodeSplice, will be removed in Heist 1.1" #-}
+
+
+------------------------------------------------------------------------------
+-- | Converts a pure XML Node splice function to a pure Builder splice
+-- function.
+xmlNodeSplice :: (a -> [X.Node]) -> a -> Builder
+xmlNodeSplice f = X.renderXmlFragment X.UTF8 . f
+
+
+------------------------------------------------------------------------------
+-- | Converts a pure HTML Node splice function to a pure Builder splice
+-- function.
+htmlNodeSplice :: (a -> [X.Node]) -> a -> Builder
+htmlNodeSplice f = X.renderHtmlFragment X.UTF8 . f
 
 
 ------------------------------------------------------------------------------
