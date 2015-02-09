@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-|
 
 This module defines a TemplateDirectory data structure for convenient
