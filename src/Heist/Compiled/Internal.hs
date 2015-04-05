@@ -32,6 +32,9 @@ import qualified Data.Vector                        as V
 import qualified Text.XmlHtml                       as X
 import qualified Text.XmlHtml.HTML.Meta             as X
 ------------------------------------------------------------------------------
+import           Data.Foldable                      (Foldable)
+import qualified Data.Foldable                      as Foldable
+------------------------------------------------------------------------------
 import           Heist.Common
 import           Heist.Internal.Types.HeistState
 ------------------------------------------------------------------------------
@@ -637,12 +640,21 @@ withSplices splice splices runtimeAction =
 
 
 ------------------------------------------------------------------------------
+{-# INLINE foldMapM #-}
+foldMapM :: (Monad f, Monoid m, Foldable list)
+         => (a -> f m)
+         -> list a
+         -> f m
+foldMapM f =
+  Foldable.foldlM (\xs x -> xs `seq` liftM (xs <>) (f x)) mempty
+
+------------------------------------------------------------------------------
 -- | Like withSplices, but evaluates the splice repeatedly for each element in
 -- a list generated at runtime.
-manyWithSplices :: Monad n
+manyWithSplices :: (Foldable f, Monad n)
                 => Splice n
                 -> Splices (RuntimeSplice n a -> Splice n)
-                -> RuntimeSplice n [a]
+                -> RuntimeSplice n (f a)
                 -> Splice n
 manyWithSplices splice splices runtimeAction = do
     p <- newEmptyPromise
@@ -650,18 +662,17 @@ manyWithSplices splice splices runtimeAction = do
     chunks <- withLocalSplices splices' mempty splice
     return $ yieldRuntime $ do
         items <- runtimeAction
-        res <- forM items $ \item -> putPromise p item >> codeGen chunks
-        return $ mconcat res
+        foldMapM (\item -> putPromise p item >> codeGen chunks) items
 
 
 ------------------------------------------------------------------------------
 -- | More powerful version of manyWithSplices that lets you also define
 -- attribute splices.
-manyWith :: (Monad n)
+manyWith :: (Foldable f, Monad n)
          => Splice n
          -> Splices (RuntimeSplice n a -> Splice n)
          -> Splices (RuntimeSplice n a -> AttrSplice n)
-         -> RuntimeSplice n [a]
+         -> RuntimeSplice n (f a)
          -> Splice n
 manyWith splice splices attrSplices runtimeAction = do
     p <- newEmptyPromise
@@ -670,27 +681,23 @@ manyWith splice splices attrSplices runtimeAction = do
     chunks <- withLocalSplices splices' attrSplices' splice
     return $ yieldRuntime $ do
         items <- runtimeAction
-        res <- forM items $ \item -> putPromise p item >> codeGen chunks
-        return $ mconcat res
+        foldMapM (\item -> putPromise p item >> codeGen chunks) items
 
 
 ------------------------------------------------------------------------------
 -- | Similar to 'mapSplices' in interpreted mode.  Gets a runtime list of
 -- items and applies a compiled runtime splice function to each element of the
 -- list.
-deferMany :: Monad n
+deferMany :: (Foldable f, Monad n)
           => (RuntimeSplice n a -> Splice n)
-          -> RuntimeSplice n [a]
+          -> RuntimeSplice n (f a)
           -> Splice n
 deferMany f getItems = do
     promise <- newEmptyPromise
     chunks <- f $ getPromise promise
     return $ yieldRuntime $ do
         items <- getItems
-        res <- forM items $ \item -> do
-            putPromise promise item
-            codeGen chunks
-        return $ mconcat res
+        foldMapM (\item -> putPromise promise item >> codeGen chunks) items
 
 
 ------------------------------------------------------------------------------
