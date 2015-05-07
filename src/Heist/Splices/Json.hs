@@ -1,5 +1,6 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Heist.Splices.Json (
   bindJson
@@ -149,7 +150,7 @@ valueTag = ask >>= go
 
 
 ------------------------------------------------------------------------------
-explodeTag :: (Monad n) => JsonMonad n n [Node]
+explodeTag :: forall n. (Monad n) => JsonMonad n n [Node]
 explodeTag = ask >>= go
   where
     --------------------------------------------------------------------------
@@ -166,7 +167,7 @@ explodeTag = ask >>= go
         "snippet" ## asHtml t
 
     --------------------------------------------------------------------------
-    goArray :: (Monad n) => V.Vector Value -> JsonMonad n n [Node]
+    goArray :: V.Vector Value -> JsonMonad n n [Node]
     goArray a = do
         lift stopRecursion
         dl <- V.foldM f id a
@@ -180,7 +181,7 @@ explodeTag = ask >>= go
     -- search the param node for attribute \"var=expr\", search the given JSON
     -- object for the expression, and if it's found run the JsonMonad action m
     -- using the restricted JSON object.
-    varAttrTag :: (Monad m) => Value -> (JsonMonad m m [Node]) -> Splice m
+    varAttrTag :: Value -> (JsonMonad n n [Node]) -> Splice n
     varAttrTag v m = do
         node <- getParamNode
         maybe (noVar node) (hasVar node) $ getAttribute "var" node
@@ -203,7 +204,7 @@ explodeTag = ask >>= go
                                  (findExpr expr v)
 
     --------------------------------------------------------------------------
-    genericBindings :: Monad n => JsonMonad n n (Splices (Splice n))
+    genericBindings :: JsonMonad n n (Splices (Splice n))
     genericBindings = ask >>= \v -> return $ do
         "with"     ## varAttrTag v explodeTag
         "snippet"  ## varAttrTag v snippetTag
