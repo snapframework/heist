@@ -82,11 +82,12 @@ module Heist
 
 
 ------------------------------------------------------------------------------
-import           Control.Error
 import           Control.Exception.Lifted
 import           Control.Monad.State
+import           Control.Monad.Trans.Either
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
+import           Data.Either
 import qualified Data.Foldable                 as F
 import           Data.HashMap.Strict           (HashMap)
 import qualified Data.HashMap.Strict           as Map

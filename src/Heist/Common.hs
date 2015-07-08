@@ -6,10 +6,10 @@ module Heist.Common where
 
 ------------------------------------------------------------------------------
 import           Control.Applicative      (Alternative (..), Applicative (..), (<$>))
-import           Control.Error
 import           Control.Exception        (SomeException)
 import qualified Control.Exception.Lifted as C
 import           Control.Monad            (liftM, mplus)
+import           Control.Monad.Trans.Either
 import qualified Data.Attoparsec.Text     as AP
 import           Data.ByteString          (ByteString)
 import qualified Data.ByteString          as B
@@ -19,6 +19,7 @@ import           Data.HashMap.Strict      (HashMap)
 import qualified Data.HashMap.Strict      as Map
 import           Data.List                (isSuffixOf)
 import           Data.Map.Syntax
+import           Data.Maybe               (isJust)
 import           Data.Monoid              (Monoid (..), (<>))
 import           Data.Text                (Text)
 import qualified Data.Text                as T
