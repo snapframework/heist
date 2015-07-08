@@ -10,6 +10,7 @@ import           Control.Error
 import           Control.Exception        (SomeException)
 import qualified Control.Exception.Lifted as C
 import           Control.Monad            (liftM, mplus)
+import           Control.Monad.Trans.Either
 import qualified Data.Attoparsec.Text     as AP
 import           Data.ByteString          (ByteString)
 import qualified Data.ByteString          as B

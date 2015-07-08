@@ -23,6 +23,7 @@ module Heist.Internal.Types
 ------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Error
+import           Control.Monad.Trans.Either
 import           Data.HashMap.Strict (HashMap)
 import           Data.Monoid
 import           Data.Text (Text)

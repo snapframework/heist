@@ -19,7 +19,8 @@ module Heist.TemplateDirectory
 import           Control.Concurrent
 import           Control.Error
 import           Control.Monad
-import           Control.Monad.Trans
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Either
 import           Heist
 import           Heist.Internal.Types
 import           Heist.Splices.Cache
