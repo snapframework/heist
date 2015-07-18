@@ -14,7 +14,7 @@ Executable testsuite
     test-framework             >= 0.4      && < 0.9,
     test-framework-hunit       >= 0.2.7    && < 0.4,
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
-    aeson                      >= 0.6      && < 0.9,
+    aeson                      >= 0.6      && < 0.10,
     attoparsec                 >= 0.10     && < 0.14,
     base                       >= 4.5      && < 5,
     blaze-builder              >= 0.2      && < 0.5,
@@ -36,7 +36,7 @@ Executable testsuite
     time                       >= 1.1      && < 1.6,
     transformers               >= 0.2      && < 0.5,
     unordered-containers       >= 0.1.4    && < 0.3,
-    vector                     >= 0.9      && < 0.11,
+    vector                     >= 0.9      && < 0.12,
     xmlhtml                    >= 0.2.3    && < 0.3
 
 
@@ -56,7 +56,7 @@ Executable benchmark
 
     -- Copied from regular dependencies:
 
-    aeson                      >= 0.6     && < 0.9,
+    aeson                      >= 0.6     && < 0.10,
     attoparsec                 >= 0.10    && < 0.14,
     base                       >= 4.5     && < 5,
     blaze-builder              >= 0.2     && < 0.5,
@@ -79,7 +79,7 @@ Executable benchmark
     time                       >= 1.1     && < 1.6,
     transformers               >= 0.2     && < 0.5,
     unordered-containers       >= 0.1.4   && < 0.3,
-    vector                     >= 0.9     && < 0.11,
+    vector                     >= 0.9     && < 0.12,
     xmlhtml                    >= 0.2.3   && < 0.3
 
   ghc-options: -O2 -Wall -fwarn-tabs -funbox-strict-fields -threaded
