@@ -9,7 +9,6 @@ import           Control.Applicative      (Alternative (..), Applicative (..), (
 import           Control.Exception        (SomeException)
 import qualified Control.Exception.Lifted as C
 import           Control.Monad            (liftM, mplus)
-import           Control.Monad.Trans.Either
 import qualified Data.Attoparsec.Text     as AP
 import           Data.ByteString          (ByteString)
 import qualified Data.ByteString          as B
@@ -31,13 +30,12 @@ import qualified Text.XmlHtml             as X
 
 ------------------------------------------------------------------------------
 runHashMap
-    :: (Monad m)
-    => Splices s
-    -> EitherT [String] m (HashMap T.Text s)
+    :: Splices s
+    -> Either [String] (HashMap T.Text s)
 runHashMap ms =
     case runMapSyntax Map.lookup Map.insert ms of
-      Left keys -> left $ map (T.unpack . mkMsg) keys
-      Right hm -> right $ hm
+      Left keys -> Left $ map (T.unpack . mkMsg) keys
+      Right hm -> Right hm
   where
     mkMsg k = "You tried to bind "<>k<>" more than once!"
 

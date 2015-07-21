@@ -24,7 +24,7 @@ import           Blaze.ByteString.Builder      (Builder)
 import           Control.Applicative           (Alternative (..),
                                                 Applicative (..), (<$>))
 import           Control.Arrow                 (first)
-import           Control.Monad                 (MonadPlus (..), ap, liftM)
+import           Control.Monad                 (MonadPlus (..), ap)
 import           Control.Monad.Base
 import           Control.Monad.Cont            (MonadCont (..))
 #if MIN_VERSION_mtl(2,2,1)

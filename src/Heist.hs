@@ -84,7 +84,6 @@ module Heist
 ------------------------------------------------------------------------------
 import           Control.Exception.Lifted
 import           Control.Monad.State
-import           Control.Monad.Trans.Either
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as B
 import           Data.Either
@@ -145,11 +144,11 @@ emptyHeistConfig = HeistConfig mempty "h" True
 
 
 allErrors :: [Either String (TPath, v)]
-          -> EitherT [String] IO (HashMap TPath v)
+          -> Either [String] (HashMap TPath v)
 allErrors tlist =
     case errs of
-        [] -> right $ Map.fromList $ rights tlist
-        _  -> left errs
+        [] -> Right $ Map.fromList $ rights tlist
+        _  -> Left errs
   where
     errs = lefts tlist
 
@@ -158,18 +157,18 @@ allErrors tlist =
 -- | Loads templates from disk.  This function returns just a template map so
 -- you can load multiple directories and combine the maps before initializing
 -- your HeistState.
-loadTemplates :: FilePath -> EitherT [String] IO TemplateRepo
+loadTemplates :: FilePath -> IO (Either [String] TemplateRepo)
 loadTemplates dir = do
-    d <- lift $ readDirectoryWith (loadTemplate dir) dir
-    allErrors $ F.fold (free d)
+    d <- readDirectoryWith (loadTemplate dir) dir
+    return $ allErrors $ F.fold (free d)
 
 
 ------------------------------------------------------------------------------
 -- | Reloads all the templates an an existing TemplateRepo.
-reloadTemplates :: TemplateRepo -> EitherT [String] IO TemplateRepo
+reloadTemplates :: TemplateRepo -> IO (Either [String] TemplateRepo)
 reloadTemplates repo = do
-    tlist <- lift $ mapM loadOrKeep $ Map.toList repo
-    allErrors tlist
+    tlist <- mapM loadOrKeep $ Map.toList repo
+    return $ allErrors tlist
   where
     loadOrKeep (p,df) =
       case dfFile df of
@@ -222,11 +221,13 @@ emptyHS kg = HeistState Map.empty Map.empty Map.empty Map.empty Map.empty
 -- function.
 initHeist :: Monad n
           => HeistConfig n
-          -> EitherT [String] IO (HeistState n)
+          -> IO (Either [String] (HeistState n))
 initHeist hc = do
-    keyGen <- lift HE.newKeyGen
+    keyGen <- HE.newKeyGen
     repos <- sequence $ _scTemplateLocations $ _hcSpliceConfig hc
-    initHeist' keyGen hc (Map.unions repos)
+    case sequence repos of
+      Left es -> return $ Left es
+      Right rs -> initHeist' keyGen hc (Map.unions rs)
 
 
 ------------------------------------------------------------------------------
@@ -241,30 +242,28 @@ initHeist' :: Monad n
            => HE.KeyGen
            -> HeistConfig n
            -> TemplateRepo
-           -> EitherT [String] IO (HeistState n)
-
+           -> IO (Either [String] (HeistState n))
 initHeist' keyGen (HeistConfig sc ns enn) repo = do
     let empty = emptyHS keyGen
     let (SpliceConfig i lt c a _) = sc
-    tmap <- preproc keyGen lt repo ns
+    etmap <- preproc keyGen lt repo ns
     let prefix = mkSplicePrefix ns
-    is <- runHashMap $ mapK (prefix<>) i
-    cs <- runHashMap $ mapK (prefix<>) c
-    as <- runHashMap $ mapK (prefix<>) a
-    let hs1 = empty { _spliceMap = is
-                    , _templateMap = tmap
-                    , _compiledSpliceMap = cs
-                    , _attrSpliceMap = as
-                    , _splicePrefix = prefix
-                    , _errorNotBound = enn
-                    }
-    EitherT $ C.compileTemplates hs1
---    liftIO $ when (not $ null $ _spliceErrors hs2) $ do
---        putStrLn "Finished compiling with errors..."
---        mapM_ T.putStrLn $ _spliceErrors hs2
---    case _spliceErrors hs2 of
---      [] -> return hs2
---      es -> left $ map T.unpack es
+    let eis = runHashMap $ mapK (prefix<>) i
+        ecs = runHashMap $ mapK (prefix<>) c
+        eas = runHashMap $ mapK (prefix<>) a
+    let hs1 = do
+          tmap <- etmap
+          is <- eis
+          cs <- ecs
+          as <- eas
+          return $ empty { _spliceMap = is
+                         , _templateMap = tmap
+                         , _compiledSpliceMap = cs
+                         , _attrSpliceMap = as
+                         , _splicePrefix = prefix
+                         , _errorNotBound = enn
+                         }
+    either (return . Left) C.compileTemplates hs1
 
 
 ------------------------------------------------------------------------------
@@ -273,19 +272,22 @@ preproc :: HE.KeyGen
         -> Splices (I.Splice IO)
         -> TemplateRepo
         -> Text
-        -> EitherT [String] IO TemplateRepo
+        -> IO (Either [String] TemplateRepo)
 preproc keyGen splices templates ns = do
-    sm <- runHashMap splices
-    let hs = (emptyHS keyGen) { _spliceMap = sm
-                              , _templateMap = templates
-                              , _preprocessingMode = True
-                              , _splicePrefix = mkSplicePrefix ns }
-    let eval a = evalHeistT a (X.TextNode "") hs
-    tPairs <- lift $ mapM (eval . preprocess) $ Map.toList templates
-    let bad = lefts tPairs
-    if not (null bad)
-      then left bad
-      else right $ Map.fromList $ rights tPairs
+    let esm = runHashMap splices
+    case esm of
+      Left errs -> return $ Left errs
+      Right sm -> do
+        let hs = (emptyHS keyGen) { _spliceMap = sm
+                                  , _templateMap = templates
+                                  , _preprocessingMode = True
+                                  , _splicePrefix = mkSplicePrefix ns }
+        let eval a = evalHeistT a (X.TextNode "") hs
+        tPairs <- mapM (eval . preprocess) $ Map.toList templates
+        let bad = lefts tPairs
+        return $ if not (null bad)
+                   then Left bad
+                   else Right $ Map.fromList $ rights tPairs
 
 
 ------------------------------------------------------------------------------
@@ -310,21 +312,27 @@ preprocess (tpath, docFile) = do
 -- implementation.
 initHeistWithCacheTag :: MonadIO n
                       => HeistConfig n
-                      -> EitherT [String] IO (HeistState n, CacheTagState)
+                      -> IO (Either [String] (HeistState n, CacheTagState))
 initHeistWithCacheTag (HeistConfig sc ns enn) = do
     (ss, cts) <- liftIO mkCacheTag
     let tag = "cache"
-    keyGen <- lift HE.newKeyGen
+    keyGen <- HE.newKeyGen
 
-    repos <- sequence $ _scTemplateLocations sc
-    -- We have to do one preprocessing pass with the cache setup splice.  This
-    -- has to happen for both interpreted and compiled templates, so we do it
-    -- here by itself because interpreted templates don't get the same load
-    -- time splices as compiled templates.
-    rawWithCache <- preproc keyGen (tag ## ss) (Map.unions repos) ns
-    let sc' = SpliceConfig (tag #! cacheImpl cts) mempty
-                           (tag #! cacheImplCompiled cts) mempty mempty
-    let hc = HeistConfig (mappend sc sc') ns enn
-    hs <- initHeist' keyGen hc rawWithCache
-    return (hs, cts)
+    erepos <- sequence $ _scTemplateLocations sc
+    case sequence erepos of
+      Left es -> return $ Left es
+      Right repos -> do
+        -- We have to do one preprocessing pass with the cache setup splice.  This
+        -- has to happen for both interpreted and compiled templates, so we do it
+        -- here by itself because interpreted templates don't get the same load
+        -- time splices as compiled templates.
+        eRawWithCache <- preproc keyGen (tag ## ss) (Map.unions repos) ns
+        case eRawWithCache of
+          Left es -> return $ Left es
+          Right rawWithCache -> do
+            let sc' = SpliceConfig (tag #! cacheImpl cts) mempty
+                                   (tag #! cacheImplCompiled cts) mempty mempty
+            let hc = HeistConfig (mappend sc sc') ns enn
+            hs <- initHeist' keyGen hc rawWithCache
+            return $ fmap (,cts) hs
 

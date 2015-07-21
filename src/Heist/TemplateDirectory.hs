@@ -19,7 +19,6 @@ module Heist.TemplateDirectory
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Either
 import           Heist
 import           Heist.Internal.Types
 import           Heist.Splices.Cache
@@ -43,14 +42,17 @@ newTemplateDirectory
     => FilePath
     -> HeistConfig n
     -- namespaced tag.
-    -> EitherT [String] IO (TemplateDirectory n)
+    -> IO (Either [String] (TemplateDirectory n))
 newTemplateDirectory dir hc = do
     let sc = (_hcSpliceConfig hc) { _scTemplateLocations = [loadTemplates dir] }
     let hc' = hc { _hcSpliceConfig = sc }
-    (hs,cts) <- initHeistWithCacheTag hc'
-    tsMVar <- liftIO $ newMVar hs
-    ctsMVar <- liftIO $ newMVar cts
-    return $ TemplateDirectory dir hc' tsMVar ctsMVar
+    epair <- initHeistWithCacheTag hc'
+    case epair of
+      Left es -> return $ Left es
+      Right (hs,cts) -> do
+        tsMVar <- liftIO $ newMVar hs
+        ctsMVar <- liftIO $ newMVar cts
+        return $ Right $ TemplateDirectory dir hc' tsMVar ctsMVar
 
 
 ------------------------------------------------------------------------------
@@ -62,7 +64,7 @@ newTemplateDirectory'
     -> HeistConfig n
     -> IO (TemplateDirectory n)
 newTemplateDirectory' dir hc = do
-    res <- runEitherT $ newTemplateDirectory dir hc
+    res <- newTemplateDirectory dir hc
     either (error . concat) return res
 
 
@@ -87,9 +89,8 @@ reloadTemplateDirectory :: (MonadIO n)
                         => TemplateDirectory n
                         -> IO (Either String ())
 reloadTemplateDirectory (TemplateDirectory p hc tsMVar ctsMVar) = do
-    ehs <- runEitherT $ do
-        let sc = (_hcSpliceConfig hc) { _scTemplateLocations = [loadTemplates p] }
-        initHeistWithCacheTag (hc { _hcSpliceConfig = sc })
+    let sc = (_hcSpliceConfig hc) { _scTemplateLocations = [loadTemplates p] }
+    ehs <- initHeistWithCacheTag (hc { _hcSpliceConfig = sc })
     leftPass ehs $ \(hs,cts) -> do
         modifyMVar_ tsMVar (const $ return hs)
         modifyMVar_ ctsMVar (const $ return cts)

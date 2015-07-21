@@ -22,7 +22,6 @@ module Heist.Internal.Types
 
 ------------------------------------------------------------------------------
 import           Control.Applicative
-import           Control.Monad.Trans.Either
 import           Data.HashMap.Strict (HashMap)
 import           Data.Monoid
 import           Data.Text (Text)
@@ -41,7 +40,7 @@ type TemplateRepo = HashMap TPath DocumentFile
 -- | An IO action for getting a template repo from this location.  By not just
 -- using a directory path here, we support templates loaded from a database,
 -- retrieved from the network, or anything else you can think of.
-type TemplateLocation = EitherT [String] IO TemplateRepo
+type TemplateLocation = IO (Either [String] TemplateRepo)
 
 
 ------------------------------------------------------------------------------
