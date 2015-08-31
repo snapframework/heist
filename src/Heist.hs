@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
@@ -160,7 +161,11 @@ allErrors tlist =
 loadTemplates :: FilePath -> IO (Either [String] TemplateRepo)
 loadTemplates dir = do
     d <- readDirectoryWith (loadTemplate dir) dir
+#if MIN_VERSION_directory_tree(0,11,0)
+    return $ allErrors $ F.fold (dirTree d)
+#else
     return $ allErrors $ F.fold (free d)
+#endif
 
 
 ------------------------------------------------------------------------------
