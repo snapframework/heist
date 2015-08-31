@@ -13,3 +13,4 @@ cabal-dev/
 **/.DS_Store
 docs/out
 tags
+cabal.sandbox.config
