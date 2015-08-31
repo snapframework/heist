@@ -27,7 +27,7 @@ license-file:   LICENSE
 author:         Doug Beardsley, Gregory Collins
 maintainer:     snap@snapframework.com
 build-type:     Simple
-cabal-version:  >= 1.6
+cabal-version:  >= 1.8.0.4
 homepage:       http://snapframework.com/
 category:       Web, Snap
 
