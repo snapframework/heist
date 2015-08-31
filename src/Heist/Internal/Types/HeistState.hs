@@ -46,12 +46,12 @@ import           Data.Map.Syntax
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Text.Encoding            (decodeUtf8)
-import           Data.Typeable                 (TyCon, Typeable(..),
-                                                Typeable1(..), mkTyConApp)
 #if MIN_VERSION_base (4,7,0)
-import           Data.Typeable.Internal        (mkTyCon)
+import           Data.Typeable                 (Typeable)
 #else
-import           Data.Typeable                 (mkTyCon)
+import           Data.Typeable                 (TyCon, Typeable(..),
+                                                Typeable1(..), mkTyCon,
+                                                mkTyConApp)
 #endif
 
 #if !MIN_VERSION_base(4,8,0)
