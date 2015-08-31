@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-| The \"markdown\" splice formats markdown content as HTML and inserts
@@ -93,7 +94,6 @@ module Heist.Splices.Markdown
   ) where
 
 ------------------------------------------------------------------------------
-import           Control.Applicative             ((<$>))
 import           Control.Concurrent
 import           Control.Exception.Lifted
 import           Control.Monad
@@ -112,6 +112,10 @@ import           System.FilePath.Posix
 import           System.IO
 import           System.Process
 import           Text.XmlHtml
+
+#if !MIN_VERSION_base(4,8,0)
+import           Control.Applicative             ((<$>))
+#endif
 
 ------------------------------------------------------------------------------
 import           Heist.Common

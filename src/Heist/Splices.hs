@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP               #-}
+
 module Heist.Splices
   ( ifISplice
   , ifCSplice
@@ -11,7 +13,10 @@ module Heist.Splices
   , module Heist.Splices.Markdown
   ) where
 
+#if !MIN_VERSION_base(4,8,0)
 import           Data.Monoid (Monoid(..))
+#endif
+
 import qualified Heist.Compiled as C
 import qualified Heist.Interpreted as I
 import           Heist.Splices.Apply
