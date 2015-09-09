@@ -21,10 +21,14 @@ module Heist.Internal.Types
   ) where
 
 ------------------------------------------------------------------------------
-import           Control.Applicative
 import           Data.HashMap.Strict (HashMap)
-import           Data.Monoid
 import           Data.Text (Text)
+
+#if !MIN_VERSION_base(4,8,0)
+import           Control.Applicative
+import           Data.Monoid
+#endif
+
 ------------------------------------------------------------------------------
 import qualified Heist.Compiled.Internal       as C
 import qualified Heist.Interpreted.Internal    as I

@@ -21,8 +21,7 @@ module Heist.Internal.Types.HeistState where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder      (Builder)
-import           Control.Applicative           (Alternative (..),
-                                                Applicative (..), (<$>))
+import           Control.Applicative           (Alternative (..))
 import           Control.Arrow                 (first)
 import           Control.Monad                 (MonadPlus (..), ap)
 import           Control.Monad.Base
@@ -44,17 +43,22 @@ import qualified Data.HashMap.Strict           as H
 import           Data.HeterogeneousEnvironment (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment as HE
 import           Data.Map.Syntax
-import           Data.Monoid                   (Monoid(..))
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Text.Encoding            (decodeUtf8)
-import           Data.Typeable                 (TyCon, Typeable(..),
-                                                Typeable1(..), mkTyConApp)
 #if MIN_VERSION_base (4,7,0)
-import           Data.Typeable.Internal        (mkTyCon)
+import           Data.Typeable                 (Typeable)
 #else
-import           Data.Typeable                 (mkTyCon)
+import           Data.Typeable                 (TyCon, Typeable(..),
+                                                Typeable1(..), mkTyCon,
+                                                mkTyConApp)
 #endif
+
+#if !MIN_VERSION_base(4,8,0)
+import           Control.Applicative           (Applicative (..), (<$>))
+import           Data.Monoid                   (Monoid(..))
+#endif
+
 import qualified Text.XmlHtml                  as X
 ------------------------------------------------------------------------------
 

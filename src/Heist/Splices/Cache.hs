@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | The \"cache\" splice ensures that its contents are cached and only
@@ -35,10 +36,12 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Read
 import           Data.Time.Clock
-import           Data.Word
 import           System.Random
 import           Text.XmlHtml
 
+#if !MIN_VERSION_base(4,8,0)
+import           Data.Word (Word)
+#endif
 
 ------------------------------------------------------------------------------
 import qualified Heist.Compiled.Internal as C

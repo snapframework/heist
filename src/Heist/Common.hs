@@ -1,11 +1,12 @@
 {-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Heist.Common where
 
 ------------------------------------------------------------------------------
-import           Control.Applicative      (Alternative (..), Applicative (..), (<$>))
+import           Control.Applicative      (Alternative (..))
 import           Control.Exception        (SomeException)
 import qualified Control.Exception.Lifted as C
 import           Control.Monad            (liftM, mplus)
@@ -19,12 +20,16 @@ import qualified Data.HashMap.Strict      as Map
 import           Data.List                (isSuffixOf)
 import           Data.Map.Syntax
 import           Data.Maybe               (isJust)
-import           Data.Monoid              (Monoid (..), (<>))
+import           Data.Monoid              ((<>))
 import           Data.Text                (Text)
 import qualified Data.Text                as T
 import           Heist.Internal.Types.HeistState
 import           System.FilePath          (pathSeparator)
 import qualified Text.XmlHtml             as X
+#if !MIN_VERSION_base(4,8,0)
+import           Control.Applicative      (Applicative (..), (<$>))
+import           Data.Monoid              (Monoid (..))
+#endif
 ------------------------------------------------------------------------------
 
 
