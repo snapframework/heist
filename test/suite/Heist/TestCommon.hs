@@ -35,11 +35,11 @@ loadT :: MonadIO m
       -> Splices (C.Splice m)
       -> Splices (AttrSplice m)
       -> IO (Either [String] (HeistState m))
-loadT baseDir a b c d = runEitherT $ do
+loadT baseDir a b c d = runExceptT $ do
     let sc = SpliceConfig (defaultInterpretedSplices `mappend` a)
                           (defaultLoadTimeSplices `mappend` b) c d
                           [loadTemplates baseDir]
-    initHeist $ HeistConfig sc "" False
+    ExceptT $ initHeist $ HeistConfig sc "" False
 
 
 ------------------------------------------------------------------------------
@@ -49,21 +49,21 @@ loadIO :: FilePath
        -> Splices (C.Splice IO)
        -> Splices (AttrSplice IO)
        -> IO (Either [String] (HeistState IO))
-loadIO baseDir a b c d = runEitherT $ do
+loadIO baseDir a b c d = runExceptT $ do
     let sc = SpliceConfig (defaultInterpretedSplices >> a)
                           (defaultLoadTimeSplices >> b) c d
                           [loadTemplates baseDir]
-    initHeist $ HeistConfig sc "" False
+    ExceptT $ initHeist $ HeistConfig sc "" False
 
 
 ------------------------------------------------------------------------------
 loadHS :: FilePath -> IO (HeistState IO)
 loadHS baseDir = do
-    etm <- runEitherT $ do
+    etm <- runExceptT $ do
         let sc = SpliceConfig defaultInterpretedSplices
                               defaultLoadTimeSplices mempty mempty
                               [loadTemplates baseDir]
-        initHeist $ HeistConfig sc "" False
+        ExceptT $ initHeist $ HeistConfig sc "" False
     either (error . concat) return etm
 
 
@@ -75,7 +75,7 @@ loadEmpty :: Splices (I.Splice IO)
 loadEmpty a b c d = do
     let sc = SpliceConfig (defaultInterpretedSplices `mappend` a)
                           (defaultLoadTimeSplices `mappend` b) c d mempty
-    res <- runEitherT $ initHeist $ HeistConfig sc "" False
+    res <- initHeist $ HeistConfig sc "" False
     either (error . concat) return res
 
 

@@ -62,8 +62,8 @@ templateHC = HeistConfig sc "" False
 
 namespaceTest1 :: IO ()
 namespaceTest1 = do
-    res <- runEitherT $ do
-        hs <- initHeist templateHC
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist templateHC
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
         b <- lift $ fst runner
@@ -76,8 +76,8 @@ namespaceTest1 = do
 
 namespaceTest2 :: IO ()
 namespaceTest2 = do
-    res <- runEitherT $ do
-        hs <- initHeist $ templateHC & hcErrorNotBound .~ True
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ templateHC & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
         b <- lift $ fst runner
@@ -90,8 +90,8 @@ namespaceTest2 = do
 
 namespaceTest3 :: IO ()
 namespaceTest3 = do
-    res <- runEitherT $ do
-        hs <- initHeist $ templateHC & hcNamespace .~ "h"
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ templateHC & hcNamespace .~ "h"
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
         b <- lift $ fst runner
@@ -104,8 +104,8 @@ namespaceTest3 = do
 
 namespaceTest4 :: IO ()
 namespaceTest4 = do
-    res <- runEitherT $ do
-        hs <- initHeist $ templateHC & hcNamespace .~ "h"
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ templateHC & hcNamespace .~ "h"
                                      & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "namespaces"
@@ -119,8 +119,8 @@ namespaceTest4 = do
 
 namespaceTest5 :: IO ()
 namespaceTest5 = do
-    res <- runEitherT $ do
-        hs <- initHeist $ templateHC & hcNamespace .~ "h"
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ templateHC & hcNamespace .~ "h"
                                      & hcCompiledSplices .~ mempty
                                      & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $

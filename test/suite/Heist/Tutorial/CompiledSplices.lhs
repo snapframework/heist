@@ -114,11 +114,11 @@ directory with compiled splices.
 >      -> Splices (C.Splice n)
 >      -> IO (HeistState n)
 > load baseDir splices = do
->     tmap <- runEitherT $ do
+>     tmap <- runExceptT $ do
 >         let sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
 >                         & scCompiledSplices .~ splices
 >                         & scTemplateLocations .~ [loadTemplates baseDir]
->         initHeist $ emptyHeistConfig & hcNamespace .~ ""
+>         ExceptT $ initHeist $ emptyHeistConfig & hcNamespace .~ ""
 >                                      & hcErrorNotBound .~ False
 >                                      & hcSpliceConfig .~ sc
 >     either (error . concat) return tmap

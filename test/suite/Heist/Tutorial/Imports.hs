@@ -10,11 +10,12 @@ module Heist.Tutorial.Imports
   , T.Text
   , T.pack
   , ByteString
-  , runEitherT
+  , runExceptT
+  , ExceptT(..)
   ) where
 
 import           Blaze.ByteString.Builder
-import           Control.Error (runEitherT)
+import           Control.Error (runExceptT, ExceptT(..))
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Control.Monad.Trans.State as ST

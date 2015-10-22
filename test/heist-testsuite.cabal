@@ -9,8 +9,8 @@ Executable testsuite
 
   build-depends:
     HUnit                      >= 1.2      && < 2,
-    QuickCheck                 >= 2        && < 2.8,
-    lens                       >= 4.3      && < 4.7,
+    QuickCheck                 >= 2        && < 2.9,
+    lens                       >= 4.3      && < 4.14,
     test-framework             >= 0.4      && < 0.9,
     test-framework-hunit       >= 0.2.7    && < 0.4,
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
@@ -50,10 +50,10 @@ Executable benchmark
   main-is: Benchmark.hs
 
   build-depends:
-    HUnit                     >= 1.2     && < 1.3,
+    HUnit,
     criterion                 >= 1.0     && < 1.1,
-    test-framework            >= 0.6     && < 0.9,
-    test-framework-hunit      >= 0.2.7   && < 0.4,
+    test-framework,
+    test-framework-hunit,
 
     -- Copied from regular dependencies:
 

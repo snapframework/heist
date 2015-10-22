@@ -32,10 +32,10 @@ import           Heist.Internal.Types
 ------------------------------------------------------------------------------
 
 loadWithCache baseDir = do
-    etm <- runEitherT $ do
+    etm <- runExceptT $ do
         let sc = SpliceConfig mempty defaultLoadTimeSplices mempty mempty
                               [loadTemplates baseDir]
-        initHeistWithCacheTag $ HeistConfig sc "" False
+        ExceptT $ initHeistWithCacheTag $ HeistConfig sc "" False
     either (error . unlines) (return . fst) etm
 
 main = do
