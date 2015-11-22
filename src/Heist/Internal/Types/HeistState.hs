@@ -500,12 +500,14 @@ modifyHS f = HeistT $ \_ s -> return ((), f s)
 
 ------------------------------------------------------------------------------
 -- | Restores the HeistState.  This function is almost like putHS except it
--- preserves the current doctypes.  You should use this function instead of
--- @putHS@ to restore an old state.  This was needed because doctypes needs to
--- be in a "global scope" as opposed to the template call "local scope" of
--- state items such as recursionDepth, curContext, and spliceMap.
+-- preserves the current doctypes and splice errors.  You should use this
+-- function instead of @putHS@ to restore an old state.  This was needed
+-- because doctypes needs to be in a "global scope" as opposed to the template
+-- call "local scope" of state items such as recursionDepth, curContext, and
+-- spliceMap.
 restoreHS :: Monad m => HeistState n -> HeistT n m ()
-restoreHS old = modifyHS (\cur -> old { _doctypes = _doctypes cur })
+restoreHS old = modifyHS (\cur -> old { _doctypes = _doctypes cur
+                                      , _spliceErrors = _spliceErrors cur })
 {-# INLINE restoreHS #-}
 
 

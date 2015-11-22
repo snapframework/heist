@@ -526,8 +526,9 @@ bindSplice :: Text             -- ^ tag name
            -> HeistState n     -- ^ source state
            -> HeistState n
 bindSplice n v ts =
-    ts { _compiledSpliceMap = H.insert n v (_compiledSpliceMap ts) }
-
+    ts { _compiledSpliceMap = H.insert n' v (_compiledSpliceMap ts) }
+  where
+    n' = _splicePrefix ts `mappend` n
 
 ------------------------------------------------------------------------------
 -- | Binds a list of compiled splices.  This function should not be exported.
@@ -535,8 +536,7 @@ bindSplices :: Splices (Splice n)  -- ^ splices to bind
             -> HeistState n        -- ^ source state
             -> HeistState n
 bindSplices ss hs =
-    hs { _compiledSpliceMap = H.union (runMapNoErrors ss)
-                                      (_compiledSpliceMap hs) }
+    hs { _compiledSpliceMap = applySpliceMap hs _compiledSpliceMap ss }
 
 
 ------------------------------------------------------------------------------

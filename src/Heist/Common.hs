@@ -47,6 +47,15 @@ runMapNoErrors :: (Eq k, Hashable k) => MapSyntaxM k v a -> HashMap k v
 runMapNoErrors = either (const mempty) id .
     runMapSyntax' (\_ new _ -> Just new) Map.lookup Map.insert
 
+applySpliceMap :: HeistState n
+                -> (HeistState n -> HashMap Text v)
+                -> MapSyntaxM Text v a
+                -> HashMap Text v
+applySpliceMap hs f =  (flip Map.union (f hs)) .
+    runMapNoErrors .
+    mapK (mappend pre)
+  where
+    pre = _splicePrefix hs
 
 ------------------------------------------------------------------------------
 -- | If Heist is running in fail fast mode, then this function will throw an
@@ -338,9 +347,7 @@ bindAttributeSplices :: Splices (AttrSplice n) -- ^ splices to bind
                      -> HeistState n           -- ^ start state
                      -> HeistState n
 bindAttributeSplices ss hs =
-    hs { _attrSpliceMap = Map.union (runMapNoErrors ss)
-                                    (_attrSpliceMap hs) }
-
+    hs { _attrSpliceMap = applySpliceMap hs _attrSpliceMap ss }
 
 ------------------------------------------------------------------------------
 -- | Mappends a doctype to the state.
