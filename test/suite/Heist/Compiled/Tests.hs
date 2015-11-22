@@ -35,6 +35,8 @@ tests = [ testCase     "compiled/simple"       simpleCompiledTest
         , testCase     "compiled/namespace3"    namespaceTest3
         , testCase     "compiled/namespace4"    namespaceTest4
         , testCase     "compiled/namespace5"    namespaceTest5
+        , testCase     "compiled/nsbind"        nsBindTest
+        , testCase     "compiled/nsbinderr"     nsBindErrorTest
         ]
 
 simpleCompiledTest :: IO ()
@@ -129,3 +131,47 @@ namespaceTest5 = do
         return $ toByteString b
 
     H.assertEqual "namespace test" (Left ["templates/namespaces.tpl: No splice bound for h:foo"]) res
+
+
+nsBindTemplateHC :: HeistConfig IO
+nsBindTemplateHC = HeistConfig sc "h" False
+  where
+    sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
+                & scCompiledSplices .~ nsBindTestSplices
+                & scTemplateLocations .~ [loadTemplates "templates-nsbind"]
+
+nsBindTestSplices :: Splices (Splice IO)
+nsBindTestSplices = "main" ## do
+    tpl <- withSplices runChildren nsBindSubSplices (return ())
+    return $ yieldRuntime $ codeGen tpl
+
+nsBindSubSplices :: Splices (RuntimeSplice IO () -> Splice IO)
+nsBindSubSplices = mapV (pureSplice . textSplice) $
+    "sub" ## const "asdf"
+
+
+nsBindTest :: IO ()
+nsBindTest = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ nsBindTemplateHC
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "nsbind"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace bind test" (Right expected)  res
+  where
+    expected = "Alpha\n&#10;Beta\nasdf&#10;Gamma\n<sub></sub>&#10;&#10;"
+
+
+nsBindErrorTest :: IO ()
+nsBindErrorTest = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ nsBindTemplateHC
+                                     & hcErrorNotBound .~ True
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "nsbinderror"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace bind error test" (Left ["templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid"])  res
