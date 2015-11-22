@@ -47,7 +47,7 @@ bindSplices :: Splices (Splice n) -- ^ splices to bind
             -> HeistState n       -- ^ start state
             -> HeistState n
 bindSplices ss hs =
-    hs { _spliceMap = Map.union (runMapNoErrors ss) (_spliceMap hs) }
+    hs { _spliceMap = applySpliceMap hs _spliceMap ss }
 
 
 ------------------------------------------------------------------------------
