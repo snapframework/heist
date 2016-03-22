@@ -50,7 +50,7 @@ import           Heist.Internal.Types.HeistState
 -- The more interesting part of the type signature is what comes before the
 -- return value.  The first type parameter in @'HeistT' n IO@ is the runtime
 -- monad.  This reveals that the Chunks know about the runtime monad.  The
--- second type parameter in @HeistT n IO@ is @IO@.  This tells is that the
+-- second type parameter in @HeistT n IO@ is @IO@.  This tells us that the
 -- compiled splices themselves are run in the IO monad, which will usually
 -- mean at load time.  Compiled splices run at load time, and they return
 -- computations that run at runtime.
