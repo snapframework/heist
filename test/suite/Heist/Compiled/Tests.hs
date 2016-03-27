@@ -8,6 +8,8 @@ import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Lens
 import           Control.Monad.Trans
+import qualified Data.ByteString as B
+import           Data.Char
 import           Data.Map.Syntax
 import           Data.Monoid
 import           Test.Framework (Test)
@@ -37,6 +39,8 @@ tests = [ testCase     "compiled/simple"       simpleCompiledTest
         , testCase     "compiled/namespace5"    namespaceTest5
         , testCase     "compiled/nsbind"        nsBindTest
         , testCase     "compiled/nsbinderr"     nsBindErrorTest
+        , testCase     "compiled/nscall"        nsCallTest
+        , testCase     "compiled/nscallerr"     nsCallErrTest
         ]
 
 simpleCompiledTest :: IO ()
@@ -133,17 +137,24 @@ namespaceTest5 = do
     H.assertEqual "namespace test" (Left ["templates/namespaces.tpl: No splice bound for h:foo"]) res
 
 
-nsBindTemplateHC :: HeistConfig IO
-nsBindTemplateHC = HeistConfig sc "h" False
+nsBindTemplateHC :: String -> HeistConfig IO
+nsBindTemplateHC dir = HeistConfig sc "h" False
   where
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
                 & scCompiledSplices .~ nsBindTestSplices
-                & scTemplateLocations .~ [loadTemplates "templates-nsbind"]
+                & scTemplateLocations .~ [loadTemplates dir]
+
 
 nsBindTestSplices :: Splices (Splice IO)
-nsBindTestSplices = "main" ## do
-    tpl <- withSplices runChildren nsBindSubSplices (return ())
-    return $ yieldRuntime $ codeGen tpl
+nsBindTestSplices = do
+    "main" ## do
+        tpl <- withSplices runChildren nsBindSubSplices (return ())
+        return $ yieldRuntime $ codeGen tpl
+    "call" ## do
+        tpl <- withSplices (callTemplate "_call")
+               nsBindSubSplices (return ())
+        return $ yieldRuntime $ codeGen tpl
+
 
 nsBindSubSplices :: Splices (RuntimeSplice IO () -> Splice IO)
 nsBindSubSplices = mapV (pureSplice . textSplice) $
@@ -153,7 +164,7 @@ nsBindSubSplices = mapV (pureSplice . textSplice) $
 nsBindTest :: IO ()
 nsBindTest = do
     res <- runExceptT $ do
-        hs <- ExceptT $ initHeist $ nsBindTemplateHC
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nsbind")
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "nsbind"
         b <- lift $ fst runner
@@ -167,7 +178,7 @@ nsBindTest = do
 nsBindErrorTest :: IO ()
 nsBindErrorTest = do
     res <- runExceptT $ do
-        hs <- ExceptT $ initHeist $ nsBindTemplateHC
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nsbind")
                                      & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "nsbinderror"
@@ -175,3 +186,32 @@ nsBindErrorTest = do
         return $ toByteString b
 
     H.assertEqual "namespace bind error test" (Left ["templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid"])  res
+
+
+nsCallTest :: IO ()
+nsCallTest = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nscall")
+                                     & hcErrorNotBound .~ True
+                                     & hcCompiledTemplateFilter .~ nsFilter
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "nscall"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace bind error test" (Right "Top\n&#10;Inside 1\nCalled\nasdf&#10;&#10;Inside 2\n&#10;") res
+  where
+    nsFilter = (/=) (fromIntegral $ ord '_') . B.head . head
+
+
+nsCallErrTest :: IO ()
+nsCallErrTest = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nscall")
+                                     & hcErrorNotBound .~ True
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "nscall"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace bind error test" (Left ["templates-nscall/_call.tpl: No splice bound for h:sub","templates-nscall/_invalid.tpl: No splice bound for h:invalid"]) res
