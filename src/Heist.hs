@@ -204,7 +204,7 @@ addTemplatePathPrefix dir ts
 -- | Creates an empty HeistState.
 emptyHS :: HE.KeyGen -> HeistState m
 emptyHS kg = HeistState Map.empty Map.empty Map.empty Map.empty Map.empty
-                        True [] 0 [] Nothing kg False Html "" [] False
+                        True [] 0 [] Nothing kg False Html "" [] False 0
 
 
 ------------------------------------------------------------------------------

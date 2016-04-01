@@ -219,6 +219,7 @@ data HeistState m = HeistState {
     -- correspond to a bound splice.  When not using a namespace, this flag is
     -- ignored.
     , _errorNotBound       :: Bool
+    , _numNamespacedTags   :: Int
 #if MIN_VERSION_base(4,7,0)
 } deriving (Typeable)
 #else
@@ -576,6 +577,13 @@ localHS f k = do
 modRecursionDepth :: Monad m => (Int -> Int) -> HeistT n m ()
 modRecursionDepth f =
     modifyHS (\st -> st { _recursionDepth = f (_recursionDepth st) })
+
+
+------------------------------------------------------------------------------
+-- | Increments the namespaced tag count
+incNamespacedTags :: Monad m => HeistT n m ()
+incNamespacedTags =
+    modifyHS (\st -> st { _numNamespacedTags = _numNamespacedTags st + 1 })
 
 
 ------------------------------------------------------------------------------
