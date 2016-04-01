@@ -29,6 +29,7 @@ import           Data.Text                          (Text)
 import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as T
 import qualified Data.Vector                        as V
+import           Text.Printf
 import qualified Text.XmlHtml                       as X
 import qualified Text.XmlHtml.HTML.Meta             as X
 ------------------------------------------------------------------------------
@@ -161,9 +162,25 @@ compileTemplates
     -> IO (Either [String] (HeistState n))
 compileTemplates hs = do
     (tmap, hs') <- runHeistT compileTemplates' (X.TextNode "") hs
+    let pre = _splicePrefix hs'
+    let nsErr = if not (T.null pre) && (_numNamespacedTags hs' == 0)
+                  then Left [noNamespaceSplicesMsg $ T.unpack pre]
+                  else Right ()
     return $ case _spliceErrors hs' of
-               [] -> Right $! hs { _compiledTemplateMap = tmap }
-               es -> Left $ map T.unpack es
+               [] -> nsErr >> (Right $! hs { _compiledTemplateMap = tmap })
+               es -> Left $ either (++) (const id) nsErr $ map T.unpack es
+
+
+------------------------------------------------------------------------------
+noNamespaceSplicesMsg :: String -> String
+noNamespaceSplicesMsg pre = unwords
+    [ printf "You are using a namespace of '%s', but you don't have any" ns
+    , printf "tags starting with '%s'.  If you have not defined any" pre
+    , "splices, then change your namespace to the empty string to get rid"
+    , "of this message."
+    ]
+  where
+    ns = reverse $ drop 1 $ reverse pre
 
 
 ------------------------------------------------------------------------------
@@ -253,6 +270,9 @@ lookupSplice nm = do
 -- compileNode to generate the appropriate runtime computation.
 runNode :: Monad n => X.Node -> Splice n
 runNode node = localParamNode (const node) $ do
+    pre <- getsHS _splicePrefix
+    let hasPrefix = (T.isPrefixOf pre <$> (X.tagName node)) == Just True
+    when (not (T.null pre) && hasPrefix) incNamespacedTags
     isStatic <- subtreeIsStatic node
     markup <- getsHS _curMarkup
     if isStatic

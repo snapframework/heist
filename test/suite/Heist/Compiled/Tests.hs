@@ -18,6 +18,7 @@ import qualified Test.HUnit as H
 ------------------------------------------------------------------------------
 import           Heist
 import           Heist.Compiled
+import           Heist.Compiled.Internal
 import           Heist.Internal.Types
 import           Heist.Tutorial.CompiledSplices
 import           Heist.TestCommon
@@ -35,6 +36,7 @@ tests = [ testCase     "compiled/simple"       simpleCompiledTest
         , testCase     "compiled/namespace3"    namespaceTest3
         , testCase     "compiled/namespace4"    namespaceTest4
         , testCase     "compiled/namespace5"    namespaceTest5
+        , testCase     "compiled/no-ns-splices" noNsSplices
         , testCase     "compiled/nsbind"        nsBindTest
         , testCase     "compiled/nsbinderr"     nsBindErrorTest
         ]
@@ -131,6 +133,25 @@ namespaceTest5 = do
         return $ toByteString b
 
     H.assertEqual "namespace test" (Left ["templates/namespaces.tpl: No splice bound for h:foo"]) res
+
+------------------------------------------------------------------------------
+-- | The templates-no-ns directory should have no tags beginning with h: so
+-- this test will throw an error.
+noNsSplices :: IO ()
+noNsSplices = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist hc
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "test"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace test" (Left [noNamespaceSplicesMsg "h:"]) res
+  where
+    hc = HeistConfig sc "h" True
+    sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
+                & scCompiledSplices .~ ("foo" ## return (yieldPureText "aoeu"))
+                & scTemplateLocations .~ [loadTemplates "templates-no-ns"]
 
 
 nsBindTemplateHC :: HeistConfig IO
