@@ -271,7 +271,7 @@ lookupSplice nm = do
 runNode :: Monad n => X.Node -> Splice n
 runNode node = localParamNode (const node) $ do
     pre <- getsHS _splicePrefix
-    let hasPrefix = (T.isPrefixOf pre <$> (X.tagName node)) == Just True
+    let hasPrefix = (T.isPrefixOf pre `fmap` X.tagName node) == Just True
     when (not (T.null pre) && hasPrefix) incNamespacedTags
     isStatic <- subtreeIsStatic node
     markup <- getsHS _curMarkup
