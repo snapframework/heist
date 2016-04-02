@@ -497,7 +497,7 @@ instance (Typeable1 m) => Typeable1 (HeistT n m) where
 -- returns the Node for the @speech@ tag and its children.  @getParamNode >>=
 -- childNodes@ returns a list containing one 'TextNode' containing part of
 -- Hamlet's speech.  @liftM (getAttribute \"author\") getParamNode@ would
--- return @Just "Shakespeare"@.
+-- return @Just \"Shakespeare\"@.
 getParamNode :: Monad m => HeistT n m X.Node
 getParamNode = HeistT $ curry return
 {-# INLINE getParamNode #-}
