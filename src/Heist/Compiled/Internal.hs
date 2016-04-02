@@ -679,13 +679,8 @@ manyWithSplices :: (Foldable f, Monad n)
                 -> Splices (RuntimeSplice n a -> Splice n)
                 -> RuntimeSplice n (f a)
                 -> Splice n
-manyWithSplices splice splices runtimeAction = do
-    p <- newEmptyPromise
-    let splices' = mapV ($ getPromise p) splices
-    chunks <- withLocalSplices splices' mempty splice
-    return $ yieldRuntime $ do
-        items <- runtimeAction
-        foldMapM (\item -> putPromise p item >> codeGen chunks) items
+manyWithSplices splice splices runtimeAction =
+    manyWith splice splices mempty runtimeAction
 
 
 ------------------------------------------------------------------------------
