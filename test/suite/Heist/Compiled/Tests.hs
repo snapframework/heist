@@ -139,8 +139,8 @@ namespaceTest5 = do
 -- this test will throw an error.
 noNsSplices :: IO ()
 noNsSplices = do
-    res <- runExceptT $ do
-        hs <- ExceptT $ initHeist hc
+    res <- runEitherT $ do
+        hs <- initHeist hc
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "test"
         b <- lift $ fst runner
