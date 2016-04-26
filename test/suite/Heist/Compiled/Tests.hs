@@ -1,15 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Heist.Compiled.Tests
-  ( tests
-  ) where
+module Heist.Compiled.Tests where
 
 import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Lens
 import           Control.Monad.Trans
+import           Data.ByteString (ByteString)
 import           Data.Map.Syntax
 import           Data.Monoid
+import           Data.Text.Encoding
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
 import qualified Test.HUnit as H
@@ -29,8 +29,8 @@ import           Heist.TestCommon
 -- with ".." in the tag path (which doesn't currently work).
 
 tests :: [Test]
-tests = [ testCase     "compiled/simple"       simpleCompiledTest
-        , testCase     "compiled/people"       peopleTest
+tests = [ testCase     "compiled/simple"        simpleCompiledTest
+        , testCase     "compiled/people"        peopleTest
         , testCase     "compiled/namespace1"    namespaceTest1
         , testCase     "compiled/namespace2"    namespaceTest2
         , testCase     "compiled/namespace3"    namespaceTest3
@@ -39,6 +39,7 @@ tests = [ testCase     "compiled/simple"       simpleCompiledTest
         , testCase     "compiled/no-ns-splices" noNsSplices
         , testCase     "compiled/nsbind"        nsBindTest
         , testCase     "compiled/nsbinderr"     nsBindErrorTest
+        , testCase     "compiled/doctype"       doctypeTest
         ]
 
 simpleCompiledTest :: IO ()
@@ -55,7 +56,7 @@ peopleTest = do
     H.assertEqual "people splice" expected res
   where
     expected =
-      mappend doctype "\n&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
+      "&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
 
 templateHC :: HeistConfig IO
 templateHC = HeistConfig sc "" False
@@ -63,6 +64,23 @@ templateHC = HeistConfig sc "" False
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
                 & scCompiledSplices .~ ("foo" ## return (yieldPureText "aoeu"))
                 & scTemplateLocations .~ [loadTemplates "templates"]
+
+genericTest :: String -> ByteString -> ByteString -> IO ()
+genericTest nm template expected = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist templateHC
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs template
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual nm (Right expected) res
+
+doctypeTest :: IO ()
+doctypeTest = genericTest "doctype test" "rss" expected
+  where
+    expected = encodeUtf8
+      "<rss><channel><link>http://www.devalot.com/</link></channel></rss>&#10;"
 
 namespaceTest1 :: IO ()
 namespaceTest1 = do
@@ -73,9 +91,9 @@ namespaceTest1 = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace test" (Right expected) res
+    H.assertEqual "namespace test 1" (Right expected) res
   where
-    expected = mappend doctype "\nAlpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
+    expected = "Alpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
 
 
 namespaceTest2 :: IO ()
@@ -87,9 +105,9 @@ namespaceTest2 = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace test" (Right expected) res
+    H.assertEqual "namespace test 2" (Right expected) res
   where
-    expected = mappend doctype "\nAlpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
+    expected = "Alpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
 
 
 namespaceTest3 :: IO ()
@@ -101,9 +119,9 @@ namespaceTest3 = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace test" (Right expected) res
+    H.assertEqual "namespace test 3" (Right expected) res
   where
-    expected = mappend doctype "\nAlpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
+    expected = "Alpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
 
 
 namespaceTest4 :: IO ()
@@ -116,9 +134,9 @@ namespaceTest4 = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace test" (Right expected) res
+    H.assertEqual "namespace test 4" (Right expected) res
   where
-    expected = mappend doctype "\nAlpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
+    expected = "Alpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
 
 
 namespaceTest5 :: IO ()
@@ -132,7 +150,7 @@ namespaceTest5 = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace test" (Left ["templates/namespaces.tpl: No splice bound for h:foo"]) res
+    H.assertEqual "namespace test 5" (Left ["templates/namespaces.tpl: No splice bound for h:foo"]) res
 
 ------------------------------------------------------------------------------
 -- | The templates-no-ns directory should have no tags beginning with h: so
@@ -146,7 +164,7 @@ noNsSplices = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace test" (Left [noNamespaceSplicesMsg "h:"]) res
+    H.assertEqual "noNsSplices" (Left [noNamespaceSplicesMsg "h:"]) res
   where
     hc = HeistConfig sc "h" True
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
