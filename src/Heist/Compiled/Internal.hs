@@ -133,7 +133,8 @@ runDocumentFile tpath df = do
                    X.XmlDocument _ _ _ -> Xml
                    X.HtmlDocument _ _ _ -> Html
     modifyHS (\hs -> hs { _curMarkup = markup })
-    addDoctype $ maybeToList $ X.docType $ dfDoc df
+    let inDoctype = X.docType $ dfDoc df
+    addDoctype $ maybeToList inDoctype
     modifyHS (setCurTemplateFile curPath .  setCurContext tpath)
     res <- runNodeList nodes
     dt <- getsHS (listToMaybe . _doctypes)
@@ -195,6 +196,7 @@ compileTemplates' = do
     foldM runOne H.empty tpathDocfiles
   where
     runOne tmap (tpath, df) = do
+        modifyHS (\hs -> hs { _doctypes = []})
         !mHtml <- compileTemplate tpath df
         return $! H.insert tpath (mHtml, mimeType $! dfDoc df) tmap
 

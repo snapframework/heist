@@ -76,7 +76,7 @@ type TPath = [ByteString]
 data DocumentFile = DocumentFile
     { dfDoc  :: X.Document
     , dfFile :: Maybe FilePath
-    } deriving ( Eq
+    } deriving ( Eq, Show
 #if MIN_VERSION_base(4,7,0)
                , Typeable
 #endif

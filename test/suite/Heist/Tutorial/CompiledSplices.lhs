@@ -30,10 +30,6 @@ buildbot.  So first we need to get some boilerplate and imports out of the way.
 > import           Control.Applicative
 > import           Control.Lens
 > import           Data.Map.Syntax
-> import qualified Data.Text as T
-> import           Data.Text.Encoding
-> import qualified Heist.Compiled.LowLevel as C
-> import           Text.XmlHtml
 
 As a review, normal (interpreted) Heist splices are defined like this.
 

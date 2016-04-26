@@ -81,8 +81,8 @@ attrSpliceTest = do
   where
     expected1 = "<input type='checkbox' value='foo' checked />\n<input type='checkbox' value='bar' />\n"
     expected2 = "<input type='checkbox' value='foo' />\n<input type='checkbox' value='bar' checked />\n"
-    expected3 = mappend doctype "\n<input type=\"checkbox\" value=\"foo\" checked />&#10;<input type=\"checkbox\" value=\"bar\" />&#10;"
-    expected4 = mappend doctype "\n<input type=\"checkbox\" value=\"foo\" />&#10;<input type=\"checkbox\" value=\"bar\" checked />&#10;"
+    expected3 = "<input type=\"checkbox\" value=\"foo\" checked />&#10;<input type=\"checkbox\" value=\"bar\" />&#10;"
+    expected4 = "<input type=\"checkbox\" value=\"foo\" />&#10;<input type=\"checkbox\" value=\"bar\" checked />&#10;"
 
 fooSplice :: I.Splice (StateT Int IO)
 fooSplice = do
@@ -152,8 +152,7 @@ headMergeTest = do
       (toByteString mres)
   where
     expected = B.intercalate "\n"
-      [doctype
-      ,"<html><head>\n<link href='wrapper-link' />\n"
+      ["<html><head>\n<link href='wrapper-link' />\n"
       ,"<link href='nav-link' />\n\n<link href='index-link' />"
       ,"</head>\n\n<body>\n\n<div>nav bar</div>\n\n\n"
       ,"<div>index page</div>\n\n</body>\n</html>&#10;&#10;"
@@ -170,8 +169,7 @@ bindApplyInteractionTest = do
     H.assertEqual "interpreted failure" iExpected iOut
   where
     cExpected = B.intercalate "\n"
-      [doctype
-      ,"&#10;This is a test."
+      ["&#10;This is a test."
       ,"===bind content===&#10;Another test line."
       ,"apply content&#10;Last test line."
       ,"&#10;"
@@ -197,6 +195,6 @@ backslashHandlingTest = do
     iOut <- iRender hs "backslash"
     H.assertEqual "interpreted failure" iExpected iOut
   where
-    cExpected = mappend doctype "\n<foo regex='abc\\d+\\\\e'></foo>&#10;"
+    cExpected = "<foo regex='abc\\d+\\\\e'></foo>&#10;"
     iExpected = "<foo regex='abc\\d+\\\\e'></foo>\n"
 
