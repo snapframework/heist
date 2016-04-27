@@ -1,3 +1,7 @@
+# 0.14.1.4
+
+* Fix bug in doctype handling
+
 # 0.14.0
 
 * Add namespace support (hcNamespace and hcErrorNotBound)
