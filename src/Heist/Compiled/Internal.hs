@@ -30,6 +30,7 @@ import           Data.Text                          (Text)
 import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as T
 import qualified Data.Vector                        as V
+import           Text.Printf
 import qualified Text.XmlHtml                       as X
 import qualified Text.XmlHtml.HTML.Meta             as X
 ------------------------------------------------------------------------------
@@ -138,7 +139,8 @@ runDocumentFile tpath df = do
                    X.XmlDocument _ _ _ -> Xml
                    X.HtmlDocument _ _ _ -> Html
     modifyHS (\hs -> hs { _curMarkup = markup })
-    addDoctype $ maybeToList $ X.docType $ dfDoc df
+    let inDoctype = X.docType $ dfDoc df
+    addDoctype $ maybeToList inDoctype
     modifyHS (setCurTemplateFile curPath .  setCurContext tpath)
     res <- runNodeList nodes
     dt <- getsHS (listToMaybe . _doctypes)
@@ -168,9 +170,25 @@ compileTemplates
     -> IO (Either [String] (HeistState n))
 compileTemplates f hs = do
     (tmap, hs') <- runHeistT (compileTemplates' f) (X.TextNode "") hs
+    let pre = _splicePrefix hs'
+    let nsErr = if not (T.null pre) && (_numNamespacedTags hs' == 0)
+                  then Left [noNamespaceSplicesMsg $ T.unpack pre]
+                  else Right ()
     return $ case _spliceErrors hs' of
-               [] -> Right $! hs { _compiledTemplateMap = tmap }
-               es -> Left $ map T.unpack es
+               [] -> nsErr >> (Right $! hs { _compiledTemplateMap = tmap })
+               es -> Left $ either (++) (const id) nsErr $ map T.unpack es
+
+
+------------------------------------------------------------------------------
+noNamespaceSplicesMsg :: String -> String
+noNamespaceSplicesMsg pre = unwords
+    [ printf "You are using a namespace of '%s', but you don't have any" ns
+    , printf "tags starting with '%s'.  If you have not defined any" pre
+    , "splices, then change your namespace to the empty string to get rid"
+    , "of this message."
+    ]
+  where
+    ns = reverse $ drop 1 $ reverse pre
 
 
 ------------------------------------------------------------------------------
@@ -186,6 +204,7 @@ compileTemplates' f = do
     foldM runOne H.empty tpathDocfiles
   where
     runOne tmap (tpath, df) = do
+        modifyHS (\hs -> hs { _doctypes = []})
         !mHtml <- compileTemplate tpath df
         return $! H.insert tpath (mHtml, mimeType $! dfDoc df) tmap
 
@@ -261,6 +280,9 @@ lookupSplice nm = do
 -- compileNode to generate the appropriate runtime computation.
 runNode :: Monad n => X.Node -> Splice n
 runNode node = localParamNode (const node) $ do
+    pre <- getsHS _splicePrefix
+    let hasPrefix = (T.isPrefixOf pre `fmap` X.tagName node) == Just True
+    when (not (T.null pre) && hasPrefix) incNamespacedTags
     isStatic <- subtreeIsStatic node
     markup <- getsHS _curMarkup
     if isStatic
@@ -661,13 +683,8 @@ manyWithSplices :: (Foldable f, Monad n)
                 -> Splices (RuntimeSplice n a -> Splice n)
                 -> RuntimeSplice n (f a)
                 -> Splice n
-manyWithSplices splice splices runtimeAction = do
-    p <- newEmptyPromise
-    let splices' = mapV ($ getPromise p) splices
-    chunks <- withLocalSplices splices' mempty splice
-    return $ yieldRuntime $ do
-        items <- runtimeAction
-        foldMapM (\item -> putPromise p item >> codeGen chunks) items
+manyWithSplices splice splices runtimeAction =
+    manyWith splice splices mempty runtimeAction
 
 
 ------------------------------------------------------------------------------
