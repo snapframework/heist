@@ -166,6 +166,16 @@ type AttrSplice m = Text -> RuntimeSplice m [(Text, Text)]
 
 
 ------------------------------------------------------------------------------
+-- | Detailed information about a splice error.
+data SpliceError = SpliceError
+    { spliceHistory      :: [(TPath, Maybe FilePath, Text)]
+    , spliceTemplateFile :: Maybe FilePath
+    , visibleSplices     :: [Text]
+    , spliceMsg          :: Text
+    } deriving ( Show, Eq )
+
+
+------------------------------------------------------------------------------
 -- | Holds all the state information needed for template processing.  You will
 -- build a @HeistState@ using 'initHeist' and any of Heist's @HeistState ->
 -- HeistState@ \"filter\" functions.  Then you use the resulting @HeistState@
@@ -190,6 +200,8 @@ data HeistState m = HeistState {
     , _recurse             :: Bool
     -- | The path to the template currently being processed.
     , _curContext          :: TPath
+    -- | Stack of the splices used.
+    , _splicePath          :: [(TPath, Maybe FilePath, Text)]
     -- | A counter keeping track of the current recursion depth to prevent
     -- infinite loops.
     , _recursionDepth      :: Int
@@ -213,7 +225,7 @@ data HeistState m = HeistState {
     , _splicePrefix        :: Text
 
     -- | List of errors encountered during splice processing.
-    , _spliceErrors        :: [Text]
+    , _spliceErrors        :: [SpliceError]
 
     -- | Whether to throw an error when a tag wih the heist namespace does not
     -- correspond to a bound splice.  When not using a namespace, this flag is

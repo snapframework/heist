@@ -39,6 +39,7 @@ tests = [ testCase     "compiled/simple"        simpleCompiledTest
         , testCase     "compiled/no-ns-splices" noNsSplices
         , testCase     "compiled/nsbind"        nsBindTest
         , testCase     "compiled/nsbinderr"     nsBindErrorTest
+        , testCase     "compiled/nsbindstack"   nsBindStackTest
         , testCase     "compiled/doctype"       doctypeTest
         ]
 
@@ -180,13 +181,21 @@ nsBindTemplateHC = HeistConfig sc "h" False
                 & scTemplateLocations .~ [loadTemplates "templates-nsbind"]
 
 nsBindTestSplices :: Splices (Splice IO)
-nsBindTestSplices = "main" ## do
+nsBindTestSplices = do
+    "main" ## nsBindSubImpl (return ())
+    "main2" ## nsBindSubImpl (return ())
+
+
+nsBindSubImpl :: RuntimeSplice IO b -> Splice IO
+nsBindSubImpl _ = do
     tpl <- withSplices runChildren nsBindSubSplices (return ())
     return $ yieldRuntime $ codeGen tpl
 
+
 nsBindSubSplices :: Splices (RuntimeSplice IO () -> Splice IO)
-nsBindSubSplices = mapV (pureSplice . textSplice) $
-    "sub" ## const "asdf"
+nsBindSubSplices = do
+    "sub" ## pureSplice . textSplice $ const "asdf"
+    "recurse" ## nsBindSubImpl
 
 
 nsBindTest :: IO ()
@@ -203,6 +212,8 @@ nsBindTest = do
     expected = "Alpha\n&#10;Beta\nasdf&#10;Gamma\n<sub></sub>&#10;&#10;"
 
 
+------------------------------------------------------------------------------
+-- | Test splice error reporting.
 nsBindErrorTest :: IO ()
 nsBindErrorTest = do
     res <- runExceptT $ do
@@ -213,4 +224,38 @@ nsBindErrorTest = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace bind error test" (Left ["templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid"])  res
+    H.assertEqual "namespace bind error test" (Left [ err1, err2, err3 ]) res
+  where
+    err1 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid3\n   ... via templates-nsbind/nsbinderror.tpl: h:main2\nBound splices: h:sub h:recurse h:main2 h:main"
+    err2 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid2\n   ... via templates-nsbind/nsbinderror.tpl: h:recurse\n   ... via templates-nsbind/nsbinderror.tpl: h:main\nBound splices: h:sub h:recurse h:main2 h:main"
+    err3 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid1\nBound splices: h:main2 h:main"
+
+
+------------------------------------------------------------------------------
+-- | Test splice error data structure.
+nsBindStackTest :: IO ()
+nsBindStackTest = do
+    res <- initHeist nsBindTemplateHC >>=
+           return . (either Left (Right . _spliceErrors))
+
+    H.assertEqual "namespace bind stack test" (Right [ err1, err2, err3 ]) res
+  where
+    err1 = SpliceError [ ( ["nsbinderror"]
+                         , Just "templates-nsbind/nsbinderror.tpl"
+                         , "h:main2") ]
+               (Just "templates-nsbind/nsbinderror.tpl")
+               ["h:sub","h:recurse","h:main2","h:main"]
+               "No splice bound for h:invalid3"
+    err2 = SpliceError [ ( ["nsbinderror"]
+                         , Just "templates-nsbind/nsbinderror.tpl"
+                         , "h:recurse")
+                       , ( ["nsbinderror"]
+                         , Just "templates-nsbind/nsbinderror.tpl"
+                         ,"h:main") ]
+               (Just "templates-nsbind/nsbinderror.tpl")
+               ["h:sub","h:recurse","h:main2","h:main"]
+               "No splice bound for h:invalid2"
+    err3 = SpliceError []
+               (Just "templates-nsbind/nsbinderror.tpl")
+               ["h:main2","h:main"]
+               "No splice bound for h:invalid1"

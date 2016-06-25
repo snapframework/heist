@@ -40,6 +40,7 @@ module Heist
   , RuntimeSplice
   , Chunk
   , HeistState
+  , SpliceError(..)
   , HeistT
 
   -- * Lenses (can be used with lens or lens-family)
@@ -77,6 +78,7 @@ module Heist
   , getDoc
   , getXMLDoc
   , tellSpliceError
+  , spliceErrorText
   , orError
   , Splices
   ) where
@@ -204,7 +206,7 @@ addTemplatePathPrefix dir ts
 -- | Creates an empty HeistState.
 emptyHS :: HE.KeyGen -> HeistState m
 emptyHS kg = HeistState Map.empty Map.empty Map.empty Map.empty Map.empty
-                        True [] 0 [] Nothing kg False Html "" [] False 0
+                        True [] [] 0 [] Nothing kg False Html "" [] False 0
 
 
 ------------------------------------------------------------------------------
@@ -340,4 +342,3 @@ initHeistWithCacheTag (HeistConfig sc ns enn) = do
             let hc = HeistConfig (mappend sc sc') ns enn
             hs <- initHeist' keyGen hc rawWithCache
             return $ fmap (,cts) hs
-
