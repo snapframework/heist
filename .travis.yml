@@ -1,5 +1,5 @@
 install:
-  - cabal install pandoc
+  - cabal install pandoc --reorder-goals
 
 language: haskell
 ghc:
