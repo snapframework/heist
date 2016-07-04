@@ -1,5 +1,0 @@
-:set -XOverloadedStrings
-:set -Wall
-:set -i../src
-:set -isuite
-:set -hide-package MonadCatchIO-mtl
