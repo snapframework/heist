@@ -30,6 +30,7 @@ build-type:     Simple
 cabal-version:  >= 1.8.0.4
 homepage:       http://snapframework.com/
 category:       Web, Snap
+Tested-With:    GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.3, GHC == 8.0.1
 
 extra-source-files:
   .ghci,
@@ -197,7 +198,7 @@ Test-suite testsuite
   build-depends:
     HUnit                      >= 1.2      && < 2,
     QuickCheck                 >= 2        && < 2.9,
-    lens                       >= 4.3      && < 4.14,
+    lens                       >= 4.3      && < 4.15,
     test-framework             >= 0.4      && < 0.9,
     test-framework-hunit       >= 0.2.7    && < 0.4,
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
