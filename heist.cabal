@@ -233,7 +233,7 @@ Executable benchmark
 
   build-depends:
     HUnit,
-    criterion                 >= 1.0     && < 1.1,
+    criterion                 >= 1.0     && < 1.2,
     test-framework,
     test-framework-hunit,
 
