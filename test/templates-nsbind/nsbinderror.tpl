@@ -1,4 +1,10 @@
 Alpha
+<h:invalid1/>
 <h:main>
-<h:invalid/>
+<h:recurse>
+<h:invalid2/>
+</h:recurse>
 </h:main>
+<h:main2>
+<h:invalid3/>
+</h:main2>
