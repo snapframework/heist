@@ -1,4 +1,6 @@
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
+
 module Heist.Tests
   ( tests
   ) where
@@ -51,11 +53,19 @@ loadErrorsTest = do
            ets
   where
     expected = sort
+#if MIN_VERSION_base(4,9,0)
+        ["templates-bad/apply-missing-attr.tpl: must supply \"template\" attribute in <apply>\nCallStack (from HasCallStack):\n  error, called at src/Heist/Common.hs:76:15 in main:Heist.Common"
+        ,"templates-bad/apply-template-not-found.tpl: apply tag cannot find template \"/page\"\nCallStack (from HasCallStack):\n  error, called at src/Heist/Common.hs:76:15 in main:Heist.Common"
+        ,"templates-bad/bind-infinite-loop.tpl: template recursion exceeded max depth, you probably have infinite splice recursion!\nCallStack (from HasCallStack):\n  error, called at src/Heist/Common.hs:76:15 in main:Heist.Common"
+        ,"templates-bad/bind-missing-attr.tpl: must supply \"tag\" attribute in <bind>\nCallStack (from HasCallStack):\n  error, called at src/Heist/Common.hs:76:15 in main:Heist.Common"
+        ]
+#else
         ["templates-bad/bind-infinite-loop.tpl: template recursion exceeded max depth, you probably have infinite splice recursion!"
         ,"templates-bad/apply-template-not-found.tpl: apply tag cannot find template \"/page\""
         ,"templates-bad/bind-missing-attr.tpl: must supply \"tag\" attribute in <bind>"
         ,"templates-bad/apply-missing-attr.tpl: must supply \"template\" attribute in <apply>"
         ]
+#endif
 
 
 attrSpliceTest :: IO ()
