@@ -201,6 +201,7 @@ Test-suite testsuite
     aeson,
     attoparsec,
     base,
+    bifunctors >= 5.3 && < 5.4,
     blaze-builder,
     blaze-html,
     bytestring,
