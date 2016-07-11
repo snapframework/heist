@@ -49,6 +49,7 @@ module Heist
   , scCompiledSplices
   , scAttributeSplices
   , scTemplateLocations
+  , scCompiledTemplateFilter
   , hcSpliceConfig
   , hcNamespace
   , hcErrorNotBound
@@ -57,6 +58,7 @@ module Heist
   , hcCompiledSplices
   , hcAttributeSplices
   , hcTemplateLocations
+  , hcCompiledTemplateFilter
 
   -- * HeistT functions
   , templateNames
@@ -252,7 +254,7 @@ initHeist' :: Monad n
            -> IO (Either [String] (HeistState n))
 initHeist' keyGen (HeistConfig sc ns enn) repo = do
     let empty = emptyHS keyGen
-    let (SpliceConfig i lt c a _) = sc
+    let (SpliceConfig i lt c a _ f) = sc
     etmap <- preproc keyGen lt repo ns
     let prefix = mkSplicePrefix ns
     let eis = runHashMap $ mapK (prefix<>) i
@@ -270,7 +272,7 @@ initHeist' keyGen (HeistConfig sc ns enn) repo = do
                          , _splicePrefix = prefix
                          , _errorNotBound = enn
                          }
-    either (return . Left) C.compileTemplates hs1
+    either (return . Left) (C.compileTemplates f) hs1
 
 
 ------------------------------------------------------------------------------
@@ -338,7 +340,8 @@ initHeistWithCacheTag (HeistConfig sc ns enn) = do
           Left es -> return $ Left es
           Right rawWithCache -> do
             let sc' = SpliceConfig (tag #! cacheImpl cts) mempty
-                                   (tag #! cacheImplCompiled cts) mempty mempty
+                                   (tag #! cacheImplCompiled cts)
+                                   mempty mempty (const True)
             let hc = HeistConfig (mappend sc sc') ns enn
             hs <- initHeist' keyGen hc rawWithCache
             return $ fmap (,cts) hs

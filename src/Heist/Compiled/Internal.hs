@@ -165,10 +165,11 @@ compileTemplate tpath df = do
 ------------------------------------------------------------------------------
 compileTemplates
     :: Monad n
-    => HeistState n
+    => (TPath -> Bool)
+    -> HeistState n
     -> IO (Either [String] (HeistState n))
-compileTemplates hs = do
-    (tmap, hs') <- runHeistT compileTemplates' (X.TextNode "") hs
+compileTemplates f hs = do
+    (tmap, hs') <- runHeistT (compileTemplates' f) (X.TextNode "") hs
     let pre = _splicePrefix hs'
     let canError = _errorNotBound hs'
     let errs = _spliceErrors hs'
@@ -201,11 +202,12 @@ noNamespaceSplicesMsg pre = unwords
 ------------------------------------------------------------------------------
 compileTemplates'
     :: Monad n
-    => HeistT n IO (H.HashMap TPath ([Chunk n], MIMEType))
-compileTemplates' = do
+    => (TPath -> Bool)
+    -> HeistT n IO (H.HashMap TPath ([Chunk n], MIMEType))
+compileTemplates' f = do
     hs <- getHS
     let tpathDocfiles :: [(TPath, DocumentFile)]
-        tpathDocfiles = map (\(a,b) -> (a, b))
+        tpathDocfiles = filter (f . fst)
                             (H.toList $ _templateMap hs)
     foldM runOne H.empty tpathDocfiles
   where
