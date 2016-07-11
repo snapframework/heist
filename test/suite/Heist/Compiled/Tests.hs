@@ -6,11 +6,13 @@ import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Lens
 import           Control.Monad.Trans
+import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import           Data.Char
 import           Data.Map.Syntax
 import           Data.Monoid
+import qualified Data.Set as Set
 import           Data.Text.Encoding
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
@@ -296,7 +298,9 @@ nsCallErrTest = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace call error test" (Left [ err1, err2 ]) res
+    H.assertEqual "namespace call error test"
+      (Left $ Set.fromList [ err1, err2 ])
+      (first Set.fromList res)
   where
     err1 = "templates-nscall/_call.tpl: No splice bound for h:sub\nBound splices: h:call h:main2 h:main"
     err2 = "templates-nscall/_invalid.tpl: No splice bound for h:invalid\nBound splices: h:call h:main2 h:main"
