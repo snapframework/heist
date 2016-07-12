@@ -6,9 +6,13 @@ import           Blaze.ByteString.Builder
 import           Control.Error
 import           Control.Lens
 import           Control.Monad.Trans
+import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import           Data.Char
 import           Data.Map.Syntax
 import           Data.Monoid
+import qualified Data.Set as Set
 import           Data.Text.Encoding
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
@@ -39,6 +43,8 @@ tests = [ testCase     "compiled/simple"        simpleCompiledTest
         , testCase     "compiled/no-ns-splices" noNsSplices
         , testCase     "compiled/nsbind"        nsBindTest
         , testCase     "compiled/nsbinderr"     nsBindErrorTest
+        , testCase     "compiled/nscall"        nsCallTest
+        , testCase     "compiled/nscallerr"     nsCallErrTest
         , testCase     "compiled/nsbindstack"   nsBindStackTest
         , testCase     "compiled/doctype"       doctypeTest
         ]
@@ -173,15 +179,20 @@ noNsSplices = do
                 & scTemplateLocations .~ [loadTemplates "templates-no-ns"]
 
 
-nsBindTemplateHC :: HeistConfig IO
-nsBindTemplateHC = HeistConfig sc "h" False
+nsBindTemplateHC :: String -> HeistConfig IO
+nsBindTemplateHC dir = HeistConfig sc "h" False
   where
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
                 & scCompiledSplices .~ nsBindTestSplices
-                & scTemplateLocations .~ [loadTemplates "templates-nsbind"]
+                & scTemplateLocations .~ [loadTemplates dir]
+
 
 nsBindTestSplices :: Splices (Splice IO)
 nsBindTestSplices = do
+    "call" ## do
+        tpl <- withSplices (callTemplate "_call")
+               nsBindSubSplices (return ())
+        return $ yieldRuntime $ codeGen tpl
     "main" ## nsBindSubImpl (return ())
     "main2" ## nsBindSubImpl (return ())
 
@@ -201,7 +212,7 @@ nsBindSubSplices = do
 nsBindTest :: IO ()
 nsBindTest = do
     res <- runExceptT $ do
-        hs <- ExceptT $ initHeist $ nsBindTemplateHC
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nsbind")
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "nsbind"
         b <- lift $ fst runner
@@ -217,25 +228,25 @@ nsBindTest = do
 nsBindErrorTest :: IO ()
 nsBindErrorTest = do
     res <- runExceptT $ do
-        hs <- ExceptT $ initHeist $ nsBindTemplateHC
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nsbind")
                                      & hcErrorNotBound .~ True
         runner <- noteT ["Error rendering"] $ hoistMaybe $
                     renderTemplate hs "nsbinderror"
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace bind error test" (Left [ err1, err2, err3 ]) res
+    H.assertEqual "namespace bind error test" (Left [ err1, err2, err3 ])  res
   where
-    err1 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid3\n   ... via templates-nsbind/nsbinderror.tpl: h:main2\nBound splices: h:sub h:recurse h:main2 h:main"
-    err2 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid2\n   ... via templates-nsbind/nsbinderror.tpl: h:recurse\n   ... via templates-nsbind/nsbinderror.tpl: h:main\nBound splices: h:sub h:recurse h:main2 h:main"
-    err3 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid1\nBound splices: h:main2 h:main"
+    err1 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid3\n   ... via templates-nsbind/nsbinderror.tpl: h:main2\nBound splices: h:sub h:recurse h:call h:main2 h:main"
+    err2 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid2\n   ... via templates-nsbind/nsbinderror.tpl: h:recurse\n   ... via templates-nsbind/nsbinderror.tpl: h:main\nBound splices: h:sub h:recurse h:call h:main2 h:main"
+    err3 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid1\nBound splices: h:call h:main2 h:main"
 
 
 ------------------------------------------------------------------------------
 -- | Test splice error data structure.
 nsBindStackTest :: IO ()
 nsBindStackTest = do
-    res <- initHeist nsBindTemplateHC >>=
+    res <- initHeist (nsBindTemplateHC "templates-nsbind") >>=
            return . (either Left (Right . _spliceErrors))
 
     H.assertEqual "namespace bind stack test" (Right [ err1, err2, err3 ]) res
@@ -244,7 +255,7 @@ nsBindStackTest = do
                          , Just "templates-nsbind/nsbinderror.tpl"
                          , "h:main2") ]
                (Just "templates-nsbind/nsbinderror.tpl")
-               ["h:sub","h:recurse","h:main2","h:main"]
+               ["h:sub","h:recurse","h:call","h:main2","h:main"]
                "No splice bound for h:invalid3"
     err2 = SpliceError [ ( ["nsbinderror"]
                          , Just "templates-nsbind/nsbinderror.tpl"
@@ -253,9 +264,43 @@ nsBindStackTest = do
                          , Just "templates-nsbind/nsbinderror.tpl"
                          ,"h:main") ]
                (Just "templates-nsbind/nsbinderror.tpl")
-               ["h:sub","h:recurse","h:main2","h:main"]
+               ["h:sub","h:recurse","h:call","h:main2","h:main"]
                "No splice bound for h:invalid2"
     err3 = SpliceError []
                (Just "templates-nsbind/nsbinderror.tpl")
-               ["h:main2","h:main"]
+               ["h:call","h:main2","h:main"]
                "No splice bound for h:invalid1"
+
+
+nsCallTest :: IO ()
+nsCallTest = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nscall")
+                                     & hcErrorNotBound .~ True
+                                     & hcCompiledTemplateFilter .~ nsFilter
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "nscall"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace call test" (Right "Top\n&#10;Inside 1\nCalled\nasdf&#10;&#10;Inside 2\n&#10;") res
+  where
+    nsFilter = (/=) (fromIntegral $ ord '_') . B.head . head
+
+
+nsCallErrTest :: IO ()
+nsCallErrTest = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ (nsBindTemplateHC "templates-nscall")
+                                     & hcErrorNotBound .~ True
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "nscall"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "namespace call error test"
+      (Left $ Set.fromList [ err1, err2 ])
+      (first Set.fromList res)
+  where
+    err1 = "templates-nscall/_call.tpl: No splice bound for h:sub\nBound splices: h:call h:main2 h:main"
+    err2 = "templates-nscall/_invalid.tpl: No splice bound for h:invalid\nBound splices: h:call h:main2 h:main"
