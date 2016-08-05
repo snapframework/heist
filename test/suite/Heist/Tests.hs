@@ -91,8 +91,8 @@ attrSpliceTest = do
   where
     expected1 = "<input type='checkbox' value='foo' checked />\n<input type='checkbox' value='bar' />\n"
     expected2 = "<input type='checkbox' value='foo' />\n<input type='checkbox' value='bar' checked />\n"
-    expected3 = "<input type=\"checkbox\" value=\"foo\" checked />&#10;<input type=\"checkbox\" value=\"bar\" />&#10;"
-    expected4 = "<input type=\"checkbox\" value=\"foo\" />&#10;<input type=\"checkbox\" value=\"bar\" checked />&#10;"
+    expected3 = "<input type=\"checkbox\" value=\"foo\" checked />\n<input type=\"checkbox\" value=\"bar\" />\n"
+    expected4 = "<input type=\"checkbox\" value=\"foo\" />\n<input type=\"checkbox\" value=\"bar\" checked />\n"
 
 fooSplice :: I.Splice (StateT Int IO)
 fooSplice = do
@@ -165,7 +165,7 @@ headMergeTest = do
       ["<html><head>\n<link href='wrapper-link' />\n"
       ,"<link href='nav-link' />\n\n<link href='index-link' />"
       ,"</head>\n\n<body>\n\n<div>nav bar</div>\n\n\n"
-      ,"<div>index page</div>\n\n</body>\n</html>&#10;&#10;"
+      ,"<div>index page</div>\n\n</body>\n</html>\n\n"
       ]
 
 bindApplyInteractionTest :: IO ()
@@ -179,13 +179,13 @@ bindApplyInteractionTest = do
     H.assertEqual "interpreted failure" iExpected iOut
   where
     cExpected = B.intercalate "\n"
-      ["&#10;This is a test."
-      ,"===bind content===&#10;Another test line."
-      ,"apply content&#10;Last test line."
-      ,"&#10;"
+      ["\nThis is a test."
+      ,"===bind content===\nAnother test line."
+      ,"apply content\nLast test line."
+      ,"\n"
       ]
     iExpected = B.unlines
-      ["&#10;This is a test."
+      ["\nThis is a test."
       ,"===bind content==="
       ,"Another test line."
       ,"apply content"
@@ -200,11 +200,10 @@ backslashHandlingTest :: IO ()
 backslashHandlingTest = do
     hs <- loadHS "templates"
     cOut <- cRender hs "backslash"
-    H.assertEqual "compiled failure" cExpected cOut
+    H.assertEqual "compiled failure" expected cOut
 
     iOut <- iRender hs "backslash"
-    H.assertEqual "interpreted failure" iExpected iOut
+    H.assertEqual "interpreted failure" expected iOut
   where
-    cExpected = "<foo regex='abc\\d+\\\\e'></foo>&#10;"
-    iExpected = "<foo regex='abc\\d+\\\\e'></foo>\n"
+    expected = "<foo regex='abc\\d+\\\\e'></foo>\n"
 

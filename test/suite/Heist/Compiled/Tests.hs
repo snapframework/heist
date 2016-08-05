@@ -55,7 +55,7 @@ simpleCompiledTest = do
     H.assertEqual "compiled state splice" expected res
   where
     expected =
-      mappend doctype "\n&#10;<html>&#10;3&#10;</html>&#10;"
+      mappend doctype "\n\n<html>\n3\n</html>\n"
 
 peopleTest :: IO ()
 peopleTest = do
@@ -63,7 +63,7 @@ peopleTest = do
     H.assertEqual "people splice" expected res
   where
     expected =
-      "&#10;<p>Doe, John: 42&#32;years old</p>&#10;&#10;<p>Smith, Jane: 21&#32;years old</p>&#10;&#10;"
+      "\n<p>Doe, John: 42&#32;years old</p>\n\n<p>Smith, Jane: 21&#32;years old</p>\n\n"
 
 templateHC :: HeistConfig IO
 templateHC = HeistConfig sc "" False
@@ -87,7 +87,7 @@ doctypeTest :: IO ()
 doctypeTest = genericTest "doctype test" "rss" expected
   where
     expected = encodeUtf8
-      "<rss><channel><link>http://www.devalot.com/</link></channel></rss>&#10;"
+      "<rss><channel><link>http://www.devalot.com/</link></channel></rss>\n"
 
 namespaceTest1 :: IO ()
 namespaceTest1 = do
@@ -100,7 +100,7 @@ namespaceTest1 = do
 
     H.assertEqual "namespace test 1" (Right expected) res
   where
-    expected = "Alpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
+    expected = "Alpha\naoeu\nBeta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>\nEnd\n"
 
 
 namespaceTest2 :: IO ()
@@ -114,7 +114,7 @@ namespaceTest2 = do
 
     H.assertEqual "namespace test 2" (Right expected) res
   where
-    expected = "Alpha\naoeu&#10;Beta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>&#10;End\n"
+    expected = "Alpha\naoeu\nBeta\n<h:foo aoeu='htns'>Inside h:foo</h:foo>\nEnd\n"
 
 
 namespaceTest3 :: IO ()
@@ -128,7 +128,7 @@ namespaceTest3 = do
 
     H.assertEqual "namespace test 3" (Right expected) res
   where
-    expected = "Alpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
+    expected = "Alpha\n<foo aoeu='htns'>Inside foo</foo>\nBeta\naoeu\nEnd\n"
 
 
 namespaceTest4 :: IO ()
@@ -143,7 +143,7 @@ namespaceTest4 = do
 
     H.assertEqual "namespace test 4" (Right expected) res
   where
-    expected = "Alpha\n<foo aoeu='htns'>Inside foo</foo>&#10;Beta\naoeu&#10;End\n"
+    expected = "Alpha\n<foo aoeu='htns'>Inside foo</foo>\nBeta\naoeu\nEnd\n"
 
 
 namespaceTest5 :: IO ()
@@ -220,7 +220,7 @@ nsBindTest = do
 
     H.assertEqual "namespace bind test" (Right expected)  res
   where
-    expected = "Alpha\n&#10;Beta\nasdf&#10;Gamma\n<sub></sub>&#10;&#10;"
+    expected = "Alpha\n\nBeta\nasdf\nGamma\n<sub></sub>\n\n"
 
 
 ------------------------------------------------------------------------------
@@ -283,7 +283,7 @@ nsCallTest = do
         b <- lift $ fst runner
         return $ toByteString b
 
-    H.assertEqual "namespace call test" (Right "Top\n&#10;Inside 1\nCalled\nasdf&#10;&#10;Inside 2\n&#10;") res
+    H.assertEqual "namespace call test" (Right "Top\n\nInside 1\nCalled\nasdf\n\nInside 2\n\n") res
   where
     nsFilter = (/=) (fromIntegral $ ord '_') . B.head . head
 

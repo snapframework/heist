@@ -185,7 +185,7 @@ doctypeTest = do
   where
     indexRes = B.concat
         [doctype
-        ,"\n&#10;<html>\n<div id='pre_{att}_post'>\n/index\n</div>\n</html>\n"
+        ,"\n\n<html>\n<div id='pre_{att}_post'>\n/index\n</div>\n</html>\n"
         ]
 
 ------------------------------------------------------------------------------
