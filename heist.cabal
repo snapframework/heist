@@ -162,12 +162,10 @@ Library
     xmlhtml                    >= 0.2.3.5 && < 0.3
 
   if impl(ghc >= 6.12.0)
-    ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2
+    ghc-options: -Wall -fwarn-tabs -funbox-strict-fields
                  -fno-warn-unused-do-bind
   else
-    ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2
-
-  ghc-prof-options: -auto-all
+    ghc-options: -Wall -fwarn-tabs -funbox-strict-fields
 
   Extensions:
     GeneralizedNewtypeDeriving,
@@ -225,7 +223,7 @@ Test-suite testsuite
     unordered-containers,
     vector,
     xmlhtml
-  ghc-options: -O2 -Wall -fwarn-tabs -funbox-strict-fields -threaded
+  ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
   Extensions: OverloadedStrings
 
 Executable benchmark
@@ -268,10 +266,8 @@ Executable benchmark
     vector,
     xmlhtml
 
-  ghc-options: -O2 -Wall -fwarn-tabs -funbox-strict-fields -threaded
+  ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
                -fno-warn-unused-do-bind -rtsopts
-
-  ghc-prof-options: -auto-all
 
   Extensions:
     GeneralizedNewtypeDeriving,
