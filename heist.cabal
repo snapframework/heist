@@ -225,7 +225,7 @@ Test-suite testsuite
     unordered-containers,
     vector,
     xmlhtml
-  ghc-options: -O2 -Wall -fhpc -fwarn-tabs -funbox-strict-fields -threaded
+  ghc-options: -O2 -Wall -fwarn-tabs -funbox-strict-fields -threaded
   Extensions: OverloadedStrings
 
 Executable benchmark
