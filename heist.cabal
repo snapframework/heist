@@ -207,7 +207,7 @@ Test-suite testsuite
     directory,
     directory-tree,
     dlist,
-    errors,
+    errors                     >= 2.1      && < 2.2,
     filepath,
     hashable,
     lifted-base,
