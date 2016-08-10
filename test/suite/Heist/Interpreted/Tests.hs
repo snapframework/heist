@@ -11,7 +11,6 @@ module Heist.Interpreted.Tests
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
-import           Control.Error
 import           Control.Monad.State
 import           Data.Aeson
 import           Data.ByteString.Char8                (ByteString)
@@ -629,7 +628,6 @@ calcResult apply@(Apply name _ callee _ _) = do
                                          Nothing)) hs
     evalHeistT (runNodeList $ buildApplyCaller apply)
         (X.TextNode "") hs'
-
 
 
 

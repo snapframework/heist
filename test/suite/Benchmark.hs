@@ -6,9 +6,9 @@ module Main where
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Concurrent
-import           Control.Error
 import           Control.Exception        (evaluate)
 import           Control.Monad
+import           Control.Monad.Trans.Except (ExceptT(ExceptT), runExceptT)
 import           Criterion
 import           Criterion.Main
 import           Criterion.Measurement    hiding (getTime)

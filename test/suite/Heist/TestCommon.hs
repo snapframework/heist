@@ -2,11 +2,11 @@ module Heist.TestCommon where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
-import           Control.Error
 import           Control.Monad.Trans
+import           Control.Monad.Trans.Maybe  (MaybeT(..), runMaybeT)
+import           Control.Monad.Trans.Except (ExceptT(ExceptT), runExceptT)
 import           Data.ByteString.Char8      (ByteString)
 import qualified Data.ByteString.Char8      as B
-import           Data.Map.Syntax
 import           Data.Maybe
 import           Data.Monoid
 
@@ -113,3 +113,22 @@ iRender hs name = do
     builder <- I.renderTemplate hs name
     return $ toByteString $ fst $ fromJust builder
 
+
+------------------------------------------------------------------------------
+isLeft :: Either e a -> Bool
+isLeft (Left _) = True
+isLeft _        = False
+
+
+------------------------------------------------------------------------------
+noteT :: Monad m => e -> MaybeT m a -> ExceptT e m a
+noteT e ma = do
+  x <- lift $ runMaybeT ma
+  case x of
+    Nothing -> ExceptT $ return (Left  e)
+    Just a  -> ExceptT $ return (Right a)
+
+
+------------------------------------------------------------------------------
+hoistMaybe :: Monad m => Maybe a -> MaybeT m a
+hoistMaybe = MaybeT . return

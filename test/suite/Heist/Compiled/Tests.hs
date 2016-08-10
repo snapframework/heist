@@ -3,7 +3,7 @@
 module Heist.Compiled.Tests where
 
 import           Blaze.ByteString.Builder
-import           Control.Error
+import           Control.Monad.Trans.Except
 import           Control.Lens
 import           Control.Monad.Trans
 import           Data.Bifunctor (first)

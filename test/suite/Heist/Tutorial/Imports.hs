@@ -15,9 +15,9 @@ module Heist.Tutorial.Imports
   ) where
 
 import           Blaze.ByteString.Builder
-import           Control.Error (runExceptT, ExceptT(..))
 import           Control.Monad
 import           Control.Monad.Trans
+import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import qualified Control.Monad.Trans.State as ST
 import           Data.ByteString.Char8 (ByteString)
 import           Data.Maybe
