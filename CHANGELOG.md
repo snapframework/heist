@@ -1,3 +1,9 @@
+# 1.0.0.1
+
+* Drop the dependency on `errors` packages from heist testsuite and benchmark
+
+# 1.0.0.0
+
 # 0.14.0
 
 See http://snapframework.com/blog/2014/09/24/heist-0.14-released
