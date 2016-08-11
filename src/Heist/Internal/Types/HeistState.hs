@@ -564,6 +564,8 @@ modifyHS f = HeistT $ \_ s -> return ((), f s)
 -- spliceMap.
 restoreHS :: Monad m => HeistState n -> HeistT n m ()
 restoreHS old = modifyHS (\cur -> old { _doctypes = _doctypes cur
+                                      , _numNamespacedTags =
+                                        _numNamespacedTags cur
                                       , _spliceErrors = _spliceErrors cur })
 {-# INLINE restoreHS #-}
 
