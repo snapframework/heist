@@ -1,0 +1,1 @@
+<div><h:foo/></div>

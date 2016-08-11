@@ -41,6 +41,7 @@ tests = [ testCase     "compiled/simple"        simpleCompiledTest
         , testCase     "compiled/namespace4"    namespaceTest4
         , testCase     "compiled/namespace5"    namespaceTest5
         , testCase     "compiled/no-ns-splices" noNsSplices
+        , testCase     "compiled/ns-nested"     nsNestedUnused
         , testCase     "compiled/nsbind"        nsBindTest
         , testCase     "compiled/nsbinderr"     nsBindErrorTest
         , testCase     "compiled/nscall"        nsCallTest
@@ -177,6 +178,25 @@ noNsSplices = do
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
                 & scCompiledSplices .~ ("foo" ## return (yieldPureText "aoeu"))
                 & scTemplateLocations .~ [loadTemplates "templates-no-ns"]
+
+
+------------------------------------------------------------------------------
+-- | Test that no namespace splice message works correctly when there are no
+-- top level splices used
+nsNestedUnused :: IO ()
+nsNestedUnused = do
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist hc
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "test"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "ns nested unused warn test" (Right "<div>aeou</div>\n") res
+  where
+    hc = HeistConfig sc "h" False
+    sc = mempty & scCompiledSplices .~ ("foo" ## return $ yieldPureText "aeou")
+                & scTemplateLocations .~ [loadTemplates "templates-ns-nested"]
 
 
 nsBindTemplateHC :: String -> HeistConfig IO
