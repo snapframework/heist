@@ -1,8 +1,11 @@
 # 1.0.0.1
 
 * Drop the dependency on `errors` packages from heist testsuite and benchmark
+* Fix nested splice namespace warning bug (issue #85)
 
 # 1.0.0.0
+
+* Switch from MonadCatchIO-transformers to monad-control for Snap 1.0
 
 # 0.14.0
 
