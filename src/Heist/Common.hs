@@ -103,23 +103,6 @@ tellSpliceError msg = do
 
 
 ------------------------------------------------------------------------------
--- | Transform a SpliceError record to a Text message.
-spliceErrorText :: SpliceError -> Text
-spliceErrorText (SpliceError hist tf splices node msg) =
-    (maybe "" ((`mappend` ": ") . T.pack) tf) `T.append` msg `T.append`
-    foldr (\(_, tf', tag) -> (("\n   ... via " `T.append`
-                               (maybe "" ((`mappend` ": ") . T.pack) tf')
-                               `T.append` tag) `T.append`)) T.empty hist
-    `T.append`
-    if null splices
-      then T.empty
-      else "\nBound splices:" `T.append`
-         foldl (\x y -> x `T.append` " " `T.append` y) T.empty splices
-    `T.append`
-    (T.pack $ "\nNode: " ++ (show node))
-
-
-------------------------------------------------------------------------------
 -- | Function for showing a TPath.
 showTPath :: TPath -> String
 showTPath = BC.unpack . (`BC.append` ".tpl") . tpathName
