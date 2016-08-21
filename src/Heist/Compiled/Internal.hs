@@ -14,6 +14,7 @@ module Heist.Compiled.Internal where
 import           Blaze.ByteString.Builder
 import           Blaze.ByteString.Builder.Char.Utf8
 import           Control.Arrow
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict
@@ -290,14 +291,33 @@ runNode node = localParamNode (const node) $ do
     let pre = _splicePrefix hs
     let hasPrefix = (T.isPrefixOf pre `fmap` X.tagName node) == Just True
     when (not (T.null pre) && hasPrefix) incNamespacedTags
-    isStatic <- subtreeIsStatic node
-    markup <- getsHS _curMarkup
-    if isStatic
-      then return $! yieldPure $! renderFragment markup [parseAttrs node]
-      else localHS (\hs' -> hs' {_splicePath =
-                                 (_curContext hs', _curTemplateFile hs',
-                                  X.elementTag node):(_splicePath hs')}) $
-           compileNode node
+    hs' <- getHS
+    -- Plain rethrows for CompileException to avoid multiple annotations.
+    (res, hs'') <- liftIO $ catches (compileIO hs')
+                     [ Handler (\(ex :: CompileException) -> throwIO ex)
+                     , Handler (\(ex :: SomeException) -> handleError ex hs')]
+    putHS hs''
+    return res
+  where
+    localSplicePath =
+        localHS (\hs -> hs {_splicePath = (_curContext hs,
+                                           _curTemplateFile hs,
+                                           X.elementTag node):
+                                          (_splicePath hs)})
+    compileIO hs = runHeistT compile node hs
+    compile = do
+        isStatic <- subtreeIsStatic node
+        dl <- compile' isStatic
+        liftIO $ evaluate $ DL.fromList $! consolidate dl
+    compile' True = do
+        markup <- getsHS _curMarkup
+        return $! yieldPure $! renderFragment markup [parseAttrs node]
+    compile' False = localSplicePath $ compileNode node
+    handleError ex hs = do
+        errs <- evalHeistT (do localSplicePath $ tellSpliceError $ T.pack $
+                                 "Exception in splice compile: " ++ show ex
+                               getsHS _spliceErrors) node hs
+        throwIO $ CompileException ex errs
 
 
 parseAttrs :: X.Node -> X.Node

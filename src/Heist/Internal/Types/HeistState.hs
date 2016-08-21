@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -23,6 +24,7 @@ module Heist.Internal.Types.HeistState where
 import           Blaze.ByteString.Builder      (Builder)
 import           Control.Applicative           (Alternative (..))
 import           Control.Arrow                 (first)
+import           Control.Exception             (Exception)
 import           Control.Monad                 (MonadPlus (..), ap)
 import           Control.Monad.Base
 import           Control.Monad.Cont            (MonadCont (..))
@@ -174,6 +176,44 @@ data SpliceError = SpliceError
     , contextNode        :: X.Node
     , spliceMsg          :: Text
     } deriving ( Show, Eq )
+
+
+------------------------------------------------------------------------------
+-- | Transform a SpliceError record to a Text message.
+spliceErrorText :: SpliceError -> Text
+spliceErrorText (SpliceError hist tf splices node msg) =
+    (maybe "" ((`mappend` ": ") . T.pack) tf) `T.append` msg `T.append`
+    foldr (\(_, tf', tag) -> (("\n   ... via " `T.append`
+                               (maybe "" ((`mappend` ": ") . T.pack) tf')
+                               `T.append` tag) `T.append`)) T.empty hist
+    `T.append`
+    if null splices
+      then T.empty
+      else "\nBound splices:" `T.append`
+         foldl (\x y -> x `T.append` " " `T.append` y) T.empty splices
+    `T.append`
+    (T.pack $ "\nNode: " ++ (show node))
+
+
+------------------------------------------------------------------------------
+-- | Exception type for splice compile errors.  Wraps the original
+-- exception and provides context.
+--data (Exception e) => CompileException e = CompileException
+data CompileException = forall e . Exception e => CompileException
+    { originalException :: e
+    -- The list of splice errors.  The head of it has the context
+    -- related to the exception.
+    , exceptionContext :: [SpliceError]
+    } deriving ( Typeable )
+
+
+instance Show CompileException where
+    show (CompileException e []) =
+      "Heist load exception (unknown context): " ++ (show e)
+    show (CompileException _ (c:_)) = (T.unpack $ spliceErrorText c)
+
+
+instance Exception CompileException
 
 
 ------------------------------------------------------------------------------
