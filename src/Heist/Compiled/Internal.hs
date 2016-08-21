@@ -606,13 +606,14 @@ renderTemplate hs nm =
 -- | Looks up a compiled template and returns a compiled splice.
 callTemplate :: Monad n
              => ByteString
-             -> HeistT n IO (DList (Chunk n))
+             -> Splice n
 callTemplate nm = do
     hs <- getHS
-    runNodeList $ maybe (error err) (X.docContent . dfDoc . fst) $
-      lookupTemplate nm hs _templateMap
+    maybe (error err) call $ lookupTemplate nm hs _templateMap
   where
     err = "callTemplate: "++(T.unpack $ T.decodeUtf8 nm)++(" does not exist")
+    call (df,_) = localHS (\hs' -> hs' {_curTemplateFile = dfFile df}) $
+                    runNodeList $ X.docContent $ dfDoc df
 
 
 interpret :: Monad n => DList (Chunk n) -> n Builder
