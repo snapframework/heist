@@ -91,10 +91,12 @@ heistErrMsg msg = do
 tellSpliceError :: Monad m => Text -> HeistT n m ()
 tellSpliceError msg = do
     hs <- getHS
+    node <- getParamNode
     let spliceError = SpliceError
                       { spliceHistory = _splicePath hs
                       , spliceTemplateFile = _curTemplateFile hs
                       , visibleSplices = Map.keys $ _compiledSpliceMap hs
+                      , contextNode = node
                       , spliceMsg = msg
                       }
     modifyHS (\hs' -> hs { _spliceErrors = spliceError : _spliceErrors hs' })
@@ -103,7 +105,7 @@ tellSpliceError msg = do
 ------------------------------------------------------------------------------
 -- | Transform a SpliceError record to a Text message.
 spliceErrorText :: SpliceError -> Text
-spliceErrorText (SpliceError hist tf splices msg) =
+spliceErrorText (SpliceError hist tf splices node msg) =
     (maybe "" ((`mappend` ": ") . T.pack) tf) `T.append` msg `T.append`
     foldr (\(_, tf', tag) -> (("\n   ... via " `T.append`
                                (maybe "" ((`mappend` ": ") . T.pack) tf')
@@ -113,6 +115,8 @@ spliceErrorText (SpliceError hist tf splices msg) =
       then T.empty
       else "\nBound splices:" `T.append`
          foldl (\x y -> x `T.append` " " `T.append` y) T.empty splices
+    `T.append`
+    (T.pack $ "\nNode: " ++ (show node))
 
 
 ------------------------------------------------------------------------------

@@ -17,6 +17,7 @@ import           Data.Text.Encoding
 import           Test.Framework (Test)
 import           Test.Framework.Providers.HUnit
 import qualified Test.HUnit as H
+import qualified Text.XmlHtml as X
 
 
 ------------------------------------------------------------------------------
@@ -237,9 +238,9 @@ nsBindErrorTest = do
 
     H.assertEqual "namespace bind error test" (Left [ err1, err2, err3 ])  res
   where
-    err1 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid3\n   ... via templates-nsbind/nsbinderror.tpl: h:main2\nBound splices: h:sub h:recurse h:call h:main2 h:main"
-    err2 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid2\n   ... via templates-nsbind/nsbinderror.tpl: h:recurse\n   ... via templates-nsbind/nsbinderror.tpl: h:main\nBound splices: h:sub h:recurse h:call h:main2 h:main"
-    err3 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid1\nBound splices: h:call h:main2 h:main"
+    err1 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid3\n   ... via templates-nsbind/nsbinderror.tpl: h:main2\nBound splices: h:sub h:recurse h:call h:main2 h:main\nNode: Element {elementTag = \"h:invalid3\", elementAttrs = [], elementChildren = []}"
+    err2 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid2\n   ... via templates-nsbind/nsbinderror.tpl: h:recurse\n   ... via templates-nsbind/nsbinderror.tpl: h:main\nBound splices: h:sub h:recurse h:call h:main2 h:main\nNode: Element {elementTag = \"h:invalid2\", elementAttrs = [], elementChildren = []}"
+    err3 = "templates-nsbind/nsbinderror.tpl: No splice bound for h:invalid1\nBound splices: h:call h:main2 h:main\nNode: Element {elementTag = \"h:invalid1\", elementAttrs = [], elementChildren = []}"
 
 
 ------------------------------------------------------------------------------
@@ -256,6 +257,7 @@ nsBindStackTest = do
                          , "h:main2") ]
                (Just "templates-nsbind/nsbinderror.tpl")
                ["h:sub","h:recurse","h:call","h:main2","h:main"]
+               (X.Element "h:invalid3" [] [])
                "No splice bound for h:invalid3"
     err2 = SpliceError [ ( ["nsbinderror"]
                          , Just "templates-nsbind/nsbinderror.tpl"
@@ -265,10 +267,12 @@ nsBindStackTest = do
                          ,"h:main") ]
                (Just "templates-nsbind/nsbinderror.tpl")
                ["h:sub","h:recurse","h:call","h:main2","h:main"]
+               (X.Element "h:invalid2" [] [])
                "No splice bound for h:invalid2"
     err3 = SpliceError []
                (Just "templates-nsbind/nsbinderror.tpl")
                ["h:call","h:main2","h:main"]
+               (X.Element "h:invalid1" [] [])
                "No splice bound for h:invalid1"
 
 
@@ -302,5 +306,5 @@ nsCallErrTest = do
       (Left $ Set.fromList [ err1, err2 ])
       (first Set.fromList res)
   where
-    err1 = "templates-nscall/_call.tpl: No splice bound for h:sub\nBound splices: h:call h:main2 h:main"
-    err2 = "templates-nscall/_invalid.tpl: No splice bound for h:invalid\nBound splices: h:call h:main2 h:main"
+    err1 = "templates-nscall/_call.tpl: No splice bound for h:sub\nBound splices: h:call h:main2 h:main\nNode: Element {elementTag = \"h:sub\", elementAttrs = [], elementChildren = []}"
+    err2 = "templates-nscall/_invalid.tpl: No splice bound for h:invalid\nBound splices: h:call h:main2 h:main\nNode: Element {elementTag = \"h:invalid\", elementAttrs = [], elementChildren = []}"

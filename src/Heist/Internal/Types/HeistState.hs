@@ -171,6 +171,7 @@ data SpliceError = SpliceError
     { spliceHistory      :: [(TPath, Maybe FilePath, Text)]
     , spliceTemplateFile :: Maybe FilePath
     , visibleSplices     :: [Text]
+    , contextNode        :: X.Node
     , spliceMsg          :: Text
     } deriving ( Show, Eq )
 
