@@ -4,6 +4,7 @@
 module Heist.Compiled.Tests where
 
 import           Blaze.ByteString.Builder
+import           Control.Applicative
 import           Control.Exception
 import           Control.Monad.Trans.Except
 import           Control.Lens
