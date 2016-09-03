@@ -320,13 +320,14 @@ nsCallErrTest = do
 -- | Test exception handling in template load.
 exceptionsTest :: IO ()
 exceptionsTest = do
-    res <- catch (runExceptT $ do
-                      hs <- ExceptT $ initHeist hc
-                      -- The rest needed only for type inference.
-                      runner <- noteT ["Error rendering"] $ hoistMaybe $
-                                  renderTemplate hs ""
-                      _ <- lift $ fst runner
-                      throwE ["Unexpected success"])
+    res <- Control.Exception.catch
+             (runExceptT $ do
+                  hs <- ExceptT $ initHeist hc
+                  -- The rest needed only for type inference.
+                  runner <- noteT ["Error rendering"] $ hoistMaybe $
+                              renderTemplate hs ""
+                  _ <- lift $ fst runner
+                  throwE ["Unexpected success"])
              (\(e :: CompileException) -> return $ Right
                                             (show e, head $
                                                        exceptionContext e))
