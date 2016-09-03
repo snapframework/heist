@@ -204,11 +204,7 @@ data CompileException = forall e . Exception e => CompileException
     -- The list of splice errors.  The head of it has the context
     -- related to the exception.
     , exceptionContext :: [SpliceError]
-#if MIN_VERSION_base(4,7,0)
-} deriving ( Typeable )
-#else
-}
-#endif
+    } deriving ( Typeable )
 
 
 instance Show CompileException where
