@@ -41,6 +41,7 @@ module Heist
   , Chunk
   , HeistState
   , SpliceError(..)
+  , CompileException(..)
   , HeistT
 
   -- * Lenses (can be used with lens or lens-family)
