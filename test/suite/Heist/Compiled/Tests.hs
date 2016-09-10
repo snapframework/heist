@@ -13,6 +13,7 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import           Data.Char
+import           Data.IORef
 import           Data.Maybe
 import           Data.Map.Syntax
 import           Data.Monoid
@@ -55,6 +56,7 @@ tests = [ testCase     "compiled/simple"        simpleCompiledTest
         , testCase     "compiled/nsbindstack"   nsBindStackTest
         , testCase     "compiled/doctype"       doctypeTest
         , testCase     "compiled/exceptions"    exceptionsTest
+        , testCase     "compiled/defer"         deferTest
         ]
 
 simpleCompiledTest :: IO ()
@@ -377,3 +379,41 @@ exceptionsTest = do
             value :: Int <- read . T.unpack . fromJust .
                               X.getAttribute "value" <$> getParamNode
             return $ yieldPureText $ T.pack $ show $ 1 + value
+
+
+------------------------------------------------------------------------------
+-- | Test for defer functions to see that they correctly save the result of
+-- a runtime computation.
+deferTest :: IO ()
+deferTest = do
+    rs <- mapM newIORef $ replicate 5 (0 :: Int)
+    res <- runExceptT $ do
+        hs <- ExceptT $ initHeist $ hc rs
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "test"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    vs <- mapM readIORef rs
+    H.assertEqual "defer test" ([2, 1, 1, 1, 1], Right msg) (vs, res)
+  where
+    msg = "1&#32;2\n1&#32;1\n1&#32;1\n\n1&#32;1\n"
+    hc rs = HeistConfig (sc rs) "h" True
+    sc rs = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
+                   & scCompiledSplices .~ (splices rs)
+                   & scTemplateLocations .~ [loadTemplates "templates-defer"]
+    splices [r1, r2, r3, r4, r5] = do
+        "plain" ## subSplice $ addAndReturn r1
+        "defer" ## deferMap return subSplice $ addAndReturn r2
+        "maydefer" ## mayDeferMap (return . Just) subSplice $ addAndReturn r3
+        "maydefer2" ## mayDeferMap (const $ return Nothing) subSplice $
+                         addAndReturn r4
+        "defermany" ## deferMany subSplice $ addAndReturn' r5
+    subSplice =
+        withSplices runChildren
+          ("use" ## \n -> return $ yieldRuntimeText $ return . T.pack . show =<< n)
+    addAndReturn r = liftIO $ modifyIORef r (+1) >> readIORef r
+    addAndReturn' r = liftIO $ do
+        modifyIORef r (+1)
+        val <- readIORef r
+        return [val]
