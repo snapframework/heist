@@ -756,21 +756,31 @@ deferMany f getItems = do
 ------------------------------------------------------------------------------
 -- | Saves the results of a runtme computation in a 'Promise' so they don't
 -- get recalculated if used more than once.
-deferMap :: Monad n
-         => (a -> RuntimeSplice n b)
-         -> (RuntimeSplice n b -> Splice n)
-         -> RuntimeSplice n a -> Splice n
-deferMap f pf n = do
+--
+-- Note that this is just a specialized version of function application ($)
+-- done for the side effect in runtime splice.
+defer :: Monad n
+      => (RuntimeSplice n a -> Splice n)
+      -> RuntimeSplice n a -> Splice n
+defer pf n = do
     p2 <- newEmptyPromise
-    let action = yieldRuntimeEffect $ putPromise p2 =<< f =<< n
+    let action = yieldRuntimeEffect $ putPromise p2 =<< n
     res <- pf $ getPromise p2
     return $ action `mappend` res
 
 
 ------------------------------------------------------------------------------
--- | Like deferMap, but only runs the result if a Maybe function of the
--- runtime value returns Just.  If it returns Nothing, then no output is
--- generated.
+-- | A version of defer which applies a function on the runtime value.
+deferMap :: Monad n
+         => (a -> RuntimeSplice n b)
+         -> (RuntimeSplice n b -> Splice n)
+         -> RuntimeSplice n a -> Splice n
+deferMap f pf n = defer pf $ f =<< n
+
+
+------------------------------------------------------------------------------
+-- | Like defer, but only runs the result if the runtime value is a Just.  If
+-- it's Nothing, then no output is generated.
 --
 -- This is a good example of how to do more complex flow control with
 -- promises.  The generalization of this abstraction is too complex to be
@@ -778,20 +788,28 @@ deferMap f pf n = do
 -- own special flow control, then you should use functions from the
 -- `Heist.Compiled.LowLevel` module similarly to how it is done in the
 -- implementation of this function.
-mayDeferMap :: Monad n
-            => (a -> RuntimeSplice n (Maybe b))
-            -> (RuntimeSplice n b -> Splice n)
-            -> RuntimeSplice n a -> Splice n
-mayDeferMap f pf n = do
+mayDefer :: Monad n
+         => (RuntimeSplice n a -> Splice n)
+         -> RuntimeSplice n (Maybe a) -> Splice n
+mayDefer pf n = do
     p2 <- newEmptyPromise
     action <- pf $ getPromise p2
     return $ yieldRuntime $ do
-        mb <- f =<< n
+        mb <- n
         case mb of
           Nothing -> return mempty
           Just b -> do
             putPromise p2 b
             codeGen action
+
+
+------------------------------------------------------------------------------
+-- | A version of mayDefer which applies a function on the runtime value.
+mayDeferMap :: Monad n
+            => (a -> RuntimeSplice n (Maybe b))
+            -> (RuntimeSplice n b -> Splice n)
+            -> RuntimeSplice n a -> Splice n
+mayDeferMap f pf n = mayDefer pf $ f =<< n
 
 
 ------------------------------------------------------------------------------
