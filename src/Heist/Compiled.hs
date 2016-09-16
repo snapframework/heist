@@ -28,6 +28,7 @@ module Heist.Compiled
   , pureSplice
 
   , deferMany
+  , defer
   , deferMap
   , mayDeferMap
   , bindLater
