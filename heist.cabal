@@ -67,6 +67,7 @@ extra-source-files:
   test/templates/attrs.tpl,
   test/templates/attrsubtest1.tpl,
   test/templates/attrsubtest2.tpl,
+  test/templates/backslash.tpl
   test/templates/bar/a.tpl,
   test/templates/bar/index.tpl,
   test/templates/bind-apply-interaction/_outer.tpl,
@@ -86,13 +87,18 @@ extra-source-files:
   test/templates/index.tpl,
   test/templates/ioc.tpl,
   test/templates/json.tpl,
+  test/templates/json_array.tpl
   test/templates/json_object.tpl,
   test/templates/json_snippet.tpl,
   test/templates/markdown.tpl,
+  test/templates/namespaces.tpl
   test/templates/page.tpl,
+  test/templates/pandoc.tpl
+  test/templates/pandocdiv.tpl
   test/templates/people.tpl,
   test/templates/post.tpl,
   test/templates/readme.txt,
+  test/templates/rss.xtpl
   test/templates/test.md,
   test/templates/textarea_expansion.tpl,
   test/templates/title_expansion.tpl,
@@ -104,6 +110,16 @@ extra-source-files:
   test/templates-bad/apply-template-not-found.tpl,
   test/templates-bad/bind-infinite-loop.tpl,
   test/templates-bad/bind-missing-attr.tpl,
+  test/templates-defer/test.tpl,
+  test/templates-loaderror/_error.tpl,
+  test/templates-loaderror/_ok.tpl,
+  test/templates-loaderror/test.tpl,
+  test/templates-nsbind/nsbind.tpl,
+  test/templates-nsbind/nsbinderror.tpl,
+  test/templates-ns-nested/test.tpl,
+  test/templates-nscall/_call.tpl,
+  test/templates-nscall/_invalid.tpl,
+  test/templates-nscall/nscall.tpl,
   TODO
 
 
