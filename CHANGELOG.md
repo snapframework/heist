@@ -1,3 +1,10 @@
+# 1.0.1.0
+
+* Change benchmark from an executable section to a benchmark section in the
+  cabal file.  This eliminates the criterion dependency when doing "cabal
+  install heist".
+* Export manyWith
+
 # 1.0.0.1
 
 * Drop the dependency on `errors` packages from heist testsuite and benchmark
