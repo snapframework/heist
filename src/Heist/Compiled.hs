@@ -34,6 +34,7 @@ module Heist.Compiled
   , bindLater
   , withSplices
   , manyWithSplices
+  , manyWith
   , withLocalSplices
 
   -- * Constructing Chunks
