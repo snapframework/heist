@@ -241,8 +241,9 @@ Test-suite testsuite
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
   Extensions: OverloadedStrings
 
-Executable benchmark
+Benchmark benchmark
   hs-source-dirs: src test/suite
+  type: exitcode-stdio-1.0
   main-is: Benchmark.hs
 
   build-depends:
