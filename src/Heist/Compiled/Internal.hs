@@ -613,6 +613,10 @@ withLocalSplices ss as = localHS (bindSplices ss . bindAttributeSplices as)
 ------------------------------------------------------------------------------
 -- | Looks up a compiled template and returns a runtime monad computation that
 -- constructs a builder.
+--
+-- Note that template names should not include the .tpl extension:
+--
+-- @renderTemplate hs "index"@
 renderTemplate :: Monad n
                => HeistState n
                -> ByteString

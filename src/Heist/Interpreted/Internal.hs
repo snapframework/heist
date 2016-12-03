@@ -387,6 +387,10 @@ callTemplateWithText name splices = callTemplate name $ mapV textSplice splices
 -- the root template was an HTML or XML format template.  It will always be
 -- @text/html@ or @text/xml@.  If a more specific MIME type is needed for a
 -- particular XML application, it must be provided by the application.
+--
+-- Note that template names should not include the .tpl extension:
+--
+-- @renderTemplate hs "index"@
 renderTemplate :: Monad n
                => HeistState n
                -> ByteString
