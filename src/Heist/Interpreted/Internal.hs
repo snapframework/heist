@@ -395,11 +395,24 @@ renderTemplate :: Monad n
                => HeistState n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
-renderTemplate hs name = evalHeistT tpl (X.TextNode "") hs
+renderTemplate hs name = renderTemplateWithEncoding hs name X.UTF8
+
+
+------------------------------------------------------------------------------
+-- | A generalized version of 'renderTemplate' that allows overriding the
+-- render encoding, for example to allow encoding to ISO-8859-1 with
+-- html entity escape sequences
+renderTemplateWithEncoding :: Monad n
+                           => HeistState n
+                           -> ByteString
+                           -> X.Encoding
+                           -> n (Maybe (Builder, MIMEType))
+renderTemplateWithEncoding hs name enc = evalHeistT tpl (X.TextNode "") hs
   where tpl = do mt <- evalWithDoctypes name
                  case mt of
-                    Nothing  -> return Nothing
-                    Just doc -> return $ Just $ (X.render doc, mimeType doc)
+                     Nothing  -> return Nothing
+                     Just doc -> let doc' = doc { X.docEncoding = enc }
+                                 in  return $ Just (X.render doc', mimeType doc')
 
 
 ------------------------------------------------------------------------------
