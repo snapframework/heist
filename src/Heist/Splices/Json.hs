@@ -9,22 +9,22 @@ module Heist.Splices.Json (
 ------------------------------------------------------------------------------
 import           Control.Monad.Reader
 import           Data.Aeson
-import qualified Data.ByteString.Char8       as S
-import qualified Data.ByteString.Lazy.Char8  as L
-import qualified Data.HashMap.Strict         as Map
+import qualified Data.ByteString.Char8           as S
+import qualified Data.ByteString.Lazy.Char8      as L
+import qualified Data.HashMap.Strict             as Map
 import           Data.Map.Syntax
 import           Data.Maybe
-import           Data.Text                   (Text)
-import qualified Data.Text                   as T
-import qualified Data.Text.Encoding          as T
-import qualified Data.Vector                 as V
-import           Text.Blaze.Html5            ((!))
-import qualified Text.Blaze.Html5            as B
+import           Data.Text                       (Text)
+import qualified Data.Text                       as T
+import qualified Data.Text.Encoding              as T
+import qualified Data.Vector                     as V
+import           Text.Blaze.Html5                ((!))
+import qualified Text.Blaze.Html5                as B
 import           Text.Blaze.Renderer.XmlHtml
 import           Text.XmlHtml
 ------------------------------------------------------------------------------
-import           Heist.Interpreted.Internal
 import           Heist.Internal.Types.HeistState
+import           Heist.Interpreted.Internal
 ------------------------------------------------------------------------------
 
                                  ------------
