@@ -249,7 +249,6 @@ differently in the case of failure.
 
 < failingSplice :: MonadSnap m => C.Splice m
 < failingSplice = do
-<     children <- childNodes <$> getParamNode
 <     promise <- C.newEmptyPromise
 <     outputChildren <- C.withSplices C.runChildren splices (C.getPromise promise)
 <     return $ C.yieldRuntime $ do         

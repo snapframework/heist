@@ -255,7 +255,7 @@ consolidate = consolidateL . DL.toList
 
 
 ------------------------------------------------------------------------------
--- | Given a list of output chunks, consolidate turns consecutive runs of
+-- | Given a list of output chunks, codeGen turns consecutive runs of
 -- @Pure Html@ values into maximally-efficient pre-rendered strict
 -- 'ByteString' chunks.
 codeGen :: Monad n => DList (Chunk n) -> RuntimeSplice n Builder
@@ -758,7 +758,7 @@ deferMany f getItems = do
 
 
 ------------------------------------------------------------------------------
--- | Saves the results of a runtme computation in a 'Promise' so they don't
+-- | Saves the results of a runtime computation in a 'Promise' so they don't
 -- get recalculated if used more than once.
 --
 -- Note that this is just a specialized version of function application ($)
