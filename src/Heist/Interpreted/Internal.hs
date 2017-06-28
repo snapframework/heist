@@ -164,17 +164,21 @@ stopRecursion = modifyHS (\st -> st { _recurse = False })
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a single node.
-runNode :: Monad n => X.Node -> Splice n
-runNode (X.Element nm at ch) = do
+runNodeWithRenderOptions :: Monad n => X.RenderOptions -> X.Node -> Splice n
+runNodeWithRenderOptions ropts (X.Element nm at ch) = do
     newAtts <- runAttributes at
     let n = X.Element nm newAtts ch
     s <- liftM (lookupSplice nm) getHS
     maybe (runKids newAtts) (recurseSplice n) s
   where
     runKids newAtts = do
-        newKids <- runNodeList ch
+        newKids <- runNodeListWithRenderOptions ropts ch
         return [X.Element nm newAtts newKids]
-runNode n                    = return [n]
+runNodeWithRenderOptions _ n                        = return [n]
+
+
+runNode :: Monad n => X.Node -> Splice n
+runNode = runNodeWithRenderOptions X.defaultRenderOptions
 
 
 ------------------------------------------------------------------------------
@@ -252,10 +256,18 @@ getAttributeSplice name = do
 
 ------------------------------------------------------------------------------
 -- | Performs splice processing on a list of nodes.
-runNodeList :: Monad n => [X.Node] -> Splice n
-runNodeList = mapSplices runNode
+runNodeListWithRenderOptions
+    :: Monad n
+    => X.RenderOptions
+    -> [X.Node]
+    -> Splice n
+runNodeListWithRenderOptions ropts =
+    mapSplices (runNodeWithRenderOptions ropts)
 {-# INLINE runNodeList #-}
 
+
+runNodeList :: Monad n => [X.Node] -> Splice n
+runNodeList = runNodeListWithRenderOptions X.defaultRenderOptions
 
 ------------------------------------------------------------------------------
 -- | The maximum recursion depth.  (Used to prevent infinite loops.)

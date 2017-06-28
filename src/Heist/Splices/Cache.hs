@@ -38,6 +38,7 @@ import           Data.Text.Read
 import           Data.Time.Clock
 import           System.Random
 import           Text.XmlHtml
+import qualified Text.XmlHtml as X
 
 #if !MIN_VERSION_base(4,8,0)
 import           Data.Word (Word)
@@ -130,12 +131,16 @@ cacheImpl (CTS mv) = do
 
 ------------------------------------------------------------------------------
 -- | This is the compiled splice version of cacheImpl.
-cacheImplCompiled :: (MonadIO n) => CacheTagState -> C.Splice n
-cacheImplCompiled cts = do
+cacheImplCompiledWithRenderOptions
+    :: (MonadIO n)
+    => X.RenderOptions
+    -> CacheTagState
+    -> C.Splice n
+cacheImplCompiledWithRenderOptions ropts cts = do
     tree <- getParamNode
     let !ttl = getTTL tree
 
-    compiled <- C.runNodeList $ childNodes tree
+    compiled <- C.runNodeListWithRenderOptions ropts $ childNodes tree
     ref <- liftIO $ newIORef Nothing
     liftIO $ addCompiledRef ref cts
     let reload curTime = do
@@ -152,6 +157,10 @@ cacheImplCompiled cts = do
                 if (ttl > 0 && diffUTCTime cur lastUpdate > ttl)
                   then reload cur
                   else return $! bs
+
+
+cacheImplCompiled :: MonadIO n => CacheTagState -> C.Splice n
+cacheImplCompiled = cacheImplCompiledWithRenderOptions X.defaultRenderOptions
 
 
 ------------------------------------------------------------------------------

@@ -65,13 +65,15 @@ module Heist.Interpreted
 
   -- * HeistT functions
   , stopRecursion
-  , runNode
+  -- , runNode
+  , runNodeWithRenderOptions
   , runAttributes
-  , runNodeList
+  -- , runNodeList
+  , runNodeListWithRenderOptions
   , evalTemplate
   , bindStrings
   , bindString
-  , callTemplate
+  -- , callTemplate
   , callTemplateWithText
   , renderTemplate
   , renderTemplateWithEncoding

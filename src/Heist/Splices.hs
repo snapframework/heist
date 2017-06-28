@@ -41,12 +41,14 @@ ifISplice cond =
 ------------------------------------------------------------------------------
 -- | Function for constructing if splices that use a runtime predicate
 -- function to determine whether the node's children should be rendered.
-ifCSplice :: Monad m
-          => (t -> Bool)
-          -> RuntimeSplice m t
-          -> C.Splice m
-ifCSplice predicate runtime = do
-    chunks <- C.runChildren
+ifCSpliceWithRenderOptions
+    :: Monad m
+    => X.RenderOptions
+    -> (t -> Bool)
+    -> RuntimeSplice m t
+    -> C.Splice m
+ifCSpliceWithRenderOptions ropts predicate runtime = do
+    chunks <- C.runChildren ropts
     return $ C.yieldRuntime $ do
         a <- runtime
         if predicate a
@@ -55,23 +57,41 @@ ifCSplice predicate runtime = do
           else
             return mempty
 
+ifCSplice :: Monad m => (t -> Bool) -> RuntimeSplice m t -> C.Splice m
+ifCSplice = ifCSpliceWithRenderOptions X.defaultRenderOptions
 
 ------------------------------------------------------------------------------
 -- | Implements an if/then/else conditional splice.  It splits its children
 -- around the <else/> element to get the markup to be used for the two cases.
-ifElseISplice :: Monad m => Bool -> I.Splice m
-ifElseISplice cond = getParamNode >>= (rewrite . X.childNodes)
+ifElseISpliceWithRenderOptions
+    :: Monad m
+    => X.RenderOptions
+    -> Bool
+    -> I.Splice m
+ifElseISpliceWithRenderOptions ropts cond = getParamNode >>= (rewrite . X.childNodes)
   where
     rewrite nodes = 
       let (ns, ns') = break (\n -> X.tagName n==Just "else") nodes
-      in I.runNodeList $ if cond then ns else (drop 1 ns') 
+      in I.runNodeListWithRenderOptions ropts $ if cond then ns else (drop 1 ns') 
+
+
+ifElseISplice :: Monad m => Bool -> I.Splice m
+ifElseISplice = ifElseISpliceWithRenderOptions X.defaultRenderOptions
 
 
 ------------------------------------------------------------------------------
 -- | Implements an if/then/else conditional splice.  It splits its children
 -- around the <else/> element to get the markup to be used for the two cases.
-ifElseCSplice :: Monad m => Bool -> C.Splice m
-ifElseCSplice cond = getParamNode >>= (rewrite . X.childNodes)
-  where rewrite nodes = 
+ifElseCSpliceWithRenderOptions
+    :: Monad m
+    => X.RenderOptions
+    -> Bool
+    -> C.Splice m
+ifElseCSpliceWithRenderOptions ropts cond =
+    getParamNode >>= (rewrite . X.childNodes)
+  where rewrite nodes =
           let (ns, ns') = break (\n -> X.tagName n==Just "else") nodes
-          in C.runNodeList $ if cond then ns else (drop 1 ns') 
+          in C.runNodeListWithRenderOptions ropts $ if cond then ns else (drop 1 ns')
+
+ifElseCSplice :: Monad m => Bool -> C.Splice m
+ifElseCSplice = ifElseCSpliceWithRenderOptions X.defaultRenderOptions

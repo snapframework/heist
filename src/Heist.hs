@@ -146,7 +146,7 @@ defaultInterpretedSplices = do
 -- | An empty HeistConfig that uses the \"h\" namespace with error checking
 -- turned on.
 emptyHeistConfig :: HeistConfig m
-emptyHeistConfig = HeistConfig mempty "h" True
+emptyHeistConfig = HeistConfig mempty "h" True X.defaultRenderOptions
 
 
 allErrors :: [Either String (TPath, v)]
@@ -253,7 +253,7 @@ initHeist' :: Monad n
            -> HeistConfig n
            -> TemplateRepo
            -> IO (Either [String] (HeistState n))
-initHeist' keyGen (HeistConfig sc ns enn) repo = do
+initHeist' keyGen (HeistConfig sc ns enn ropts) repo = do
     let empty = emptyHS keyGen
     let (SpliceConfig i lt c a _ f) = sc
     etmap <- preproc keyGen lt repo ns
@@ -273,7 +273,7 @@ initHeist' keyGen (HeistConfig sc ns enn) repo = do
                          , _splicePrefix = prefix
                          , _errorNotBound = enn
                          }
-    either (return . Left) (C.compileTemplates f) hs1
+    either (return . Left) (C.compileTemplates ropts f) hs1
 
 
 ------------------------------------------------------------------------------
@@ -323,7 +323,7 @@ preprocess (tpath, docFile) = do
 initHeistWithCacheTag :: MonadIO n
                       => HeistConfig n
                       -> IO (Either [String] (HeistState n, CacheTagState))
-initHeistWithCacheTag (HeistConfig sc ns enn) = do
+initHeistWithCacheTag (HeistConfig sc ns enn ropts) = do
     (ss, cts) <- liftIO mkCacheTag
     let tag = "cache"
     keyGen <- HE.newKeyGen
@@ -343,6 +343,6 @@ initHeistWithCacheTag (HeistConfig sc ns enn) = do
             let sc' = SpliceConfig (tag #! cacheImpl cts) mempty
                                    (tag #! cacheImplCompiled cts)
                                    mempty mempty (const True)
-            let hc = HeistConfig (mappend sc sc') ns enn
+            let hc = HeistConfig (mappend sc sc') ns enn ropts
             hs <- initHeist' keyGen hc rawWithCache
             return $ fmap (,cts) hs

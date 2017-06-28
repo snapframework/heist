@@ -47,10 +47,13 @@ module Heist.Compiled
 
   -- * Running nodes and splices
   , runNodeList
+  , runNodeListWithRenderOptions
   , runNode
+  , runNodeWithRenderOptions
   , runAttributes
   , runAttributesRaw
   , callTemplate
+  , callTemplateWithRenderOptions
 
   ) where
 

@@ -64,16 +64,16 @@ type Splice n = HeistT n IO (DList (Chunk n))
 -- chunks.  By itself this function is a simple passthrough splice that makes
 -- the spliced node disappear.  In combination with locally bound splices,
 -- this function makes it easier to pass the desired view into your splices.
-runChildren :: Monad n => Splice n
-runChildren = runNodeList . X.childNodes =<< getParamNode
+runChildren :: Monad n => X.RenderOptions -> Splice n
+runChildren ropts = runNodeListWithRenderOptions ropts . X.childNodes =<< getParamNode
 {-# INLINE runChildren #-}
 
 
-renderFragment :: Markup -> [X.Node] -> Builder
-renderFragment markup ns =
+renderFragment :: X.RenderOptions -> Markup -> [X.Node] -> Builder
+renderFragment opts markup ns =
     case markup of
-      Html -> X.renderHtmlFragment X.UTF8 ns
-      Xml  -> X.renderXmlFragment X.UTF8 ns
+      Html -> X.renderHtmlFragmentWithOptions opts X.UTF8 ns
+      Xml  -> X.renderXmlFragmentWithOptions  opts X.UTF8 ns
 
 
 ------------------------------------------------------------------------------
@@ -125,17 +125,24 @@ yieldRuntimeText = yieldRuntime .  liftM fromText
 ------------------------------------------------------------------------------
 -- | Returns a computation that performs load-time splice processing on the
 -- supplied list of nodes.
-runNodeList :: Monad n => [X.Node] -> Splice n
-runNodeList = mapSplices runNode
+runNodeListWithRenderOptions
+    :: Monad n
+    => X.RenderOptions
+    -> [X.Node]
+    -> Splice n
+runNodeListWithRenderOptions ropts = mapSplices (runNodeWithRenderOptions ropts)
 
+runNodeList :: Monad n => [X.Node] -> Splice n
+runNodeList = runNodeListWithRenderOptions X.defaultRenderOptions
 
 ------------------------------------------------------------------------------
 -- | Runs a DocumentFile with the appropriate template context set.
 runDocumentFile :: Monad n
-                => TPath
+                => X.RenderOptions
+                -> TPath
                 -> DocumentFile
                 -> Splice n
-runDocumentFile tpath df = do
+runDocumentFile ropts tpath df = do
     let markup = case dfDoc df of
                    X.XmlDocument _ _ _ -> Xml
                    X.HtmlDocument _ _ _ -> Html
@@ -143,7 +150,7 @@ runDocumentFile tpath df = do
     let inDoctype = X.docType $ dfDoc df
     addDoctype $ maybeToList inDoctype
     modifyHS (setCurTemplateFile curPath .  setCurContext tpath)
-    res <- runNodeList nodes
+    res <- runNodeListWithRenderOptions ropts nodes
     dt <- getsHS (listToMaybe . _doctypes)
     let enc = X.docEncoding $ dfDoc df
     return $! (yieldPure (X.renderDocType enc dt) `mappend` res)
@@ -155,22 +162,24 @@ runDocumentFile tpath df = do
 ------------------------------------------------------------------------------
 compileTemplate
     :: Monad n
-    => TPath
+    => X.RenderOptions
+    -> TPath
     -> DocumentFile
     -> HeistT n IO [Chunk n]
-compileTemplate tpath df = do
-    !chunks <- runDocumentFile tpath df
+compileTemplate ropts tpath df = do
+    !chunks <- runDocumentFile ropts tpath df
     return $! consolidate chunks
 
 
 ------------------------------------------------------------------------------
 compileTemplates
     :: Monad n
-    => (TPath -> Bool)
+    => X.RenderOptions
+    -> (TPath -> Bool)
     -> HeistState n
     -> IO (Either [String] (HeistState n))
-compileTemplates f hs = do
-    (tmap, hs') <- runHeistT (compileTemplates' f) (X.TextNode "") hs
+compileTemplates ropts f hs = do
+    (tmap, hs') <- runHeistT (compileTemplates' ropts f) (X.TextNode "") hs
     let pre = _splicePrefix hs'
     let canError = _errorNotBound hs'
     let errs = _spliceErrors hs'
@@ -203,9 +212,10 @@ noNamespaceSplicesMsg pre = unwords
 ------------------------------------------------------------------------------
 compileTemplates'
     :: Monad n
-    => (TPath -> Bool)
+    => X.RenderOptions
+    -> (TPath -> Bool)
     -> HeistT n IO (H.HashMap TPath ([Chunk n], MIMEType))
-compileTemplates' f = do
+compileTemplates' ropts f = do
     hs <- getHS
     let tpathDocfiles :: [(TPath, DocumentFile)]
         tpathDocfiles = filter (f . fst)
@@ -214,7 +224,7 @@ compileTemplates' f = do
   where
     runOne tmap (tpath, df) = do
         modifyHS (\hs -> hs { _doctypes = []})
-        !mHtml <- compileTemplate tpath df
+        !mHtml <- compileTemplate ropts tpath df
         return $! H.insert tpath (mHtml, mimeType $! dfDoc df) tmap
 
 
@@ -285,8 +295,8 @@ lookupSplice nm = do
 -- | Runs a single node.  If there is no splice referenced anywhere in the
 -- subtree, then it is rendered as a pure chunk, otherwise it calls
 -- compileNode to generate the appropriate runtime computation.
-runNode :: Monad n => X.Node -> Splice n
-runNode node = localParamNode (const node) $ do
+runNodeWithRenderOptions :: Monad n => X.RenderOptions -> X.Node -> Splice n
+runNodeWithRenderOptions ropts node = localParamNode (const node) $ do
     hs <- getHS
     let pre = _splicePrefix hs
     let hasPrefix = (T.isPrefixOf pre `fmap` X.tagName node) == Just True
@@ -311,13 +321,16 @@ runNode node = localParamNode (const node) $ do
         liftIO $ evaluate $ DL.fromList $! consolidate dl
     compile' True = do
         markup <- getsHS _curMarkup
-        return $! yieldPure $! renderFragment markup [parseAttrs node]
-    compile' False = localSplicePath $ compileNode node
+        return $! yieldPure $! renderFragment ropts markup [parseAttrs node]
+    compile' False = localSplicePath $ compileNode ropts node
     handleError ex hs = do
         errs <- evalHeistT (do localSplicePath $ tellSpliceError $ T.pack $
                                  "Exception in splice compile: " ++ show ex
                                getsHS _spliceErrors) node hs
         throwIO $ CompileException ex errs
+
+runNode :: Monad n => X.Node -> Splice n
+runNode = runNodeWithRenderOptions X.defaultRenderOptions
 
 
 parseAttrs :: X.Node -> X.Node
@@ -372,8 +385,8 @@ hasAttributeSubstitutions txt = any isIdent ast
 ------------------------------------------------------------------------------
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
 -- generate html at runtime.
-compileNode :: Monad n => X.Node -> Splice n
-compileNode (X.Element nm attrs ch) = do
+compileNode :: Monad n => X.RenderOptions -> X.Node -> Splice n
+compileNode ropts (X.Element nm attrs ch) = do
     msplice <- lookupSplice nm
     fromMaybe compileStaticElement msplice
   where
@@ -384,7 +397,7 @@ compileNode (X.Element nm attrs ch) = do
         -- Parse the attributes: we have Left for static and Right for runtime
         compiledAttrs <- runAttributes attrs
 
-        childHtml <- runNodeList ch
+        childHtml <- runNodeListWithRenderOptions ropts ch
 
         return $! if null (DL.toList childHtml) && nm `S.member` X.voidTags
           then DL.concat [ DL.singleton $! pureTextChunk $! tag0
@@ -397,7 +410,7 @@ compileNode (X.Element nm attrs ch) = do
                          , childHtml
                          , DL.singleton $! pureTextChunk $! end
                          ]
-compileNode _ = error "impossible"
+compileNode _ _ = error "impossible"
 
 
 ------------------------------------------------------------------------------
@@ -628,16 +641,21 @@ renderTemplate hs nm =
 
 ------------------------------------------------------------------------------
 -- | Looks up a compiled template and returns a compiled splice.
-callTemplate :: Monad n
-             => ByteString
+callTemplateWithRenderOptions :: Monad n
+             => X.RenderOptions
+             -> ByteString
              -> Splice n
-callTemplate nm = do
+callTemplateWithRenderOptions ropts nm = do
     hs <- getHS
     maybe (error err) call $ lookupTemplate nm hs _templateMap
   where
-    err = "callTemplate: "++(T.unpack $ T.decodeUtf8 nm)++(" does not exist")
+    err = "callTemplateWithRenderOptions: "++(T.unpack $ T.decodeUtf8 nm)++(" does not exist")
     call (df,_) = localHS (\hs' -> hs' {_curTemplateFile = dfFile df}) $
-                    runNodeList $ X.docContent $ dfDoc df
+                    runNodeListWithRenderOptions ropts $ X.docContent $ dfDoc df
+
+
+callTemplate :: Monad n => ByteString -> Splice n
+callTemplate = callTemplateWithRenderOptions X.defaultRenderOptions
 
 
 interpret :: Monad n => DList (Chunk n) -> n Builder

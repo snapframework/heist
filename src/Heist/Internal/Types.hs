@@ -23,6 +23,7 @@ module Heist.Internal.Types
 ------------------------------------------------------------------------------
 import           Data.HashMap.Strict (HashMap)
 import           Data.Text (Text)
+import qualified Text.XmlHtml as X
 
 #if !MIN_VERSION_base(4,8,0)
 import           Control.Applicative
@@ -172,6 +173,7 @@ data HeistConfig m = HeistConfig
         -- ^ Whether to throw an error when a tag wih the heist namespace does
         -- not correspond to a bound splice.  When not using a namespace, this
         -- flag is ignored.
+    , _hcXmlHtmlOptions :: X.RenderOptions
     }
 
 
