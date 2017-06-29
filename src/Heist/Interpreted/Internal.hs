@@ -7,6 +7,7 @@ module Heist.Interpreted.Internal where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
+import           Control.Arrow                 ((&&&))
 import           Control.Monad
 import           Control.Monad.State.Strict
 import qualified Data.Attoparsec.Text          as AP
@@ -396,10 +397,9 @@ renderTemplate :: Monad n
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
 renderTemplate hs name = evalHeistT tpl (X.TextNode "") hs
-  where tpl = do mt <- evalWithDoctypes name
-                 case mt of
-                    Nothing  -> return Nothing
-                    Just doc -> return $ Just $ (X.render doc, mimeType doc)
+  where tpl = (fmap .fmap)
+              (X.render &&& mimeType)
+              (evalWithDoctypes name)
 
 
 ------------------------------------------------------------------------------
@@ -415,3 +415,9 @@ renderWithArgs :: Monad n
 renderWithArgs args hs = renderTemplate (bindStrings args hs)
 
 
+renderTemplateToDoc :: Monad n
+            => HeistState n
+            -> ByteString
+            -> n (Maybe X.Document)
+renderTemplateToDoc hs name =
+    evalHeistT (evalWithDoctypes name) (X.TextNode "") hs
