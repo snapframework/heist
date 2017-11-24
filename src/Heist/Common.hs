@@ -350,6 +350,7 @@ mimeType d = case d of
     -- rendering will include a byte order mark. (RFC 2781, Sec. 3.3)
     enc X.UTF16BE = "utf-16"
     enc X.UTF16LE = "utf-16"
+    enc X.ISO_8859_1 = "iso-8859-1"
 
 
 ------------------------------------------------------------------------------
