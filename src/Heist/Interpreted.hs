@@ -74,6 +74,7 @@ module Heist.Interpreted
   , callTemplate
   , callTemplateWithText
   , renderTemplate
+  , renderTemplateToDoc
   , renderWithArgs
   ) where
 
