@@ -1,5 +1,5 @@
 name:           heist
-version:        1.0.1.1
+version:        1.0.1.2
 synopsis:       An Haskell template system supporting both HTML5 and XML.
 description:
     Heist is a powerful template system that supports both HTML5 and XML.
