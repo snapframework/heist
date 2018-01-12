@@ -236,6 +236,7 @@ Test-suite testsuite
     time,
     transformers,
     transformers-base,
+    unix,
     unordered-containers,
     vector,
     xmlhtml

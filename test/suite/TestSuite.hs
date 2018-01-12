@@ -3,7 +3,7 @@ module Main where
 import           Control.Monad           (liftM, when)
 import           Data.List               (isPrefixOf)
 import           System.Directory        (findExecutable, setCurrentDirectory)
-import           System.Environment      (setEnv)
+import           System.Posix.Env        (setEnv)
 import           System.Process          (readProcess)
 import           Test.Framework          (defaultMain, testGroup)
 
@@ -18,7 +18,7 @@ main = do
     shouldMockPandoc <- pandoc1Unavailable
     when shouldMockPandoc $ do
         putStrLn "Using mock pandoc implementation."
-        setEnv "PATH" "."
+        setEnv "PATH" "." True
     defaultMain tests
   where tests = [ testGroup "Heist.Interpreted.Tests"
                             Heist.Interpreted.Tests.tests
