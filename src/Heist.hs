@@ -314,7 +314,6 @@ preprocess (tpath, docFile) = do
               :: HeistT IO IO (Either SomeException (Maybe X.Document))
     let f !doc = (tpath, docFile { dfDoc = doc })
     return $! either (Left . show) (Right . maybe die f) emdoc
-  where
 
 
 ------------------------------------------------------------------------------
