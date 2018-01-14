@@ -57,8 +57,8 @@ ifCSplice predicate runtime = do
 
 
 ------------------------------------------------------------------------------
--- | Implements an if/then/else conditional splice.  It splits its children
--- around the <else/> element to get the markup to be used for the two cases.
+-- | Implements an if\/then\/else conditional splice.  It splits its children
+-- around the \<else\/\> element to get the markup to be used for the two cases.
 ifElseISplice :: Monad m => Bool -> I.Splice m
 ifElseISplice cond = getParamNode >>= (rewrite . X.childNodes)
   where
@@ -68,8 +68,8 @@ ifElseISplice cond = getParamNode >>= (rewrite . X.childNodes)
 
 
 ------------------------------------------------------------------------------
--- | Implements an if/then/else conditional splice.  It splits its children
--- around the <else/> element to get the markup to be used for the two cases.
+-- | Implements an if\/then\/else conditional splice.  It splits its children
+-- around the \<else\/\> element to get the markup to be used for the two cases.
 ifElseCSplice :: Monad m => Bool -> C.Splice m
 ifElseCSplice cond = getParamNode >>= (rewrite . X.childNodes)
   where rewrite nodes = 
