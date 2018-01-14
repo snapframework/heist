@@ -91,6 +91,7 @@ module Heist
 import           Control.Exception.Lifted
 import           Control.Monad.State
 import           Data.ByteString               (ByteString)
+import qualified Data.ByteString.Char8         as BC
 import qualified Data.ByteString               as B
 import           Data.Either
 import qualified Data.Foldable                 as F
@@ -306,12 +307,13 @@ preprocess :: (TPath, DocumentFile)
            -> HeistT IO IO (Either String (TPath, DocumentFile))
 preprocess (tpath, docFile) = do
     let tname = tpathName tpath
+        die   = error $ "Preprocess failed because the template `"
+                     ++ BC.unpack tname
+                     ++ "` was not found in the template repository."
     !emdoc <- try $ I.evalWithDoctypes tname
               :: HeistT IO IO (Either SomeException (Maybe X.Document))
     let f !doc = (tpath, docFile { dfDoc = doc })
     return $! either (Left . show) (Right . maybe die f) emdoc
-  where
-    die = error "Preprocess didn't succeed!  This should never happen."
 
 
 ------------------------------------------------------------------------------
