@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Mock implementation of pandoc.
+
+echo '<p>This <em>is</em> a test.</p>'
+
