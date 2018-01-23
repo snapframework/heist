@@ -57,6 +57,7 @@ extra-source-files:
   test/suite/Benchmark.hs,
   test/suite/Heist/Compiled/Tests.hs,
   test/suite/Heist/Interpreted/Tests.hs,
+  test/suite/Heist/Interpreted/Pandoc/Tests.hs
   test/suite/Heist/TestCommon.hs,
   test/suite/Heist/Tests.hs,
   test/suite/Heist/Tutorial/AttributeSplices.lhs,
@@ -79,9 +80,6 @@ extra-source-files:
   test/templates/div_expansion.tpl,
   test/templates/foo/a.tpl,
   test/templates/foo/b.tpl,
-  test/templates/foo/markdown-chdir.tpl,
-  test/templates/foo/markdown-origdir.tpl,
-  test/templates/foo/test2.md,
   test/templates/head_merge/index.tpl,
   test/templates/head_merge/nav.tpl,
   test/templates/head_merge/wrap.tpl,
@@ -91,16 +89,12 @@ extra-source-files:
   test/templates/json_array.tpl
   test/templates/json_object.tpl,
   test/templates/json_snippet.tpl,
-  test/templates/markdown.tpl,
   test/templates/namespaces.tpl
   test/templates/page.tpl,
-  test/templates/pandoc.tpl
-  test/templates/pandocdiv.tpl
   test/templates/people.tpl,
   test/templates/post.tpl,
   test/templates/readme.txt,
   test/templates/rss.xtpl
-  test/templates/test.md,
   test/templates/textarea_expansion.tpl,
   test/templates/title_expansion.tpl,
   test/templates/user/admin/main.tpl,
@@ -121,6 +115,14 @@ extra-source-files:
   test/templates-nscall/_call.tpl,
   test/templates-nscall/_invalid.tpl,
   test/templates-nscall/nscall.tpl,
+  test/templates-pandoc/markdown.tpl,
+  test/templates-pandoc/page.tpl,
+  test/templates-pandoc/pandoc.tpl,
+  test/templates-pandoc/pandocdiv.tpl,
+  test/templates-pandoc/test.md,
+  test/templates-pandoc/foo/markdown-chdir.tpl,
+  test/templates-pandoc/foo/markdown-origdir.tpl,
+  test/templates-pandoc/foo/test2.md,
   TODO
 
 

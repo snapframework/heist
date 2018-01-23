@@ -40,7 +40,6 @@ import           Heist.Interpreted.Internal
 import           Heist.Splices.Apply
 import           Heist.Splices.Ignore
 import           Heist.Splices.Json
-import           Heist.Splices.Markdown
 import           Heist.TestCommon
 import qualified Text.XmlHtml                         as X
 import qualified Text.XmlHtml.Cursor                  as X
@@ -59,14 +58,10 @@ tests = [ testProperty "heist/simpleBind"            simpleBindTest
         , testCase     "heist/doctype"               doctypeTest
         , testCase     "heist/attributeSubstitution" attrSubstTest
         , testCase     "heist/bindAttribute"         bindAttrTest
-        , testCase     "heist/markdown"              markdownTest
-        , testCase     "heist/pandoc"                pandocTest
-        , testCase     "heist/pandoc_div"            pandocDivTest
         , testCase     "heist/title_expansion"       titleExpansion
         , testCase     "heist/textarea_expansion"    textareaExpansion
         , testCase     "heist/div_expansion"         divExpansion
         , testCase     "heist/bind_param"            bindParam
-        , testCase     "heist/markdownText"          markdownTextTest
         , testCase     "heist/apply"                 applyTest
         , testCase     "heist/ignore"                ignoreTest
         , testCase     "heist/lookupTemplateContext" lookupTemplateTest
@@ -140,7 +135,7 @@ loadTest = do
     ets <- loadIO "templates" mempty mempty mempty mempty
     either (error "Error loading templates")
            (\ts -> do let tm = _templateMap ts
-                      H.assertEqual "loadTest size" 41 $ Map.size tm
+                      H.assertEqual "loadTest size" 36 $ Map.size tm
            ) ets
 
 
@@ -161,6 +156,7 @@ fsLoadTest = do
   where
     g ts p n = H.assertBool ("loading template " ++ n) $ p $
                lookupTemplate (B.pack n) ts _templateMap
+
 
 ------------------------------------------------------------------------------
 renderNoNameTest :: H.Assertion
@@ -186,6 +182,7 @@ doctypeTest = do
         [doctype
         ,"\n\n<html>\n<div id='pre_{att}_post'>\n/index\n</div>\n</html>\n"
         ]
+
 
 ------------------------------------------------------------------------------
 attrSubstTest :: H.Assertion
@@ -231,41 +228,6 @@ bindAttrTest = do
             snd $ B.breakSubstring "${bar}" $ toByteString $ resDoc
 
 
-------------------------------------------------------------------------------
-markdownHtmlExpected :: ByteString
-markdownHtmlExpected =
-    "<div class='markdown'><p>This <em>is</em> a test.</p></div>"
-
-------------------------------------------------------------------------------
--- | Markdown test on a file
-markdownTest :: H.Assertion
-markdownTest = renderTest "markdown" markdownHtmlExpected
-
------------------------------------------------------------------------------
-
--- | Pandoc test on a file
-pandocTest :: H.Assertion
-pandocTest = renderTest "pandoc" pandocNoDivHtmlExpected
-
-pandocDivTest :: H.Assertion
-pandocDivTest = renderTest "pandocdiv" pandocDivHtmlExpected
-
-pandocNoDivHtmlExpected :: ByteString
-pandocNoDivHtmlExpected = "<p>This <em>is</em> a test.</p>"
-
-pandocDivHtmlExpected :: ByteString
-pandocDivHtmlExpected =
-  "<div class='foo test' id='pandoc'><p>This <em>is</em> a test.</p></div>"
-  -- Implementaton dependent. Class is prepended in current implementation,
-  -- it will be first attribute
-
-pandocTestSplices :: Splices (Splice IO)
-pandocTestSplices = do
-    "pandocnodiv" ## pandocSplice optsNoDiv
-    "pandocdiv"   ## pandocSplice optsDiv
-  where
-    optsNoDiv = setPandocWrapDiv Nothing defaultPandocOptions
-    optsDiv = setPandocWrapDiv (Just "test") defaultPandocOptions
 
 ------------------------------------------------------------------------------
 jsonValueTest :: H.Assertion
@@ -277,7 +239,6 @@ jsonValueTest = do
     jsonExpected1 = B.concat [ "<i>&lt;b&gt;ok&lt;/b&gt;</i><i>1</i>"
                              , "<i></i><i>false</i><i>foo</i>" ]
     jsonExpected2 = "<i><b>ok</b></i><i>1</i><i></i><i>false</i><i>foo</i>"
-
 
 
 ------------------------------------------------------------------------------
@@ -294,7 +255,7 @@ renderTest  :: ByteString   -- ^ template name
             -> ByteString   -- ^ expected result
             -> H.Assertion
 renderTest templateName expectedResult = do
-    ets <- loadT "templates" mempty pandocTestSplices mempty mempty
+    ets <- loadT "templates" mempty mempty mempty mempty
     let ts = either (error "Error loading templates") id ets
 
     check ts expectedResult
@@ -359,19 +320,6 @@ attrSpliceContext = renderTest "attrsubtest2"
 
 
 ------------------------------------------------------------------------------
--- | Markdown test on supplied text
-markdownTextTest :: H.Assertion
-markdownTextTest = do
-    hs <- loadEmpty mempty mempty mempty mempty
-    result <- evalHeistT markdownSplice
-                         (X.TextNode "This *is* a test.")
-                         hs
-    H.assertEqual "Markdown text" markdownHtmlExpected
-      (B.filter (/= '\n') $ toByteString $
-        X.render (X.HtmlDocument X.UTF8 Nothing result))
-
-
-------------------------------------------------------------------------------
 applyTest :: H.Assertion
 applyTest = do
     es <- loadEmpty mempty mempty mempty mempty
@@ -400,10 +348,12 @@ lookupTemplateTest = do
     res <- runHeistT k (X.TextNode "") hs
     H.assertBool "lookup context test" $ isJust $ fst res
 
+
 ------------------------------------------------------------------------------
 xmlNotHtmlTest :: H.Assertion
 xmlNotHtmlTest = renderTest "rss" expected where
   expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss><channel><link>http://www.devalot.com/</link></channel></rss>"
+
 
 ------------------------------------------------------------------------------
 identStartChar :: [Char]
