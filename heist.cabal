@@ -209,7 +209,7 @@ Test-suite testsuite
   build-depends:
     HUnit                      >= 1.2      && < 2,
     QuickCheck                 >= 2        && < 2.11,
-    lens                       >= 4.3      && < 4.16,
+    lens                       >= 4.3      && < 4.17,
     test-framework             >= 0.4      && < 0.9,
     test-framework-hunit       >= 0.2.7    && < 0.4,
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
