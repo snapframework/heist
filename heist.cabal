@@ -249,6 +249,10 @@ Test-suite testsuite
     unordered-containers,
     vector,
     xmlhtml
+
+  if !impl(ghc >= 8.0)
+    build-depends: semigroups >= 0.16 && < 0.19
+
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
   Extensions: OverloadedStrings
 
@@ -291,6 +295,9 @@ Benchmark benchmark
     unordered-containers,
     vector,
     xmlhtml
+
+  if !impl(ghc >= 8.0)
+    build-depends: semigroups >= 0.16 && < 0.19
 
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
                -fno-warn-unused-do-bind -rtsopts
