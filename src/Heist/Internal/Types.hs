@@ -28,6 +28,9 @@ import           Data.Text (Text)
 import           Control.Applicative
 import           Data.Monoid
 #endif
+#if !MIN_VERSION_base(4,11,0)
+import           Data.Semigroup
+#endif
 
 ------------------------------------------------------------------------------
 import qualified Heist.Compiled.Internal       as C
@@ -154,12 +157,16 @@ scCompiledTemplateFilter = lens _scCompiledTemplateFilter setter
     setter sc v = sc { _scCompiledTemplateFilter = v }
 
 
+instance Semigroup (SpliceConfig m) where
+    SpliceConfig a1 b1 c1 d1 e1 f1 <> SpliceConfig a2 b2 c2 d2 e2 f2 =
+      SpliceConfig (a1 <> a2) (b1 <> b2) (c1 <> c2)
+                   (d1 <> d2) (e1 <> e2) (\x -> f1 x && f2 x)
+
 instance Monoid (SpliceConfig m) where
     mempty = SpliceConfig mempty mempty mempty mempty mempty (const True)
-    mappend (SpliceConfig a1 b1 c1 d1 e1 f1)
-            (SpliceConfig a2 b2 c2 d2 e2 f2) =
-      SpliceConfig (mappend a1 a2) (mappend b1 b2) (mappend c1 c2)
-                   (mappend d1 d2) (mappend e1 e2) (\x -> f1 x && f2 x)
+#if !MIN_VERSION_base(4,11,0)
+    mappend = (<>)
+#endif
 
 
 data HeistConfig m = HeistConfig

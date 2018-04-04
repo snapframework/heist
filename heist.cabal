@@ -1,5 +1,5 @@
 name:           heist
-version:        1.0.1.2
+version:        1.0.1.3
 synopsis:       An Haskell template system supporting both HTML5 and XML.
 description:
     Heist is a powerful template system that supports both HTML5 and XML.
@@ -30,8 +30,15 @@ build-type:     Simple
 cabal-version:  >= 1.8.0.4
 homepage:       http://snapframework.com/
 category:       Web, Snap
-Tested-With:    GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.3
-                GHC == 8.0.1, GHC == 8.2.2
+
+Tested-With:
+  GHC == 7.4.2,
+  GHC == 7.6.3,
+  GHC == 7.8.4,
+  GHC == 7.10.3,
+  GHC == 8.0.1,
+  GHC == 8.2.2,
+  GHC == 8.4.1
 
 extra-source-files:
   .ghci,
@@ -154,7 +161,7 @@ Library
   build-depends:
     aeson                      >= 0.6     && < 1.4,
     attoparsec                 >= 0.10    && < 0.14,
-    base                       >= 4.5     && < 5,
+    base                       >= 4.5     && < 4.12,
     blaze-builder              >= 0.2     && < 0.5,
     blaze-html                 >= 0.4     && < 0.10,
     bytestring                 >= 0.9     && < 0.11,
@@ -165,13 +172,13 @@ Library
     filepath                   >= 1.3     && < 1.5,
     hashable                   >= 1.1     && < 1.3,
     lifted-base                >= 0.2     && < 0.3,
-    map-syntax                 >= 0.2     && < 0.3,
+    map-syntax                 >= 0.2     && < 0.4,
     monad-control              >= 0.3     && < 1.1,
     mtl                        >= 2.0     && < 2.3,
     process                    >= 1.1     && < 1.7,
     random                     >= 1.0.1.0 && < 1.2,
     text                       >= 0.10    && < 1.3,
-    time                       >= 1.1     && < 1.9,
+    time                       >= 1.1     && < 1.10,
     transformers               >= 0.3     && < 0.6,
     transformers-base          >= 0.4     && < 0.5,
     unordered-containers       >= 0.1.4   && < 0.3,
@@ -208,7 +215,7 @@ Test-suite testsuite
 
   build-depends:
     HUnit                      >= 1.2      && < 2,
-    QuickCheck                 >= 2        && < 2.11,
+    QuickCheck                 >= 2        && < 2.12,
     lens                       >= 4.3      && < 4.17,
     test-framework             >= 0.4      && < 0.9,
     test-framework-hunit       >= 0.2.7    && < 0.4,
@@ -249,7 +256,7 @@ Benchmark benchmark
 
   build-depends:
     HUnit,
-    criterion                 >= 1.0     && < 1.3,
+    criterion                 >= 1.0     && < 1.5,
     test-framework,
     test-framework-hunit,
 

@@ -99,7 +99,9 @@ import           Data.HashMap.Strict           (HashMap)
 import qualified Data.HashMap.Strict           as Map
 import qualified Data.HeterogeneousEnvironment as HE
 import           Data.Map.Syntax
+#if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid
+#endif
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           System.Directory.Tree

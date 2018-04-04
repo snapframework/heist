@@ -1,3 +1,7 @@
+# 1.0.1.3
+
+* Add Semigroup instances to support GHC 8.4
+
 # 1.0.1.0
 
 * Change benchmark from an executable section to a benchmark section in the

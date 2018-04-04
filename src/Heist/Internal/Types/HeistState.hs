@@ -45,6 +45,9 @@ import qualified Data.HashMap.Strict           as H
 import           Data.HeterogeneousEnvironment (HeterogeneousEnvironment)
 import qualified Data.HeterogeneousEnvironment as HE
 import           Data.Map.Syntax
+#if !MIN_VERSION_base(4,11,0)
+import           Data.Semigroup
+#endif
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Text.Encoding            (decodeUtf8)
@@ -122,13 +125,18 @@ newtype RuntimeSplice m a = RuntimeSplice {
 
 
 ------------------------------------------------------------------------------
-instance (Monad m, Monoid a) => Monoid (RuntimeSplice m a) where
-    mempty = return mempty
-
-    a `mappend` b = do
+instance (Monad m, Semigroup a) => Semigroup (RuntimeSplice m a) where
+    a <> b = do
         !x <- a
         !y <- b
-        return $! x `mappend` y
+        return $! x <> y
+
+
+instance (Monad m, Monoid a) => Monoid (RuntimeSplice m a) where
+    mempty = return mempty
+#if !MIN_VERSION_base(4,11,0)
+    mappend = (<>)
+#endif
 
 
 ------------------------------------------------------------------------------
