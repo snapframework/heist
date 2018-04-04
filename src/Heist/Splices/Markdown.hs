@@ -165,9 +165,9 @@ data PandocOptions = PandocOptions
 -- | Default options
 defaultPandocOptions :: PandocOptions
 defaultPandocOptions = PandocOptions "pandoc"
-                                     ["-S", "--no-wrap"]
+                                     ["--wrap=none"]
                                      Nothing
-                                     (Just "markdown")
+                                     (Just "markdown+smart")
 
 -- | Name of pandoc executable
 setPandocExecutable :: FilePath -> PandocOptions -> PandocOptions

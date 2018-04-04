@@ -234,7 +234,7 @@ bindAttrTest = do
 ------------------------------------------------------------------------------
 markdownHtmlExpected :: ByteString
 markdownHtmlExpected =
-    "<div class='markdown'><p>This <em>is</em> a test.</p></div>"
+    "<div class='markdown+smart'><p>This <em>is</em> a test.</p></div>"
 
 ------------------------------------------------------------------------------
 -- | Markdown test on a file
