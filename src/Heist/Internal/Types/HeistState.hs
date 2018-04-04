@@ -132,7 +132,11 @@ instance (Monad m, Semigroup a) => Semigroup (RuntimeSplice m a) where
         return $! x <> y
 
 
+#if !MIN_VERSION_base(4,11,0)
+instance (Monad m, Semigroup a, Monoid a) => Monoid (RuntimeSplice m a) where
+#else
 instance (Monad m, Monoid a) => Monoid (RuntimeSplice m a) where
+#endif
     mempty = return mempty
 #if !MIN_VERSION_base(4,11,0)
     mappend = (<>)
