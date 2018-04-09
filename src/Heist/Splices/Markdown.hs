@@ -165,7 +165,7 @@ data PandocOptions = PandocOptions
 -- | Default options
 defaultPandocOptions :: PandocOptions
 defaultPandocOptions = PandocOptions "pandoc"
-                                     ["-S", "--no-wrap"]
+                                     []
                                      Nothing
                                      (Just "markdown")
 
@@ -209,7 +209,7 @@ markdownTag :: Text
 markdownTag = "markdown"
 
 ------------------------------------------------------------------------------
--- | Default markdown splice with executable "pandoc" and options "-S --no-wrap"
+-- | Default markdown splice with executable "pandoc"
 markdownSplice :: MonadIO m => Splice m
 markdownSplice= pandocSplice defaultPandocOptions
 
@@ -258,24 +258,18 @@ pandocSplice PandocOptions{..} = do
 
 pandoc :: FilePath -> FilePath -> FilePath -> IO ByteString
 pandoc pandocPath templateDir inputFile = do
-    sout <- pandocWith pandocPath args templateDir inputFile
+    sout <- pandocWith pandocPath [] templateDir inputFile
     return $ BC.concat [ "<div class=\"markdown\">\n"
                          , sout
                          , "\n</div>" ]
 
-  where
-    args = [ "-S", "--no-wrap"]
-
 
 pandocBS :: FilePath -> ByteString -> IO ByteString
 pandocBS pandocPath s = do
-    sout <- pandocWithBS pandocPath args s
+    sout <- pandocWithBS pandocPath [] s
     return $ BC.concat [ "<div class=\"markdown\">\n"
                        , sout
                        , "\n</div>" ]
-
-  where
-    args = [ "-S", "--no-wrap" ]
 
 
 pandocWith :: FilePath -> [String] -> FilePath -> FilePath -> IO ByteString
