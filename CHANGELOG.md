@@ -1,3 +1,10 @@
+# 1.1
+
+* Remove -S and --no-wrap arguments to pandoc for compatibility with both 1.x
+  and 2.x versions of the pandoc command line tool.
+
+* Bump map-syntax lower bound
+
 # 1.0.1.3
 
 * Add Semigroup instances to support GHC 8.4
