@@ -1,9 +1,13 @@
 # 1.1
 
-* Remove -S and --no-wrap arguments to pandoc for compatibility with both 1.x
-  and 2.x versions of the pandoc command line tool.
+* Remove pandoc and pandocBS
 
-* Bump map-syntax lower bound
+* Stop exporting readProcessWithExitCode'
+
+* Remove -S and --no-wrap arguments to pandoc for compatibility with both 1.x
+  and 2.x versions of the pandoc command line tool
+
+* Bump map-syntax lower bound to fix 8.4 build problem
 
 # 1.0.1.3
 

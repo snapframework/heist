@@ -87,10 +87,6 @@ module Heist.Splices.Markdown
   , pandocArgs
   , pandocBaseDir
   , pandocWrapDiv
-  -- * Internal helper functions
-  , pandoc
-  , pandocBS
-  , readProcessWithExitCode'
   ) where
 
 ------------------------------------------------------------------------------
@@ -254,22 +250,6 @@ pandocSplice PandocOptions{..} = do
                     in [Element "div" finalAttrs  body]
     appendClass Nothing cls = cls
     appendClass (Just orig) cls = T.concat [orig, " ", cls]
-
-
-pandoc :: FilePath -> FilePath -> FilePath -> IO ByteString
-pandoc pandocPath templateDir inputFile = do
-    sout <- pandocWith pandocPath [] templateDir inputFile
-    return $ BC.concat [ "<div class=\"markdown\">\n"
-                         , sout
-                         , "\n</div>" ]
-
-
-pandocBS :: FilePath -> ByteString -> IO ByteString
-pandocBS pandocPath s = do
-    sout <- pandocWithBS pandocPath [] s
-    return $ BC.concat [ "<div class=\"markdown\">\n"
-                       , sout
-                       , "\n</div>" ]
 
 
 pandocWith :: FilePath -> [String] -> FilePath -> FilePath -> IO ByteString
