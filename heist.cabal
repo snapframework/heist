@@ -264,6 +264,7 @@ Benchmark benchmark
   build-depends:
     HUnit,
     criterion                 >= 1.0     && < 1.6,
+    criterion-measurement     >= 0.1     && < 0.2,
     test-framework,
     test-framework-hunit,
 
