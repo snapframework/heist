@@ -399,6 +399,11 @@ instance Monad m => Monad (HeistT n m) where
 
 
 ------------------------------------------------------------------------------
+-- | MonadFail instance
+instance MonadFail m => MonadFail (HeistT n m) where
+    fail = lift . fail
+
+------------------------------------------------------------------------------
 -- | MonadIO instance
 instance MonadIO m => MonadIO (HeistT n m) where
     liftIO = lift . liftIO
