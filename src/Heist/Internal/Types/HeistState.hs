@@ -33,6 +33,7 @@ import           Control.Monad.Except          (MonadError (..))
 #else
 import           Control.Monad.Error           (MonadError (..))
 #endif
+import qualified Control.Monad.Fail as Fail
 import           Control.Monad.Fix             (MonadFix (..))
 import           Control.Monad.Reader          (MonadReader (..))
 import           Control.Monad.State.Strict    (MonadState (..), StateT)
@@ -400,8 +401,9 @@ instance Monad m => Monad (HeistT n m) where
 
 ------------------------------------------------------------------------------
 -- | MonadFail instance
-instance MonadFail m => MonadFail (HeistT n m) where
-    fail = lift . fail
+instance Fail.MonadFail m => Fail.MonadFail (HeistT n m) where
+    fail = lift . Fail.fail
+
 
 ------------------------------------------------------------------------------
 -- | MonadIO instance
