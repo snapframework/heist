@@ -33,7 +33,9 @@ import           Control.Monad.Except          (MonadError (..))
 #else
 import           Control.Monad.Error           (MonadError (..))
 #endif
+#if MIN_VERSION_base(4,9,0)
 import qualified Control.Monad.Fail as Fail
+#endif
 import           Control.Monad.Fix             (MonadFix (..))
 import           Control.Monad.Reader          (MonadReader (..))
 import           Control.Monad.State.Strict    (MonadState (..), StateT)
@@ -399,10 +401,12 @@ instance Monad m => Monad (HeistT n m) where
     {-# INLINE (>>=) #-}
 
 
+#if MIN_VERSION_base(4,9,0)
 ------------------------------------------------------------------------------
 -- | MonadFail instance
 instance Fail.MonadFail m => Fail.MonadFail (HeistT n m) where
     fail = lift . Fail.fail
+#endif
 
 
 ------------------------------------------------------------------------------
