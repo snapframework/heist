@@ -38,7 +38,8 @@ Tested-With:
   GHC == 7.10.3,
   GHC == 8.0.1,
   GHC == 8.2.2,
-  GHC == 8.4.1
+  GHC == 8.4.3,
+  GHC == 8.6.1
 
 extra-source-files:
   .ghci,
@@ -161,11 +162,11 @@ Library
   build-depends:
     aeson                      >= 0.6     && < 1.5,
     attoparsec                 >= 0.10    && < 0.14,
-    base                       >= 4.5     && < 4.12,
+    base                       >= 4.5     && < 4.13,
     blaze-builder              >= 0.2     && < 0.5,
     blaze-html                 >= 0.4     && < 0.10,
     bytestring                 >= 0.9     && < 0.11,
-    containers                 >= 0.2     && < 0.6,
+    containers                 >= 0.2     && < 0.7,
     directory                  >= 1.1     && < 1.4,
     directory-tree             >= 0.10    && < 0.13,
     dlist                      >= 0.5     && < 0.9,
@@ -218,8 +219,8 @@ Test-suite testsuite
 
   build-depends:
     HUnit                      >= 1.2      && < 2,
-    QuickCheck                 >= 2        && < 2.12,
-    lens                       >= 4.3      && < 4.17,
+    QuickCheck                 >= 2        && < 2.13,
+    lens                       >= 4.3      && < 4.18,
     test-framework             >= 0.4      && < 0.9,
     test-framework-hunit       >= 0.2.7    && < 0.4,
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
@@ -288,7 +289,7 @@ Benchmark benchmark
     mtl,
     process,
     random,
-    statistics                 >= 0.11    && < 0.15,
+    statistics                 >= 0.11    && < 0.16,
     text,
     time,
     transformers,
