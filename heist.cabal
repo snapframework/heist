@@ -254,7 +254,7 @@ Test-suite testsuite
   if !impl(ghc >= 8.0)
     build-depends: semigroups >= 0.16 && < 0.19
 
-  if impl(ghc >= 7.4) && impl(ghc < 7.6)
+  if impl(ghc >= 7.8) && impl(ghc < 7.10)
     build-depends: transformers-compat >= 0.3 && < 0.7
 
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
@@ -304,7 +304,7 @@ Benchmark benchmark
   if !impl(ghc >= 8.0)
     build-depends: semigroups >= 0.16 && < 0.19
 
-  if impl(ghc >= 7.4) && impl(ghc < 7.6)
+  if impl(ghc >= 7.8) && impl(ghc < 7.10)
     build-depends: transformers-compat
 
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
