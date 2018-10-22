@@ -254,6 +254,9 @@ Test-suite testsuite
   if !impl(ghc >= 8.0)
     build-depends: semigroups >= 0.16 && < 0.19
 
+  if impl(ghc >= 7.4) && impl(ghc < 7.6)
+    build-depends: transformers-compat >= 0.3 && < 0.7
+
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
   Extensions: OverloadedStrings
 
@@ -300,6 +303,9 @@ Benchmark benchmark
 
   if !impl(ghc >= 8.0)
     build-depends: semigroups >= 0.16 && < 0.19
+
+  if impl(ghc >= 7.4) && impl(ghc < 7.6)
+    build-depends: transformers-compat
 
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
                -fno-warn-unused-do-bind -rtsopts
