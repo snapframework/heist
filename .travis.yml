@@ -66,13 +66,13 @@ before_install:
 install:
   - cabal --version
   - cabal update
+  - cabal outdated --exit-code
   - echo "$(${HC} --version) [$(${HC} --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - BENCH=${BENCH---enable-benchmarks}
   - TEST=${TEST---enable-tests}
   - HADDOCK=${HADDOCK-true}
   - INSTALLED=${INSTALLED-true}
   - GHCHEAD=${GHCHEAD-false}
-  - travis_retry cabal update -v
   - "sed -i.bak 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config"
   - rm -fv cabal.project cabal.project.local
   - grep -Ev -- '^\s*--' ${HOME}/.cabal/config | grep -Ev '^\s*$'
