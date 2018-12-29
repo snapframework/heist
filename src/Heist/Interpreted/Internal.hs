@@ -36,16 +36,16 @@ type Splice n = HeistT n n Template
 -- | Binds a new splice declaration to a tag name within a 'HeistState'.
 bindSplice :: Text            -- ^ tag name
            -> Splice n        -- ^ splice action
-           -> HeistState n    -- ^ source state
-           -> HeistState n
+           -> HeistState n m  -- ^ source state
+           -> HeistState n m
 bindSplice n v hs = hs {_spliceMap = Map.insert n v (_spliceMap hs)}
 
 
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
 bindSplices :: Splices (Splice n) -- ^ splices to bind
-            -> HeistState n       -- ^ start state
-            -> HeistState n
+            -> HeistState n m     -- ^ start state
+            -> HeistState n m
 bindSplices ss hs =
     hs { _spliceMap = applySpliceMap hs _spliceMap ss }
 
@@ -104,7 +104,7 @@ runChildrenWithText = runChildrenWithTrans textSplice
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a splice.
 lookupSplice :: Text
-             -> HeistState n
+             -> HeistState n m
              -> Maybe (Splice n)
 lookupSplice nm hs = Map.lookup nm $ _spliceMap hs
 {-# INLINE lookupSplice #-}
@@ -119,8 +119,8 @@ addTemplate :: ByteString
             -> Maybe FilePath
             -- ^ An optional path to the actual file on disk where the
             -- template is stored
-            -> HeistState n
-            -> HeistState n
+            -> HeistState n m
+            -> HeistState n m
 addTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -136,8 +136,8 @@ addXMLTemplate :: ByteString
                -> Maybe FilePath
                -- ^ An optional path to the actual file on disk where the
                -- template is stored
-               -> HeistState n
-               -> HeistState n
+               -> HeistState n m
+               -> HeistState n m
 addXMLTemplate n t mfp st =
     insertTemplate (splitTemplatePath n) doc st
   where
@@ -342,8 +342,8 @@ evalWithDoctypes name = lookupAndRun name $ \(t,ctx) -> do
 -- | Binds a list of constant string splices.
 bindStrings :: Monad n
             => Splices Text
-            -> HeistState n
-            -> HeistState n
+            -> HeistState n m
+            -> HeistState n m
 bindStrings splices = bindSplices (mapV textSplice splices)
 
 
@@ -352,8 +352,8 @@ bindStrings splices = bindSplices (mapV textSplice splices)
 bindString :: Monad n
            => Text
            -> Text
-           -> HeistState n
-           -> HeistState n
+           -> HeistState n m
+           -> HeistState n m
 bindString n = bindSplice n . textSplice
 
 
@@ -382,6 +382,13 @@ callTemplateWithText name splices = callTemplate name $ mapV textSplice splices
 
 
 ------------------------------------------------------------------------------
+-- | Cast mixed HeistState to an homogenously typed version by discarding
+-- _compiledSpliceMap.  It's unused in interpreted mode.
+coerceInteractive :: HeistState n m -> HeistState n n
+coerceInteractive hs = hs { _compiledSpliceMap = Map.empty }
+
+
+------------------------------------------------------------------------------
 -- | Renders a template from the specified HeistState to a 'Builder'.  The
 -- MIME type returned is based on the detected character encoding, and whether
 -- the root template was an HTML or XML format template.  It will always be
@@ -392,10 +399,10 @@ callTemplateWithText name splices = callTemplate name $ mapV textSplice splices
 --
 -- @renderTemplate hs "index"@
 renderTemplate :: Monad n
-               => HeistState n
+               => HeistState n m
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
-renderTemplate hs name = evalHeistT tpl (X.TextNode "") hs
+renderTemplate hs name = evalHeistT tpl (X.TextNode "") (coerceInteractive hs)
   where tpl = do mt <- evalWithDoctypes name
                  case mt of
                     Nothing  -> return Nothing
@@ -409,15 +416,15 @@ renderTemplate hs name = evalHeistT tpl (X.TextNode "") hs
 -- template.
 renderWithArgs :: Monad n
                => Splices Text
-               -> HeistState n
+               -> HeistState n m
                -> ByteString
                -> n (Maybe (Builder, MIMEType))
 renderWithArgs args hs = renderTemplate (bindStrings args hs)
 
 
 renderTemplateToDoc :: Monad n
-            => HeistState n
+            => HeistState n m
             -> ByteString
             -> n (Maybe X.Document)
 renderTemplateToDoc hs name =
-    evalHeistT (evalWithDoctypes name) (X.TextNode "") hs
+    evalHeistT (evalWithDoctypes name) (X.TextNode "") (coerceInteractive hs)

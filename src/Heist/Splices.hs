@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE FlexibleContexts  #-}
 
 module Heist.Splices
   ( ifISplice
@@ -17,6 +18,8 @@ module Heist.Splices
 import           Data.Monoid (Monoid(..))
 #endif
 
+import           Control.Monad.Trans
+import           Control.Monad.Trans.Control
 import qualified Heist.Compiled as C
 import qualified Heist.Interpreted as I
 import           Heist.Splices.Apply
@@ -41,10 +44,10 @@ ifISplice cond =
 ------------------------------------------------------------------------------
 -- | Function for constructing if splices that use a runtime predicate
 -- function to determine whether the node's children should be rendered.
-ifCSplice :: Monad m
+ifCSplice :: (Monad n, MonadIO m, MonadBaseControl IO m)
           => (t -> Bool)
-          -> RuntimeSplice m t
-          -> C.Splice m
+          -> RuntimeSplice n t
+          -> C.GSplice n m
 ifCSplice predicate runtime = do
     chunks <- C.runChildren
     return $ C.yieldRuntime $ do
@@ -70,7 +73,9 @@ ifElseISplice cond = getParamNode >>= (rewrite . X.childNodes)
 ------------------------------------------------------------------------------
 -- | Implements an if\/then\/else conditional splice.  It splits its children
 -- around the \<else\/\> element to get the markup to be used for the two cases.
-ifElseCSplice :: Monad m => Bool -> C.Splice m
+ifElseCSplice :: (Monad n, MonadIO m, MonadBaseControl IO m)
+              => Bool
+              -> C.GSplice n m
 ifElseCSplice cond = getParamNode >>= (rewrite . X.childNodes)
   where rewrite nodes = 
           let (ns, ns') = break (\n -> X.tagName n==Just "else") nodes

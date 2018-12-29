@@ -16,6 +16,7 @@ module Heist.Compiled
   (
   -- * High level compiled splice API
     Splice
+  , GSplice
   , renderTemplate
   , codeGen
   , runChildren

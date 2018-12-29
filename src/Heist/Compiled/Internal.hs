@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE CPP                        #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoMonomorphismRestriction  #-}
@@ -14,10 +15,11 @@ module Heist.Compiled.Internal where
 import           Blaze.ByteString.Builder
 import           Blaze.ByteString.Builder.Char.Utf8
 import           Control.Arrow
-import           Control.Exception
+import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict
+import           Control.Monad.Trans.Control
 import qualified Data.Attoparsec.Text               as AP
 import           Data.ByteString                    (ByteString)
 import           Data.DList                         (DList)
@@ -60,11 +62,18 @@ type Splice n = HeistT n IO (DList (Chunk n))
 
 
 ------------------------------------------------------------------------------
+-- | Generalised version of Splice parametrised over any @MonadIO m@ as the
+-- compile time monad.
+
+type GSplice n m = HeistT n m (DList (Chunk n))
+
+
+------------------------------------------------------------------------------
 -- | Runs the parameter node's children and returns the resulting compiled
 -- chunks.  By itself this function is a simple passthrough splice that makes
 -- the spliced node disappear.  In combination with locally bound splices,
 -- this function makes it easier to pass the desired view into your splices.
-runChildren :: Monad n => Splice n
+runChildren :: (Monad n, MonadIO m, MonadBaseControl IO m) => GSplice n m
 runChildren = runNodeList . X.childNodes =<< getParamNode
 {-# INLINE runChildren #-}
 
@@ -125,16 +134,18 @@ yieldRuntimeText = yieldRuntime .  liftM fromText
 ------------------------------------------------------------------------------
 -- | Returns a computation that performs load-time splice processing on the
 -- supplied list of nodes.
-runNodeList :: Monad n => [X.Node] -> Splice n
+runNodeList :: (Monad n, MonadIO m, MonadBaseControl IO m)
+            => [X.Node]
+            -> GSplice n m
 runNodeList = mapSplices runNode
 
 
 ------------------------------------------------------------------------------
 -- | Runs a DocumentFile with the appropriate template context set.
-runDocumentFile :: Monad n
+runDocumentFile :: (Monad n, MonadIO m, MonadBaseControl IO m)
                 => TPath
                 -> DocumentFile
-                -> Splice n
+                -> GSplice n m
 runDocumentFile tpath df = do
     let markup = case dfDoc df of
                    X.XmlDocument _ _ _ -> Xml
@@ -154,10 +165,10 @@ runDocumentFile tpath df = do
 
 ------------------------------------------------------------------------------
 compileTemplate
-    :: Monad n
+    :: (Monad n, MonadIO m, MonadBaseControl IO m)
     => TPath
     -> DocumentFile
-    -> HeistT n IO [Chunk n]
+    -> HeistT n m [Chunk n]
 compileTemplate tpath df = do
     !chunks <- runDocumentFile tpath df
     return $! consolidate chunks
@@ -165,10 +176,10 @@ compileTemplate tpath df = do
 
 ------------------------------------------------------------------------------
 compileTemplates
-    :: Monad n
+    :: (Monad n, MonadIO m, MonadBaseControl IO m)
     => (TPath -> Bool)
-    -> HeistState n
-    -> IO (Either [String] (HeistState n))
+    -> HeistState n m
+    -> m (Either [String] (HeistState n m))
 compileTemplates f hs = do
     (tmap, hs') <- runHeistT (compileTemplates' f) (X.TextNode "") hs
     let pre = _splicePrefix hs'
@@ -202,9 +213,9 @@ noNamespaceSplicesMsg pre = unwords
 
 ------------------------------------------------------------------------------
 compileTemplates'
-    :: Monad n
+    :: (Monad n, MonadIO m, MonadBaseControl IO m)
     => (TPath -> Bool)
-    -> HeistT n IO (H.HashMap TPath ([Chunk n], MIMEType))
+    -> HeistT n m (H.HashMap TPath ([Chunk n], MIMEType))
 compileTemplates' f = do
     hs <- getHS
     let tpathDocfiles :: [(TPath, DocumentFile)]
@@ -270,7 +281,7 @@ codeGen l = V.foldr mappend mempty $!
 
 ------------------------------------------------------------------------------
 -- | Looks up a splice in the compiled splice map.
-lookupSplice :: Text -> HeistT n IO (Maybe (Splice n))
+lookupSplice :: Monad m => Text -> HeistT n m (Maybe (GSplice n m))
 lookupSplice nm = do
     pre <- getsHS _splicePrefix
     res <- getsHS (H.lookup nm . _compiledSpliceMap)
@@ -285,7 +296,9 @@ lookupSplice nm = do
 -- | Runs a single node.  If there is no splice referenced anywhere in the
 -- subtree, then it is rendered as a pure chunk, otherwise it calls
 -- compileNode to generate the appropriate runtime computation.
-runNode :: Monad n => X.Node -> Splice n
+runNode :: (Monad n, MonadIO m, MonadBaseControl IO m)
+        => X.Node
+        -> GSplice n m
 runNode node = localParamNode (const node) $ do
     hs <- getHS
     let pre = _splicePrefix hs
@@ -293,8 +306,9 @@ runNode node = localParamNode (const node) $ do
     when (not (T.null pre) && hasPrefix) incNamespacedTags
     hs' <- getHS
     -- Plain rethrows for CompileException to avoid multiple annotations.
-    (res, hs'') <- liftIO $ catches (compileIO hs')
-                     [ Handler (\(ex :: CompileException) -> throwIO ex)
+    (res, hs'') <- lift $ catches (compileIO hs')
+                     [ Handler (\(ex :: CompileException) ->
+                                  liftIO $ throwIO ex)
                      , Handler (\(ex :: SomeException) -> handleError ex hs')]
     putHS hs''
     return res
@@ -317,7 +331,7 @@ runNode node = localParamNode (const node) $ do
         errs <- evalHeistT (do localSplicePath $ tellSpliceError $ T.pack $
                                  "Exception in splice compile: " ++ show ex
                                getsHS _spliceErrors) node hs
-        throwIO $ CompileException ex errs
+        liftIO $ throwIO $ CompileException ex errs
 
 
 parseAttrs :: X.Node -> X.Node
@@ -339,7 +353,7 @@ parseAttr (k,v) = (k, T.concat $! map cvt ast)
 ------------------------------------------------------------------------------
 -- | Checks whether a node's subtree is static and can be rendered up front at
 -- load time.
-subtreeIsStatic :: X.Node -> HeistT n IO Bool
+subtreeIsStatic :: Monad m => X.Node -> HeistT n m Bool
 subtreeIsStatic (X.Element nm attrs ch) = do
     isNodeDynamic <- liftM isJust $ lookupSplice nm
     attrSplices <- getsHS _attrSpliceMap
@@ -372,7 +386,9 @@ hasAttributeSubstitutions txt = any isIdent ast
 ------------------------------------------------------------------------------
 -- | Given a 'X.Node' in the DOM tree, produces a \"runtime splice\" that will
 -- generate html at runtime.
-compileNode :: Monad n => X.Node -> Splice n
+compileNode :: (Monad n, MonadIO m, MonadBaseControl IO m)
+            => X.Node
+            -> GSplice n m
 compileNode (X.Element nm attrs ch) = do
     msplice <- lookupSplice nm
     fromMaybe compileStaticElement msplice
@@ -402,7 +418,9 @@ compileNode _ = error "impossible"
 
 ------------------------------------------------------------------------------
 -- |
-parseAtt :: Monad n => (Text, Text) -> HeistT n IO (DList (Chunk n))
+parseAtt :: (Monad n, MonadIO m)
+         => (Text, Text)
+         -> HeistT n m (DList (Chunk n))
 parseAtt (k,v) = do
     mas <- getsHS (H.lookup k . _attrSpliceMap)
     maybe doInline (return . doAttrSplice) mas
@@ -430,9 +448,9 @@ parseAtt (k,v) = do
 
 ------------------------------------------------------------------------------
 -- |
-parseAtt2 :: Monad n
+parseAtt2 :: (Monad n, MonadIO m)
           => (Text, Text)
-          -> HeistT n IO (RuntimeSplice n [(Text, Text)])
+          -> HeistT n m (RuntimeSplice n [(Text, Text)])
 parseAtt2 (k,v) = do
     mas <- getsHS (H.lookup k . _attrSpliceMap)
     maybe doInline (return . doAttrSplice) mas
@@ -461,9 +479,9 @@ parseAtt2 (k,v) = do
 -- | Performs splice processing on a list of attributes.  This is useful in
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
-runAttributes :: Monad n
+runAttributes :: (Monad n, MonadIO m)
               => [(Text, Text)] -- ^ List of attributes
-              -> HeistT n IO [DList (Chunk n)]
+              -> HeistT n m [DList (Chunk n)]
 runAttributes = mapM parseAtt
 
 
@@ -471,10 +489,10 @@ runAttributes = mapM parseAtt
 -- | Performs splice processing on a list of attributes.  This is useful in
 -- situations where you need to stop recursion, but still run splice
 -- processing on the node's attributes.
-runAttributesRaw :: Monad n
+runAttributesRaw :: (Monad n, MonadIO m)
                  -- Note that this parameter should not be changed to Splices
                  => [(Text, Text)] -- ^ List of attributes
-                 -> HeistT n IO (RuntimeSplice n [(Text, Text)])
+                 -> HeistT n m (RuntimeSplice n [(Text, Text)])
 runAttributesRaw attrs = do
     arrs <- mapM parseAtt2 attrs
     return $ liftM concat $ sequence arrs
@@ -503,7 +521,7 @@ attrToBuilder (k,v)
 
 
 ------------------------------------------------------------------------------
-getAttributeSplice :: Text -> HeistT n IO (DList (Chunk n))
+getAttributeSplice :: Monad m => Text -> HeistT n m (DList (Chunk n))
 getAttributeSplice name =
     lookupSplice name >>= fromMaybe
       (return $ DL.singleton $ Pure $ T.encodeUtf8 $
@@ -511,7 +529,9 @@ getAttributeSplice name =
 {-# INLINE getAttributeSplice #-}
 
 
-getAttributeSplice2 :: Monad n => Text -> HeistT n IO (RuntimeSplice n Text)
+getAttributeSplice2 :: (Monad n, Monad m)
+                    => Text
+                    -> HeistT n m (RuntimeSplice n Text)
 getAttributeSplice2 name = do
     mSplice <- lookupSplice name
     case mSplice of
@@ -557,7 +577,7 @@ adjustPromise (Promise k) f = modify (HE.adjust f k)
 
 ------------------------------------------------------------------------------
 -- | Creates an empty promise.
-newEmptyPromise :: HeistT n IO (Promise a)
+newEmptyPromise :: MonadIO m => HeistT n m (Promise a)
 newEmptyPromise = do
     keygen <- getsHS _keygen
     key    <- liftIO $ HE.makeKey keygen
@@ -582,9 +602,9 @@ newEmptyPromise = do
 ------------------------------------------------------------------------------
 -- | Binds a compiled splice.  This function should not be exported.
 bindSplice :: Text             -- ^ tag name
-           -> Splice n         -- ^ splice action
-           -> HeistState n     -- ^ source state
-           -> HeistState n
+           -> GSplice n m      -- ^ splice action
+           -> HeistState n m   -- ^ source state
+           -> HeistState n m
 bindSplice n v ts =
     ts { _compiledSpliceMap = H.insert n' v (_compiledSpliceMap ts) }
   where
@@ -592,9 +612,9 @@ bindSplice n v ts =
 
 ------------------------------------------------------------------------------
 -- | Binds a list of compiled splices.  This function should not be exported.
-bindSplices :: Splices (Splice n)  -- ^ splices to bind
-            -> HeistState n        -- ^ source state
-            -> HeistState n
+bindSplices :: Splices (GSplice n m) -- ^ splices to bind
+            -> HeistState n m        -- ^ source state
+            -> HeistState n m
 bindSplices ss hs =
     hs { _compiledSpliceMap = applySpliceMap hs _compiledSpliceMap ss }
 
@@ -603,10 +623,11 @@ bindSplices ss hs =
 -- | Adds a list of compiled splices to the splice map.  This function is
 -- useful because it allows compiled splices to bind other compiled splices
 -- during load-time splice processing.
-withLocalSplices :: Splices (Splice n)
+withLocalSplices :: Monad m
+                 => Splices (GSplice n m)
                  -> Splices (AttrSplice n)
-                 -> HeistT n IO a
-                 -> HeistT n IO a
+                 -> HeistT n m a
+                 -> HeistT n m a
 withLocalSplices ss as = localHS (bindSplices ss . bindAttributeSplices as)
 
 
@@ -618,7 +639,7 @@ withLocalSplices ss as = localHS (bindSplices ss . bindAttributeSplices as)
 --
 -- @renderTemplate hs "index"@
 renderTemplate :: Monad n
-               => HeistState n
+               => HeistState n m
                -> ByteString
                -> Maybe (n Builder, MIMEType)
 renderTemplate hs nm =
@@ -628,9 +649,9 @@ renderTemplate hs nm =
 
 ------------------------------------------------------------------------------
 -- | Looks up a compiled template and returns a compiled splice.
-callTemplate :: Monad n
+callTemplate :: (Monad n, MonadIO m, MonadBaseControl IO m)
              => ByteString
-             -> Splice n
+             -> GSplice n m
 callTemplate nm = do
     hs <- getHS
     maybe (error err) call $ lookupTemplate nm hs _templateMap
@@ -680,21 +701,24 @@ htmlNodeSplice f = X.renderHtmlFragment X.UTF8 . f
 ------------------------------------------------------------------------------
 -- | Converts a pure Builder splice function into a monadic splice function
 -- of a RuntimeSplice.
-pureSplice :: Monad n => (a -> Builder) -> RuntimeSplice n a -> Splice n
+pureSplice :: (Monad n, Monad m)
+           => (a -> Builder)
+           -> RuntimeSplice n a
+           -> GSplice n m
 pureSplice f n = return $ yieldRuntime (return . f =<< n)
 
 
 ------------------------------------------------------------------------------
 -- | Runs a splice, but first binds splices given by splice functions that
 -- need some runtime data.
-withSplices :: Monad n
-            => Splice n
+withSplices :: (Monad n, Monad m)
+            => GSplice n m
             -- ^ Splice to be run
-            -> Splices (RuntimeSplice n a -> Splice n)
+            -> Splices (RuntimeSplice n a -> GSplice n m)
             -- ^ Splices to be bound first
             -> RuntimeSplice n a
             -- ^ Runtime data needed by the above splices
-            -> Splice n
+            -> GSplice n m
 withSplices splice splices runtimeAction =
     withLocalSplices splices' mempty splice
   where
@@ -713,11 +737,11 @@ foldMapM f =
 ------------------------------------------------------------------------------
 -- | Like withSplices, but evaluates the splice repeatedly for each element in
 -- a list generated at runtime.
-manyWithSplices :: (Foldable f, Monad n)
-                => Splice n
-                -> Splices (RuntimeSplice n a -> Splice n)
+manyWithSplices :: (Foldable f, Monad n, MonadIO m)
+                => GSplice n m
+                -> Splices (RuntimeSplice n a -> GSplice n m)
                 -> RuntimeSplice n (f a)
-                -> Splice n
+                -> GSplice n m
 manyWithSplices splice splices runtimeAction =
     manyWith splice splices mempty runtimeAction
 
@@ -725,12 +749,12 @@ manyWithSplices splice splices runtimeAction =
 ------------------------------------------------------------------------------
 -- | More powerful version of manyWithSplices that lets you also define
 -- attribute splices.
-manyWith :: (Foldable f, Monad n)
-         => Splice n
-         -> Splices (RuntimeSplice n a -> Splice n)
+manyWith :: (Foldable f, Monad n, MonadIO m)
+         => GSplice n m
+         -> Splices (RuntimeSplice n a -> GSplice n m)
          -> Splices (RuntimeSplice n a -> AttrSplice n)
          -> RuntimeSplice n (f a)
-         -> Splice n
+         -> GSplice n m
 manyWith splice splices attrSplices runtimeAction = do
     p <- newEmptyPromise
     let splices' = mapV ($ getPromise p) splices
@@ -745,10 +769,10 @@ manyWith splice splices attrSplices runtimeAction = do
 -- | Similar to 'mapSplices' in interpreted mode.  Gets a runtime list of
 -- items and applies a compiled runtime splice function to each element of the
 -- list.
-deferMany :: (Foldable f, Monad n)
-          => (RuntimeSplice n a -> Splice n)
+deferMany :: (Foldable f, Monad n, MonadIO m)
+          => (RuntimeSplice n a -> GSplice n m)
           -> RuntimeSplice n (f a)
-          -> Splice n
+          -> GSplice n m
 deferMany f getItems = do
     promise <- newEmptyPromise
     chunks <- f $ getPromise promise
@@ -763,9 +787,9 @@ deferMany f getItems = do
 --
 -- Note that this is just a specialized version of function application ($)
 -- done for the side effect in runtime splice.
-defer :: Monad n
-      => (RuntimeSplice n a -> Splice n)
-      -> RuntimeSplice n a -> Splice n
+defer :: (Monad n, MonadIO m)
+      => (RuntimeSplice n a -> GSplice n m)
+      -> RuntimeSplice n a -> GSplice n m
 defer pf n = do
     p2 <- newEmptyPromise
     let action = yieldRuntimeEffect $ putPromise p2 =<< n
@@ -775,10 +799,10 @@ defer pf n = do
 
 ------------------------------------------------------------------------------
 -- | A version of defer which applies a function on the runtime value.
-deferMap :: Monad n
+deferMap :: (Monad n, MonadIO m)
          => (a -> RuntimeSplice n b)
-         -> (RuntimeSplice n b -> Splice n)
-         -> RuntimeSplice n a -> Splice n
+         -> (RuntimeSplice n b -> GSplice n m)
+         -> RuntimeSplice n a -> GSplice n m
 deferMap f pf n = defer pf $ f =<< n
 
 
@@ -786,20 +810,20 @@ deferMap f pf n = defer pf $ f =<< n
 -- | Like deferMap, but only runs the result if a Maybe function of the
 -- runtime value returns Just.  If it returns Nothing, then no output is
 -- generated.
-mayDeferMap :: Monad n
+mayDeferMap :: (Monad n, MonadIO m)
             => (a -> RuntimeSplice n (Maybe b))
-            -> (RuntimeSplice n b -> Splice n)
-            -> RuntimeSplice n a -> Splice n
+            -> (RuntimeSplice n b -> GSplice n m)
+            -> RuntimeSplice n a -> GSplice n m
 mayDeferMap f pf n = deferMany pf $ f =<< n
 
 
 ------------------------------------------------------------------------------
 -- | Converts an RuntimeSplice into a Splice, given a helper function that
 -- generates a Builder.
-bindLater :: (Monad n)
+bindLater :: (Monad n, Monad m)
           => (a -> RuntimeSplice n Builder)
           -> RuntimeSplice n a
-          -> Splice n
+          -> GSplice n m
 bindLater f p = return $ yieldRuntime $ f =<< p
 
 

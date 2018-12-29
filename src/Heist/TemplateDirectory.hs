@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-|
 
 This module defines a TemplateDirectory data structure for convenient
@@ -19,6 +20,7 @@ module Heist.TemplateDirectory
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
+import           Control.Monad.Trans.Control
 import           Heist
 import           Heist.Internal.Types
 import           Heist.Splices.Cache
@@ -26,11 +28,11 @@ import           Heist.Splices.Cache
 
 ------------------------------------------------------------------------------
 -- | Structure representing a template directory.
-data TemplateDirectory n
+data TemplateDirectory n m
     = TemplateDirectory
         FilePath
-        (HeistConfig n)
-        (MVar (HeistState n))
+        (HeistConfig n m)
+        (MVar (HeistState n m))
         (MVar CacheTagState)
 
 
@@ -38,11 +40,11 @@ data TemplateDirectory n
 -- | Creates and returns a new 'TemplateDirectory' wrapped in an Either for
 -- error handling.
 newTemplateDirectory
-    :: MonadIO n
+    :: (MonadIO n, MonadIO m, MonadBaseControl IO m)
     => FilePath
-    -> HeistConfig n
+    -> HeistConfig n m
     -- namespaced tag.
-    -> IO (Either [String] (TemplateDirectory n))
+    -> m (Either [String] (TemplateDirectory n m))
 newTemplateDirectory dir hc = do
     let sc = (_hcSpliceConfig hc) { _scTemplateLocations = [loadTemplates dir] }
     let hc' = hc { _hcSpliceConfig = sc }
@@ -59,10 +61,10 @@ newTemplateDirectory dir hc = do
 -- | Creates and returns a new 'TemplateDirectory', using the monad's fail
 -- function on error.
 newTemplateDirectory'
-    :: MonadIO n
+    :: (MonadIO n, MonadIO m, MonadBaseControl IO m)
     => FilePath
-    -> HeistConfig n
-    -> IO (TemplateDirectory n)
+    -> HeistConfig n m
+    -> m (TemplateDirectory n m)
 newTemplateDirectory' dir hc = do
     res <- newTemplateDirectory dir hc
     either (error . concat) return res
@@ -70,28 +72,28 @@ newTemplateDirectory' dir hc = do
 
 ------------------------------------------------------------------------------
 -- | Gets the 'HeistState' from a TemplateDirectory.
-getDirectoryHS :: (MonadIO n)
-               => TemplateDirectory n
-               -> IO (HeistState n)
+getDirectoryHS :: (MonadIO n, MonadIO m)
+               => TemplateDirectory n m
+               -> IO (HeistState n m)
 getDirectoryHS (TemplateDirectory _ _ tsMVar _) =
     liftIO $ readMVar $ tsMVar
 
 
 ------------------------------------------------------------------------------
 -- | Clears the TemplateDirectory's cache tag state.
-getDirectoryCTS :: TemplateDirectory n -> IO CacheTagState
+getDirectoryCTS :: TemplateDirectory n m -> IO CacheTagState
 getDirectoryCTS (TemplateDirectory _ _ _ ctsMVar) = readMVar ctsMVar
 
 
 ------------------------------------------------------------------------------
 -- | Clears cached content and reloads templates from disk.
-reloadTemplateDirectory :: (MonadIO n)
-                        => TemplateDirectory n
-                        -> IO (Either String ())
+reloadTemplateDirectory :: (MonadIO n, MonadIO m, MonadBaseControl IO m)
+                        => TemplateDirectory n m
+                        -> m (Either String ())
 reloadTemplateDirectory (TemplateDirectory p hc tsMVar ctsMVar) = do
     let sc = (_hcSpliceConfig hc) { _scTemplateLocations = [loadTemplates p] }
     ehs <- initHeistWithCacheTag (hc { _hcSpliceConfig = sc })
-    leftPass ehs $ \(hs,cts) -> do
+    liftIO $ leftPass ehs $ \(hs,cts) -> do
         modifyMVar_ tsMVar (const $ return hs)
         modifyMVar_ ctsMVar (const $ return cts)
 

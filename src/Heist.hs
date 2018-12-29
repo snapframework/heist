@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
@@ -43,6 +44,7 @@ module Heist
   , SpliceError(..)
   , CompileException(..)
   , HeistT
+  , GHeistT
 
   -- * Lenses (can be used with lens or lens-family)
   , scInterpretedSplices
@@ -90,6 +92,7 @@ module Heist
 ------------------------------------------------------------------------------
 import           Control.Exception.Lifted
 import           Control.Monad.State
+import           Control.Monad.Trans.Control
 import           Data.ByteString               (ByteString)
 import qualified Data.ByteString.Char8         as BC
 import qualified Data.ByteString               as B
@@ -148,7 +151,7 @@ defaultInterpretedSplices = do
 ------------------------------------------------------------------------------
 -- | An empty HeistConfig that uses the \"h\" namespace with error checking
 -- turned on.
-emptyHeistConfig :: HeistConfig m
+emptyHeistConfig :: HeistConfig n m
 emptyHeistConfig = HeistConfig mempty "h" True
 
 
@@ -210,7 +213,7 @@ addTemplatePathPrefix dir ts
 
 ------------------------------------------------------------------------------
 -- | Creates an empty HeistState.
-emptyHS :: HE.KeyGen -> HeistState m
+emptyHS :: HE.KeyGen -> HeistState n m
 emptyHS kg = HeistState Map.empty Map.empty Map.empty Map.empty Map.empty
                         True [] [] 0 [] Nothing kg False Html "" [] False 0
 
@@ -232,12 +235,12 @@ emptyHS kg = HeistState Map.empty Map.empty Map.empty Map.empty Map.empty
 -- using its Monoid instance.  Due to implementation details, this is no
 -- longer possible.  All of your templates must be known when you call this
 -- function.
-initHeist :: Monad n
-          => HeistConfig n
-          -> IO (Either [String] (HeistState n))
+initHeist :: (Monad n, MonadIO m, MonadBaseControl IO m)
+          => HeistConfig n m
+          -> m (Either [String] (HeistState n m))
 initHeist hc = do
-    keyGen <- HE.newKeyGen
-    repos <- sequence $ _scTemplateLocations $ _hcSpliceConfig hc
+    keyGen <- liftIO HE.newKeyGen
+    repos <- liftIO $ sequence $ _scTemplateLocations $ _hcSpliceConfig hc
     case sequence repos of
       Left es -> return $ Left es
       Right rs -> initHeist' keyGen hc (Map.unions rs)
@@ -251,11 +254,11 @@ mkSplicePrefix ns
 
 
 ------------------------------------------------------------------------------
-initHeist' :: Monad n
+initHeist' :: (Monad n, MonadIO m, MonadBaseControl IO m)
            => HE.KeyGen
-           -> HeistConfig n
+           -> HeistConfig n m
            -> TemplateRepo
-           -> IO (Either [String] (HeistState n))
+           -> m (Either [String] (HeistState n m))
 initHeist' keyGen (HeistConfig sc ns enn) repo = do
     let empty = emptyHS keyGen
     let (SpliceConfig i lt c a _ f) = sc
@@ -281,11 +284,12 @@ initHeist' keyGen (HeistConfig sc ns enn) repo = do
 
 ------------------------------------------------------------------------------
 -- | Runs preprocess on a TemplateRepo and returns the modified templates.
-preproc :: HE.KeyGen
+preproc :: MonadIO m
+        => HE.KeyGen
         -> Splices (I.Splice IO)
         -> TemplateRepo
         -> Text
-        -> IO (Either [String] TemplateRepo)
+        -> m (Either [String] TemplateRepo)
 preproc keyGen splices templates ns = do
     let esm = runHashMap splices
     case esm of
@@ -296,7 +300,7 @@ preproc keyGen splices templates ns = do
                                   , _preprocessingMode = True
                                   , _splicePrefix = mkSplicePrefix ns }
         let eval a = evalHeistT a (X.TextNode "") hs
-        tPairs <- mapM (eval . preprocess) $ Map.toList templates
+        tPairs <- liftIO $ mapM (eval . preprocess) $ Map.toList templates
         let bad = lefts tPairs
         return $ if not (null bad)
                    then Left bad
@@ -324,15 +328,15 @@ preprocess (tpath, docFile) = do
 -- configure the cache tag differently than how this function does it, you
 -- will still probably want to pattern your approach after this function's
 -- implementation.
-initHeistWithCacheTag :: MonadIO n
-                      => HeistConfig n
-                      -> IO (Either [String] (HeistState n, CacheTagState))
+initHeistWithCacheTag :: (MonadIO n, MonadIO m, MonadBaseControl IO m)
+                      => HeistConfig n m
+                      -> m (Either [String] (HeistState n m, CacheTagState))
 initHeistWithCacheTag (HeistConfig sc ns enn) = do
     (ss, cts) <- liftIO mkCacheTag
     let tag = "cache"
-    keyGen <- HE.newKeyGen
+    keyGen <- liftIO HE.newKeyGen
 
-    erepos <- sequence $ _scTemplateLocations sc
+    erepos <- liftIO $ sequence $ _scTemplateLocations sc
     case sequence erepos of
       Left es -> return $ Left es
       Right repos -> do

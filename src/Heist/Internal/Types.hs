@@ -58,8 +58,8 @@ lens sa sbt afb s = sbt s <$> afb (sa s)
 ------------------------------------------------------------------------------
 -- | The splices and templates Heist will use.  To bind a splice simply
 -- include it in the appropriate place here.
-data SpliceConfig m = SpliceConfig
-    { _scInterpretedSplices     :: Splices (I.Splice m)
+data SpliceConfig n m = SpliceConfig
+    { _scInterpretedSplices     :: Splices (I.Splice n)
         -- ^ Interpreted splices are the splices that Heist has always had.
         -- They return a list of nodes and are processed at runtime.
     , _scLoadTimeSplices        :: Splices (I.Splice IO)
@@ -67,11 +67,11 @@ data SpliceConfig m = SpliceConfig
         -- return a list of nodes.  But they are like compiled splices because
         -- they are processed once at load time.  All of Heist's built-in
         -- splices should be used as load time splices.
-    , _scCompiledSplices        :: Splices (C.Splice m)
+    , _scCompiledSplices        :: Splices (C.GSplice n m)
         -- ^ Compiled splices return a DList of Chunks and are processed at
         -- load time to generate a runtime monad action that will be used to
         -- render the template.
-    , _scAttributeSplices       :: Splices (AttrSplice m)
+    , _scAttributeSplices       :: Splices (AttrSplice n)
         -- ^ Attribute splices are bound to attribute names and return a list
         -- of attributes.
     , _scTemplateLocations      :: [TemplateLocation]
@@ -86,11 +86,11 @@ data SpliceConfig m = SpliceConfig
 
 ------------------------------------------------------------------------------
 -- | Lens for interpreted splices
--- :: Simple Lens (SpliceConfig m) (Splices (I.Splice m))
+-- :: Simple Lens (SpliceConfig n m) (Splices (I.Splice n))
 scInterpretedSplices
     :: Functor f
-    => (Splices (I.Splice m) -> f (Splices (I.Splice m)))
-    -> SpliceConfig m -> f (SpliceConfig m)
+    => (Splices (I.Splice n) -> f (Splices (I.Splice n)))
+    -> SpliceConfig n m -> f (SpliceConfig n m)
 scInterpretedSplices = lens _scInterpretedSplices setter
   where
     setter sc v = sc { _scInterpretedSplices = v }
@@ -98,11 +98,11 @@ scInterpretedSplices = lens _scInterpretedSplices setter
 
 ------------------------------------------------------------------------------
 -- | Lens for load time splices
--- :: Simple Lens (SpliceConfig m) (Splices (I.Splice IO))
+-- :: Simple Lens (SpliceConfig n m) (Splices (I.Splice IO))
 scLoadTimeSplices
     :: Functor f
     => (Splices (I.Splice IO) -> f (Splices (I.Splice IO)))
-    -> SpliceConfig m -> f (SpliceConfig m)
+    -> SpliceConfig n m -> f (SpliceConfig n m)
 scLoadTimeSplices = lens _scLoadTimeSplices setter
   where
     setter sc v = sc { _scLoadTimeSplices = v }
@@ -110,11 +110,11 @@ scLoadTimeSplices = lens _scLoadTimeSplices setter
 
 ------------------------------------------------------------------------------
 -- | Lens for complied splices
--- :: Simple Lens (SpliceConfig m) (Splices (C.Splice m))
+-- :: Simple Lens (SpliceConfig m) (Splices (C.GSplice m))
 scCompiledSplices
     :: Functor f
-    => (Splices (C.Splice m) -> f (Splices (C.Splice m)))
-    -> SpliceConfig m -> f (SpliceConfig m)
+    => (Splices (C.GSplice n m) -> f (Splices (C.GSplice n m)))
+    -> SpliceConfig n m -> f (SpliceConfig n m)
 scCompiledSplices = lens _scCompiledSplices setter
   where
     setter sc v = sc { _scCompiledSplices = v }
@@ -122,11 +122,11 @@ scCompiledSplices = lens _scCompiledSplices setter
 
 ------------------------------------------------------------------------------
 -- | Lens for attribute splices
--- :: Simple Lens (SpliceConfig m) (Splices (AttrSplice m))
+-- :: Simple Lens (SpliceConfig n m) (Splices (AttrSplice n))
 scAttributeSplices
     :: Functor f
-    => (Splices (AttrSplice m) -> f (Splices (AttrSplice m)))
-    -> SpliceConfig m -> f (SpliceConfig m)
+    => (Splices (AttrSplice n) -> f (Splices (AttrSplice n)))
+    -> SpliceConfig n m -> f (SpliceConfig n m)
 scAttributeSplices = lens _scAttributeSplices setter
   where
     setter sc v = sc { _scAttributeSplices = v }
@@ -134,11 +134,11 @@ scAttributeSplices = lens _scAttributeSplices setter
 
 ------------------------------------------------------------------------------
 -- | Lens for template locations
--- :: Simple Lens (SpliceConfig m) [TemplateLocation]
+-- :: Simple Lens (SpliceConfig n m) [TemplateLocation]
 scTemplateLocations
     :: Functor f
     => ([TemplateLocation] -> f [TemplateLocation])
-    -> SpliceConfig m -> f (SpliceConfig m)
+    -> SpliceConfig n m -> f (SpliceConfig n m)
 scTemplateLocations = lens _scTemplateLocations setter
   where
     setter sc v = sc { _scTemplateLocations = v }
@@ -146,30 +146,30 @@ scTemplateLocations = lens _scTemplateLocations setter
 
 ------------------------------------------------------------------------------
 -- | Lens for compiled template filter
--- :: Simple Lens (SpliceConfig m) (TBool -> Bool)
+-- :: Simple Lens (SpliceConfig n m) (TBool -> Bool)
 scCompiledTemplateFilter
     :: Functor f
     => ((TPath -> Bool) -> f (TPath -> Bool))
-    -> SpliceConfig m -> f (SpliceConfig m)
+    -> SpliceConfig n m -> f (SpliceConfig n m)
 scCompiledTemplateFilter = lens _scCompiledTemplateFilter setter
   where
     setter sc v = sc { _scCompiledTemplateFilter = v }
 
 
-instance Semigroup (SpliceConfig m) where
+instance Semigroup (SpliceConfig n m) where
     SpliceConfig a1 b1 c1 d1 e1 f1 <> SpliceConfig a2 b2 c2 d2 e2 f2 =
       SpliceConfig (a1 <> a2) (b1 <> b2) (c1 <> c2)
                    (d1 <> d2) (e1 <> e2) (\x -> f1 x && f2 x)
 
-instance Monoid (SpliceConfig m) where
+instance Monoid (SpliceConfig n m) where
     mempty = SpliceConfig mempty mempty mempty mempty mempty (const True)
 #if !MIN_VERSION_base(4,11,0)
     mappend = (<>)
 #endif
 
 
-data HeistConfig m = HeistConfig
-    { _hcSpliceConfig  :: SpliceConfig m
+data HeistConfig n m = HeistConfig
+    { _hcSpliceConfig  :: SpliceConfig n m
         -- ^ Splices and templates
     , _hcNamespace     :: Text
         -- ^ A namespace to use for all tags that are bound to splices.  Use
@@ -183,11 +183,11 @@ data HeistConfig m = HeistConfig
 
 ------------------------------------------------------------------------------
 -- | Lens for the SpliceConfig
--- :: Simple Lens (HeistConfig m) (SpliceConfig m)
+-- :: Simple Lens (HeistConfig n m) (SpliceConfig n m)
 hcSpliceConfig
     :: Functor f
-    => ((SpliceConfig m) -> f (SpliceConfig m))
-    -> HeistConfig m -> f (HeistConfig m)
+    => ((SpliceConfig n m) -> f (SpliceConfig n m))
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcSpliceConfig = lens _hcSpliceConfig setter
   where
     setter hc v = hc { _hcSpliceConfig = v }
@@ -195,11 +195,11 @@ hcSpliceConfig = lens _hcSpliceConfig setter
 
 ------------------------------------------------------------------------------
 -- | Lens for the namespace
--- :: Simple Lens (HeistConfig m) Text
+-- :: Simple Lens (HeistConfig n m) Text
 hcNamespace
     :: Functor f
     => (Text -> f Text)
-    -> HeistConfig m -> f (HeistConfig m)
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcNamespace = lens _hcNamespace setter
   where
     setter hc v = hc { _hcNamespace = v }
@@ -207,11 +207,11 @@ hcNamespace = lens _hcNamespace setter
 
 ------------------------------------------------------------------------------
 -- | Lens for the namespace error flag
--- :: Simple Lens (HeistConfig m) Bool
+-- :: Simple Lens (HeistConfig n m) Bool
 hcErrorNotBound
     :: Functor f
     => (Bool -> f Bool)
-    -> HeistConfig m -> f (HeistConfig m)
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcErrorNotBound = lens _hcErrorNotBound setter
   where
     setter hc v = hc { _hcErrorNotBound = v }
@@ -219,61 +219,61 @@ hcErrorNotBound = lens _hcErrorNotBound setter
 
 ------------------------------------------------------------------------------
 -- | Lens for interpreted splices
--- :: Simple Lens (HeistConfig m) (Splices (I.Splice m))
+-- :: Simple Lens (HeistConfig n m) (Splices (I.Splice n))
 hcInterpretedSplices
     :: Functor f
-    => (Splices (I.Splice m) -> f (Splices (I.Splice m)))
-    -> HeistConfig m -> f (HeistConfig m)
+    => (Splices (I.Splice n) -> f (Splices (I.Splice n)))
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcInterpretedSplices = hcSpliceConfig . scInterpretedSplices
 
 
 ------------------------------------------------------------------------------
 -- | Lens for load time splices
--- :: Simple Lens (HeistConfig m) (Splices (I.Splice IO))
+-- :: Simple Lens (HeistConfig n m) (Splices (I.Splice IO))
 hcLoadTimeSplices
     :: Functor f
     => (Splices (I.Splice IO) -> f (Splices (I.Splice IO)))
-    -> HeistConfig m -> f (HeistConfig m)
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcLoadTimeSplices = hcSpliceConfig . scLoadTimeSplices 
 
 
 ------------------------------------------------------------------------------
 -- | Lens for compiled splices
--- :: Simple Lens (HeistConfig m) (Splices (C.Splice m))
+-- :: Simple Lens (HeistConfig n m) (Splices (C.GSplice n m))
 hcCompiledSplices
     :: Functor f
-    => (Splices (C.Splice m) -> f (Splices (C.Splice m)))
-    -> HeistConfig m -> f (HeistConfig m)
+    => (Splices (C.GSplice n m) -> f (Splices (C.GSplice n m)))
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcCompiledSplices = hcSpliceConfig . scCompiledSplices 
 
 
 ------------------------------------------------------------------------------
 -- | Lens for attribute splices
--- :: Simple Lens (HeistConfig m) (Splices (AttrSplice m))
+-- :: Simple Lens (HeistConfig n m) (Splices (AttrSplice n))
 hcAttributeSplices
     :: Functor f
-    => (Splices (AttrSplice m) -> f (Splices (AttrSplice m)))
-    -> HeistConfig m -> f (HeistConfig m)
+    => (Splices (AttrSplice n) -> f (Splices (AttrSplice n)))
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcAttributeSplices = hcSpliceConfig . scAttributeSplices 
 
 
 ------------------------------------------------------------------------------
 -- | Lens for template locations
--- :: Simple Lens (HeistConfig m) [TemplateLocation]
+-- :: Simple Lens (HeistConfig n m) [TemplateLocation]
 hcTemplateLocations
     :: Functor f
     => ([TemplateLocation] -> f [TemplateLocation])
-    -> HeistConfig m -> f (HeistConfig m)
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcTemplateLocations = hcSpliceConfig . scTemplateLocations 
 
 
 ------------------------------------------------------------------------------
 -- | Lens for compiled template filter
--- :: Simple Lens (SpliceConfig m) (TBool -> Bool)
+-- :: Simple Lens (SpliceConfig n m) (TBool -> Bool)
 hcCompiledTemplateFilter
     :: Functor f
     => ((TPath -> Bool) -> f (TPath -> Bool))
-    -> HeistConfig m -> f (HeistConfig m)
+    -> HeistConfig n m -> f (HeistConfig n m)
 hcCompiledTemplateFilter = hcSpliceConfig . scCompiledTemplateFilter
 
 

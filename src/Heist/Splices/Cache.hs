@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | The \"cache\" splice ensures that its contents are cached and only
@@ -28,6 +29,7 @@ import           Blaze.ByteString.Builder
 import           Control.Concurrent
 import           Control.Monad
 import           Control.Monad.Trans
+import           Control.Monad.Trans.Control
 import           Data.IORef
 import qualified Data.HashMap.Strict as H
 import           Data.HashMap.Strict (HashMap)
@@ -130,7 +132,9 @@ cacheImpl (CTS mv) = do
 
 ------------------------------------------------------------------------------
 -- | This is the compiled splice version of cacheImpl.
-cacheImplCompiled :: (MonadIO n) => CacheTagState -> C.Splice n
+cacheImplCompiled :: (MonadIO n, MonadIO m, MonadBaseControl IO m)
+                  => CacheTagState
+                  -> C.GSplice n m
 cacheImplCompiled cts = do
     tree <- getParamNode
     let !ttl = getTTL tree

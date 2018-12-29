@@ -72,7 +72,7 @@ errorMessage s = renderHtmlNodes $
 
 
 ------------------------------------------------------------------------------
-type JsonMonad n m a = ReaderT Value (HeistT n m) a
+type JsonMonad n m a = ReaderT Value (GHeistT n m m) a
 
 
 ------------------------------------------------------------------------------

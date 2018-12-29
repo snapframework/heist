@@ -50,8 +50,8 @@ runMapNoErrors :: (Eq k, Hashable k) => MapSyntaxM k v a -> HashMap k v
 runMapNoErrors = either (const mempty) id .
     runMapSyntax' (\_ new _ -> Just new) Map.lookup Map.insert
 
-applySpliceMap :: HeistState n
-                -> (HeistState n -> HashMap Text v)
+applySpliceMap :: HeistState n m
+                -> (HeistState n m -> HashMap Text v)
                 -> MapSyntaxM Text v a
                 -> HashMap Text v
 applySpliceMap hs f =  (flip Map.union (f hs)) .
@@ -95,7 +95,7 @@ tellSpliceError msg = do
     let spliceError = SpliceError
                       { spliceHistory = _splicePath hs
                       , spliceTemplateFile = _curTemplateFile hs
-                      , visibleSplices = Map.keys $ _compiledSpliceMap hs
+                      , visibleSplices = compiledSpliceNames hs
                       , contextNode = node
                       , spliceMsg = msg
                       }
@@ -116,13 +116,13 @@ tpathName = BC.intercalate "/" . reverse
 
 ------------------------------------------------------------------------------
 -- | Sets the current template file.
-setCurTemplateFile :: Maybe FilePath -> HeistState n -> HeistState n
+setCurTemplateFile :: Maybe FilePath -> HeistState n m -> HeistState n m
 setCurTemplateFile Nothing ts = ts
 setCurTemplateFile fp ts = ts { _curTemplateFile = fp }
 
 
 ------------------------------------------------------------------------------
-setCurContext :: TPath -> HeistState n -> HeistState n
+setCurContext :: TPath -> HeistState n m -> HeistState n m
 setCurContext tp ts = ts { _curContext = tp }
 
 
@@ -185,8 +185,8 @@ splitTemplatePath = splitPathWith '/'
 ------------------------------------------------------------------------------
 -- | Convenience function for looking up a template.
 lookupTemplate :: ByteString
-               -> HeistState n
-               -> (HeistState n -> HashMap TPath t)
+               -> HeistState n m
+               -> (HeistState n m -> HashMap TPath t)
                -> Maybe (t, TPath)
 lookupTemplate nameStr ts tm = f (tm ts) path name
   where
@@ -202,7 +202,7 @@ lookupTemplate nameStr ts tm = f (tm ts) path name
 
 ------------------------------------------------------------------------------
 -- | Returns 'True' if the given template can be found in the heist state.
-hasTemplate :: ByteString -> HeistState n -> Bool
+hasTemplate :: ByteString -> HeistState n m -> Bool
 hasTemplate nameStr ts =
     isJust $ lookupTemplate nameStr ts _templateMap
 
@@ -324,7 +324,7 @@ getXMLDoc = getDocWith X.parseXML
 
 ------------------------------------------------------------------------------
 -- | Sets the templateMap in a HeistState.
-setTemplates :: HashMap TPath DocumentFile -> HeistState n -> HeistState n
+setTemplates :: HashMap TPath DocumentFile -> HeistState n m -> HeistState n m
 setTemplates m ts = ts { _templateMap = m }
 
 
@@ -332,8 +332,8 @@ setTemplates m ts = ts { _templateMap = m }
 -- | Adds a template to the heist state.
 insertTemplate :: TPath
                -> DocumentFile
-               -> HeistState n
-               -> HeistState n
+               -> HeistState n m
+               -> HeistState n m
 insertTemplate p t st =
     setTemplates (Map.insert p t (_templateMap st)) st
 
@@ -356,8 +356,8 @@ mimeType d = case d of
 ------------------------------------------------------------------------------
 -- | Binds a set of new splice declarations within a 'HeistState'.
 bindAttributeSplices :: Splices (AttrSplice n) -- ^ splices to bind
-                     -> HeistState n           -- ^ start state
-                     -> HeistState n
+                     -> HeistState n m         -- ^ start state
+                     -> HeistState n m
 bindAttributeSplices ss hs =
     hs { _attrSpliceMap = applySpliceMap hs _attrSpliceMap ss }
 

@@ -108,7 +108,7 @@ directory with compiled splices.
 > load :: MonadIO n
 >      => FilePath
 >      -> Splices (C.Splice n)
->      -> IO (HeistState n)
+>      -> IO (HeistState n IO)
 > load baseDir splices = do
 >     tmap <- runExceptT $ do
 >         let sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices

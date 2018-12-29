@@ -9,6 +9,7 @@ import           Control.Exception
 import           Control.Monad.Trans.Except
 import           Control.Lens
 import           Control.Monad.Trans
+import           Control.Monad.Trans.Reader
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -57,6 +58,7 @@ tests = [ testCase     "compiled/simple"        simpleCompiledTest
         , testCase     "compiled/doctype"       doctypeTest
         , testCase     "compiled/exceptions"    exceptionsTest
         , testCase     "compiled/defer"         deferTest
+        , testCase     "compiled/readert"       readerTTest
         ]
 
 simpleCompiledTest :: IO ()
@@ -75,7 +77,7 @@ peopleTest = do
     expected =
       "\n<p>Doe, John: 42&#32;years old</p>\n\n<p>Smith, Jane: 21&#32;years old</p>\n\n"
 
-templateHC :: HeistConfig IO
+templateHC :: HeistConfig IO IO
 templateHC = HeistConfig sc "" False
   where
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
@@ -208,7 +210,7 @@ nsNestedUnused = do
                 & scTemplateLocations .~ [loadTemplates "templates-ns-nested"]
 
 
-nsBindTemplateHC :: String -> HeistConfig IO
+nsBindTemplateHC :: String -> HeistConfig IO IO
 nsBindTemplateHC dir = HeistConfig sc "h" False
   where
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
@@ -417,3 +419,23 @@ deferTest = do
         modifyIORef r (+1)
         val <- readIORef r
         return [val]
+
+
+------------------------------------------------------------------------------
+-- | Test for using other monad than IO as the load time type.
+readerTTest :: IO ()
+readerTTest = do
+    let splices = "foo" ## lift ask >>= return . yieldPureText
+        sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
+                    & scCompiledSplices .~ splices
+                    & scTemplateLocations .~ [loadTemplates "templates"]
+        hc = HeistConfig sc "" False :: HeistConfig IO (ReaderT T.Text IO)
+    ini <- runReaderT (initHeist hc) "hello"
+    res <- runExceptT $ do
+        hs <- ExceptT . return $ ini
+        runner <- noteT ["Error rendering"] $ hoistMaybe $
+                    renderTemplate hs "readert"
+        b <- lift $ fst runner
+        return $ toByteString b
+
+    H.assertEqual "readert test" (Right "Value for foo is hello\n") res

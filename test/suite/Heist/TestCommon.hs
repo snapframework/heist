@@ -1,8 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Heist.TestCommon where
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
 import           Control.Monad.Trans
+import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Maybe  (MaybeT(..), runMaybeT)
 import           Control.Monad.Trans.Except (ExceptT(ExceptT), runExceptT)
 import           Data.ByteString.Char8      (ByteString)
@@ -28,13 +31,13 @@ doctype = B.concat
     , "'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'>" ]
 
 
-loadT :: MonadIO m
+loadT :: (MonadIO n, MonadIO m, MonadBaseControl IO m)
       => FilePath
-      -> Splices (I.Splice m)
+      -> Splices (I.Splice n)
       -> Splices (I.Splice IO)
-      -> Splices (C.Splice m)
-      -> Splices (AttrSplice m)
-      -> IO (Either [String] (HeistState m))
+      -> Splices (C.GSplice n m)
+      -> Splices (AttrSplice n)
+      -> m (Either [String] (HeistState n m))
 loadT baseDir a b c d = runExceptT $ do
     let sc = SpliceConfig (defaultInterpretedSplices `mappend` a)
                           (defaultLoadTimeSplices `mappend` b) c d
@@ -46,9 +49,9 @@ loadT baseDir a b c d = runExceptT $ do
 loadIO :: FilePath
        -> Splices (I.Splice IO)
        -> Splices (I.Splice IO)
-       -> Splices (C.Splice IO)
+       -> Splices (C.GSplice IO IO)
        -> Splices (AttrSplice IO)
-       -> IO (Either [String] (HeistState IO))
+       -> IO (Either [String] (HeistState IO IO))
 loadIO baseDir a b c d = runExceptT $ do
     let sc = SpliceConfig (defaultInterpretedSplices >> a)
                           (defaultLoadTimeSplices >> b) c d
@@ -57,7 +60,7 @@ loadIO baseDir a b c d = runExceptT $ do
 
 
 ------------------------------------------------------------------------------
-loadHS :: FilePath -> IO (HeistState IO)
+loadHS :: FilePath -> IO (HeistState IO IO)
 loadHS baseDir = do
     etm <- runExceptT $ do
         let sc = SpliceConfig defaultInterpretedSplices
@@ -69,9 +72,9 @@ loadHS baseDir = do
 
 loadEmpty :: Splices (I.Splice IO)
           -> Splices (I.Splice IO)
-          -> Splices (C.Splice IO)
+          -> Splices (C.GSplice IO IO)
           -> Splices (AttrSplice IO)
-          -> IO (HeistState IO)
+          -> IO (HeistState IO IO)
 loadEmpty a b c d = do
     let sc = SpliceConfig (defaultInterpretedSplices `mappend` a)
                           (defaultLoadTimeSplices `mappend` b) c d mempty
@@ -103,12 +106,12 @@ quickRender baseDir name = do
     res <- I.renderTemplate ts name
     return (fmap (toByteString . fst) res)
 
-cRender :: HeistState IO -> ByteString -> IO ByteString
+cRender :: HeistState IO IO -> ByteString -> IO ByteString
 cRender hs name = do
     builder <- fst $ fromJust $ C.renderTemplate hs name
     return $ toByteString builder
 
-iRender :: HeistState IO -> ByteString -> IO ByteString
+iRender :: HeistState IO IO -> ByteString -> IO ByteString
 iRender hs name = do
     builder <- I.renderTemplate hs name
     return $ toByteString $ fst $ fromJust builder
