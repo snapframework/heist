@@ -1,5 +1,6 @@
 *~
 dist/
+dist-newstyle/
 cabal-dev/
 *.tix
 .hpc
@@ -15,3 +16,4 @@ docs/out
 tags
 cabal.sandbox.config
 .cabal-sandbox
+.ghc.environment*
