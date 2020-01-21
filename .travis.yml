@@ -27,24 +27,24 @@ before_cache:
 matrix:
   include:
     - compiler: ghc-8.8.1
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.8.1","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.8.1","cabal-install-2.4","pandoc"]}}
       env: GHCHEAD=true
     - compiler: ghc-8.6.3
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.6.3","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.6.3","cabal-install-2.4","pandoc"]}}
     - compiler: ghc-8.4.4
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.4.4","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.4.4","cabal-install-2.4","pandoc"]}}
     - compiler: ghc-8.2.2
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.2.2","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.2.2","cabal-install-2.4","pandoc"]}}
     - compiler: ghc-8.0.2
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.0.2","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-8.0.2","cabal-install-2.4","pandoc"]}}
     - compiler: ghc-7.10.3
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.10.3","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.10.3","cabal-install-2.4","pandoc"]}}
     - compiler: ghc-7.8.4
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.8.4","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.8.4","cabal-install-2.4","pandoc"]}}
     - compiler: ghc-7.6.3
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.6.3","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.6.3","cabal-install-2.4","pandoc"]}}
     - compiler: ghc-7.4.2
-      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.4.2","cabal-install-2.4"]}}
+      addons: {"apt":{"sources":["hvr-ghc"],"packages":["ghc-7.4.2","cabal-install-2.4","pandoc"]}}
   allow_failures:
     - compiler: ghc-8.8.1
 before_install:
