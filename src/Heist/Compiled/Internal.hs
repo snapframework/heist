@@ -37,6 +37,7 @@ import qualified Text.XmlHtml.HTML.Meta             as X
 ------------------------------------------------------------------------------
 #if !MIN_VERSION_base(4,8,0)
 import           Data.Foldable                      (Foldable)
+import           Data.Monoid
 #endif
 import qualified Data.Foldable                      as Foldable
 ------------------------------------------------------------------------------
@@ -749,12 +750,31 @@ deferMany :: (Foldable f, Monad n)
           => (RuntimeSplice n a -> Splice n)
           -> RuntimeSplice n (f a)
           -> Splice n
-deferMany f getItems = do
+deferMany = deferManyElse $ return mempty
+
+
+------------------------------------------------------------------------------
+-- | A version of 'deferMany' which has a default splice to run in the case
+-- when there are no elements in the given list.
+deferManyElse :: (Foldable f, Monad n)
+              => Splice n
+              -> (RuntimeSplice n a -> Splice n)
+              -> RuntimeSplice n (f a)
+              -> Splice n
+deferManyElse def f getItems = do
     promise <- newEmptyPromise
     chunks <- f $ getPromise promise
+    defaultChunk <- def
     return $ yieldRuntime $ do
         items <- getItems
-        foldMapM (\item -> putPromise promise item >> codeGen chunks) items
+        if nullGeneric items
+          then codeGen defaultChunk
+          else foldMapM (\item -> putPromise promise item >>
+                                  codeGen chunks) items
+  where
+    -- Use this instead of null for compatibility with pre 4.8 base
+    nullGeneric = foldrGeneric (\_ _ -> False) True
+    foldrGeneric f' z t = appEndo (foldMap (Endo . f') t) z
 
 
 ------------------------------------------------------------------------------
@@ -771,6 +791,23 @@ defer pf n = do
     let action = yieldRuntimeEffect $ putPromise p2 =<< n
     res <- pf $ getPromise p2
     return $ action `mappend` res
+
+
+------------------------------------------------------------------------------
+-- | Much like 'either', takes a runtime computation and branches to the
+-- respective splice depending on the runtime value.
+deferEither :: Monad n
+            => (RuntimeSplice n a -> Splice n)
+            -> (RuntimeSplice n b -> Splice n)
+            -> RuntimeSplice n (Either a b) -> Splice n
+deferEither pfa pfb n = do
+    pa <- newEmptyPromise
+    pb <- newEmptyPromise
+    failureChunk <- pfa $ getPromise pa
+    successChunk <- pfb $ getPromise pb
+    return $ yieldRuntime $ n >>= either
+        (\x -> putPromise pa x >> codeGen failureChunk)
+        (\x -> putPromise pb x >> codeGen successChunk)
 
 
 ------------------------------------------------------------------------------
