@@ -95,7 +95,7 @@ tellSpliceError msg = do
     let spliceError = SpliceError
                       { spliceHistory = _splicePath hs
                       , spliceTemplateFile = _curTemplateFile hs
-                      , visibleSplices = Map.keys $ _compiledSpliceMap hs
+                      , visibleSplices = sort $ Map.keys $ _compiledSpliceMap hs
                       , contextNode = node
                       , spliceMsg = msg
                       }
