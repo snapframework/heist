@@ -162,7 +162,7 @@ Library
     Heist.Interpreted.Internal
 
   build-depends:
-    aeson                      >= 0.6     && < 1.6,
+    aeson                      >= 0.6     && < 3,
     attoparsec                 >= 0.10    && < 0.14,
     base                       >= 4.5     && < 4.15,
     blaze-builder              >= 0.2     && < 0.5,
@@ -186,7 +186,8 @@ Library
     transformers-base          >= 0.4     && < 0.5,
     unordered-containers       >= 0.1.4   && < 0.3,
     vector                     >= 0.9     && < 0.13,
-    xmlhtml                    >= 0.2.3.5 && < 0.3
+    xmlhtml                    >= 0.2.3.5 && < 0.3,
+    indexed-traversable
 
   if !impl(ghc >= 8.0)
     build-depends: semigroups >= 0.16 && < 0.19
@@ -251,7 +252,9 @@ Test-suite testsuite
     transformers-base,
     unordered-containers,
     vector,
-    xmlhtml
+    xmlhtml,
+    indexed-traversable
+
 
   if !impl(ghc >= 8.0)
     build-depends: semigroups >= 0.16 && < 0.19
@@ -301,7 +304,9 @@ Benchmark benchmark
     transformers-base,
     unordered-containers,
     vector,
-    xmlhtml
+    xmlhtml,
+    indexed-traversable
+
 
   if !impl(ghc >= 8.0)
     build-depends: semigroups >= 0.16 && < 0.19
