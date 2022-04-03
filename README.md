@@ -2,6 +2,10 @@
 
 [![Build Status](https://travis-ci.org/snapframework/heist.svg?branch=master)](https://travis-ci.org/snapframework/heist)
 
+!!!
+This is a fork of `heist` released to Hackage, with [this PR](https://github.com/snapframework/heist/pull/130) applied on top of upstream master.
+!!!
+
 Heist, part of the [Snap Framework](http://www.snapframework.com/), is a
 Haskell library for xml/html templating. It uses simple XML tags to bind
 values to your templates in a straightforward way. For example, if you were to
