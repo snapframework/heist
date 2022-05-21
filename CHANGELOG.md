@@ -1,3 +1,8 @@
+# 1.2
+
+* Expose Heist.Common https://github.com/snapframework/heist/issues/129
+* GHC9 support
+
 # 1.1
 
 * Remove pandoc and pandocBS
