@@ -139,6 +139,7 @@ Library
 
   exposed-modules:
     Heist,
+    Heist.Common,
     Heist.Compiled,
     Heist.Compiled.LowLevel,
     Heist.Internal.Types,
@@ -156,7 +157,6 @@ Library
 
   other-modules:
     Data.HeterogeneousEnvironment,
-    Heist.Common,
     Heist.Compiled.Internal,
     Heist.Internal.Types.HeistState,
     Heist.Interpreted.Internal
