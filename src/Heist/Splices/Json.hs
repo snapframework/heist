@@ -1,6 +1,8 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Heist.Splices.Json (
   bindJson
@@ -11,7 +13,13 @@ import           Control.Monad.Reader
 import           Data.Aeson
 import qualified Data.ByteString.Char8       as S
 import qualified Data.ByteString.Lazy.Char8  as L
+#if MIN_VERSION_aeson(2,0,0)
+import qualified Data.Aeson.KeyMap           as KM
+import qualified Data.Aeson.Key              as K
+import qualified Data.Foldable.WithIndex     as FI
+#else
 import qualified Data.HashMap.Strict         as Map
+#endif
 import           Data.Map.Syntax
 import           Data.Maybe
 import           Data.Text                   (Text)
@@ -89,7 +97,6 @@ boolToText b = if b then "true" else "false"
 numToText :: ToJSON a => a -> Text
 numToText = T.decodeUtf8 . S.concat . L.toChunks . encode
 
-
 ------------------------------------------------------------------------------
 findExpr :: Text -> Value -> Maybe Value
 findExpr t = go (T.split (=='.') t)
@@ -97,7 +104,11 @@ findExpr t = go (T.split (=='.') t)
     go [] !value     = Just value
     go (x:xs) !value = findIn value >>= go xs
       where
+#if MIN_VERSION_aeson(2,0,0)
+        findIn (Object obj) = KM.lookup (K.fromText x) obj
+#else
         findIn (Object obj) = Map.lookup x obj
+#endif
         findIn (Array arr)  = tryReadIndex >>= \i -> arr V.!? i
         findIn _            = Nothing
 
@@ -217,13 +228,23 @@ explodeTag = ask >>= go
     --------------------------------------------------------------------------
     goObject obj = do
         start <- genericBindings
+#if MIN_VERSION_aeson(2,0,0)
+        let bindings = FI.ifoldl' (flip bindKvp) start  obj
+#else
         let bindings = Map.foldlWithKey' bindKvp start obj
+#endif
         lift $ runChildrenWith bindings
 
     --------------------------------------------------------------------------
+    
     bindKvp bindings k v =
-        let newBindings = do
-                T.append "with:" k    ## withValue v explodeTag
-                T.append "snippet:" k ## withValue v snippetTag
-                T.append "value:" k   ## withValue v valueTag
-        in  bindings >> newBindings
+#if MIN_VERSION_aeson(2,0,0)
+        let k' = K.toText k
+#else
+        let k' = k
+#endif
+            newBindings = do
+                T.append "with:" k'    ## withValue v explodeTag
+                T.append "snippet:" k' ## withValue v snippetTag
+                T.append "value:" k'   ## withValue v valueTag
+        in  bindings >> newBindings    

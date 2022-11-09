@@ -17,7 +17,7 @@ import qualified Data.ByteString.Char8    as BC
 import           Data.Hashable            (Hashable)
 import           Data.HashMap.Strict      (HashMap)
 import qualified Data.HashMap.Strict      as Map
-import           Data.List                (isSuffixOf)
+import           Data.List                (isSuffixOf, sort)
 import           Data.Map.Syntax
 import           Data.Maybe               (isJust)
 import           Data.Monoid              ((<>))
@@ -95,7 +95,7 @@ tellSpliceError msg = do
     let spliceError = SpliceError
                       { spliceHistory = _splicePath hs
                       , spliceTemplateFile = _curTemplateFile hs
-                      , visibleSplices = Map.keys $ _compiledSpliceMap hs
+                      , visibleSplices = sort $ Map.keys $ _compiledSpliceMap hs
                       , contextNode = node
                       , spliceMsg = msg
                       }
