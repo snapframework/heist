@@ -192,7 +192,7 @@ runAttrSplice :: (Monad n) => (Text, Text) -> HeistT n n [(Text, Text)]
 runAttrSplice a@(k,v) = do
     splice <- getsHS (Map.lookup k . _attrSpliceMap)
     maybe (liftM (:[]) $ attSubst a)
-          (lift . flip evalStateT HE.empty . unRT . ($v)) splice
+          (lift . flip evalStateT HE.empty . unRT . ($ v)) splice
 
 
 ------------------------------------------------------------------------------

@@ -190,9 +190,9 @@ lookupTemplate :: ByteString
                -> Maybe (t, TPath)
 lookupTemplate nameStr ts tm = f (tm ts) path name
   where
-    (name:p) = case splitTemplatePath nameStr of
-                   [] -> [""]
-                   ps -> ps
+    (name, p) = case splitTemplatePath nameStr of
+                   []   -> ("", [])
+                   x:xs -> (x, xs)
     ctx = if B.isPrefixOf "/" nameStr then [] else _curContext ts
     path = p ++ ctx
     f = if '/' `BC.elem` nameStr
