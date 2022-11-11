@@ -39,51 +39,62 @@ jobs:
             ghc: 8.10.7
           - os: macOS-latest
             ghc: 9.0.2
+          - os: macOS-latest
+            ghc: 9.4.2
 
           - os: windows-latest
             ghc: 8.10.7
           - os: windows-latest
             ghc: 9.0.2
+          - os: windows-latest
+            ghc: 9.4.2
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - uses: haskell/actions/setup@v2.0
-      id: setup-haskell-cabal
-      name: Setup Haskell
-      with:
-        ghc-version: ${{ matrix.ghc }}
-        cabal-version: ${{ matrix.cabal }}
+      - name: Setup Haskell
+        uses: haskell/actions/setup@v2.0
+        id: setup-haskell-cabal
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: ${{ matrix.cabal }}
 
-    - name: Configure
-      run: |
-        cabal configure --enable-tests --enable-benchmarks --enable-documentation --test-show-details=direct --write-ghc-environment-files=always
+      - name: Configure
+        run: |
+          cabal configure --enable-tests --enable-benchmarks --enable-documentation --test-show-details=direct --write-ghc-environment-files=always --allow-newer=map-syntax:base
 
-    - name: Freeze
-      run: |
-        cabal freeze
+      - name: Freeze
+        run: |
+          cabal freeze
 
-    - uses: actions/cache@v3
-      name: Cache ~/.cabal/store
-      with:
-        path: ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
-        key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
+      - uses: actions/cache@v3
+        name: Cache
+        with:
+          path: |
+            ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
+            dist-newstyle
+          key: ${{ runner.os }}-${{ matrix.ghc }}-cabal-${{ hashFiles('cabal.project.freeze') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-cabal-
 
-    - name: Install dependencies
-      run: |
-        cabal build all --only-dependencies
+      - name: Install dependencies
+        run: |
+          cabal build all --only-dependencies
 
-    - name: Build
-      run: |
-        cabal build all
+      - name: Build
+        run: |
+          cabal build all
 
-    - name: Test
-      run: |
-        cabal test all
+      - uses: nikeee/setup-pandoc@v1
+        if: matrix.os == 'ubuntu-latest'
+      # Work is needed to get tests to pass on other OSes.
+      - name: Test
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cabal test all
 
-    - name: Documentation
-      run: |
-        cabal haddock
+      - name: Documentation
+        run: |
+          cabal haddock
 
   stack:
       name: stack / ghc ${{ matrix.ghc }}
@@ -95,28 +106,43 @@ jobs:
           ghc: ["9.2.4"]
 
       steps:
-      - uses: actions/checkout@v3
+        - uses: nikeee/setup-pandoc@v1
 
-      - uses: haskell/actions/setup@v2.0
-        name: Setup Haskell Stack
-        with:
-          ghc-version: ${{ matrix.ghc }}
-          stack-version: ${{ matrix.stack }}
+        - uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
-        name: Cache ~/.stack
-        with:
-          path: ~/.stack
-          key: ${{ runner.os }}-${{ matrix.ghc }}-stack
+        - uses: haskell/actions/setup@v2.0
+          name: Setup Haskell Stack
+          with:
+            ghc-version: ${{ matrix.ghc }}
+            stack-version: ${{ matrix.stack }}
 
-      - name: Install dependencies
-        run: |
-          stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
+        - name: Configure
+          run: |
+            cat <<EOF > stack.yaml
+              packages:
+                - '.'
+              resolver: nightly-2022-11-08
+            EOF
+            stack config set system-ghc true --global
+            stack config set resolver nightly
 
-      - name: Build
-        run: |
-          stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks
+        - uses: actions/cache@v3
+          name: Cache
+          with:
+            path: |
+              ~/.stack
+              stack-work
+            key: ${{ runner.os }}-${{ matrix.ghc }}-stack-${{ hashFiles('stack.yaml') }}
+            restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-stack-
 
-      - name: Test
-        run: |
-          stack test --system-ghc
+        - name: Install dependencies
+          run: |
+            stack build --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
+
+        - name: Build
+          run: |
+            stack build --test --bench --no-run-tests --no-run-benchmarks
+
+        - name: Test
+          run: |
+            stack test
