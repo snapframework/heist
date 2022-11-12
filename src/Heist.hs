@@ -84,6 +84,10 @@ module Heist
   , spliceErrorText
   , orError
   , Splices
+
+  -- * TPath functions
+  , lookupTemplate
+  , splitTemplatePath
   ) where
 
 
