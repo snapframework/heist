@@ -27,27 +27,18 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: [ubuntu-latest]
         cabal: ["3.8.1.0"]
         ghc:
+          - "8.6.5"
+          - "8.8.4"
           - "8.10.7"
           - "9.0.2"
-          - "9.2.4"
-          - "9.4.2"
-        exclude:
-          - os: macOS-latest
-            ghc: 8.10.7
-          - os: macOS-latest
-            ghc: 9.0.2
-          - os: macOS-latest
-            ghc: 9.4.2
-
-          - os: windows-latest
-            ghc: 8.10.7
-          - os: windows-latest
-            ghc: 9.0.2
-          - os: windows-latest
-            ghc: 9.4.2
+          - "9.2.5"
+          - "9.4.3"
+        include:
+          - { os: macOS-latest,   ghc: "9.4.2", cabal: "3.8.1.0" }
+          - { os: windows-latest, ghc: "9.4.2", cabal: "3.8.1.0" }
 
     steps:
       - uses: actions/checkout@v3
@@ -61,7 +52,7 @@ jobs:
 
       - name: Configure
         run: |
-          cabal configure --enable-tests --enable-benchmarks --enable-documentation --test-show-details=direct --write-ghc-environment-files=always --allow-newer=map-syntax:base
+          cabal configure --enable-tests --enable-benchmarks --enable-documentation --test-show-details=direct --write-ghc-environment-files=always
 
       - name: Freeze
         run: |
@@ -73,7 +64,7 @@ jobs:
           path: |
             ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
             dist-newstyle
-          key: ${{ runner.os }}-${{ matrix.ghc }}-cabal-${{ hashFiles('cabal.project.freeze') }}
+          key:          ${{ runner.os }}-${{ matrix.ghc }}-cabal-${{ hashFiles('cabal.project.freeze') }}
           restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-cabal-
 
       - name: Install dependencies
@@ -97,52 +88,55 @@ jobs:
           cabal haddock
 
   stack:
-      name: stack / ghc ${{ matrix.ghc }}
-      runs-on: ubuntu-latest
+    name: stack / ghc ${{ matrix.ghc }}
+    runs-on: ubuntu-latest
 
-      strategy:
-        matrix:
-          stack: ["2.9.1"]
-          ghc: ["9.2.4"]
+    strategy:
+      matrix:
+        include:
+          # GHC version must match https://www.stackage.org/nightly
+          - stack: "2.9.1"
+            ghc: "9.2.5"
 
-      steps:
-        - uses: nikeee/setup-pandoc@v1
+    steps:
+      - uses: nikeee/setup-pandoc@v1
 
-        - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-        - uses: haskell/actions/setup@v2.0
-          name: Setup Haskell Stack
-          with:
-            ghc-version: ${{ matrix.ghc }}
-            stack-version: ${{ matrix.stack }}
+      - uses: haskell/actions/setup@v2.0
+        name: Setup Haskell Stack
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          stack-version: ${{ matrix.stack }}
 
-        - name: Configure
-          run: |
-            cat <<EOF > stack.yaml
-              packages:
-                - '.'
-              resolver: nightly-2022-11-08
-            EOF
-            stack config set system-ghc true --global
-            stack config set resolver nightly
+      - name: Configure
+        run: |
+          cat <<EOF > stack.yaml
+            packages:
+              - '.'
+            resolver: nightly-2022-11-08
+          EOF
+          stack config set system-ghc true --global
+          stack config set resolver nightly
+          stack ls dependencies > ci-stack-depends
 
-        - uses: actions/cache@v3
-          name: Cache
-          with:
-            path: |
-              ~/.stack
-              stack-work
-            key: ${{ runner.os }}-${{ matrix.ghc }}-stack-${{ hashFiles('stack.yaml') }}
-            restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-stack-
+      - uses: actions/cache@v3
+        name: Cache
+        with:
+          path: |
+            ~/.stack
+            stack-work
+          key:          ${{ runner.os }}-${{ matrix.ghc }}-stack-${{ hashFiles('ci-stack-depends') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.ghc }}-stack-
 
-        - name: Install dependencies
-          run: |
-            stack build --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
+      - name: Install dependencies
+        run: |
+          stack build --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
 
-        - name: Build
-          run: |
-            stack build --test --bench --no-run-tests --no-run-benchmarks
+      - name: Build
+        run: |
+          stack build --test --bench --no-run-tests --no-run-benchmarks
 
-        - name: Test
-          run: |
-            stack test
+      - name: Test
+        run: |
+          stack test
