@@ -1,3 +1,9 @@
+# 1.1.1.0
+
+* Expose `lookupTemplate` and `splitTemplatePath`
+
+* Bump dependency bounds for 9.4
+
 # 1.1
 
 * Remove pandoc and pandocBS
