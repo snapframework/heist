@@ -1,5 +1,6 @@
+cabal-version:  2.2
 name:           heist
-version:        1.1.0.1
+version:        1.1.1.0
 synopsis:       An Haskell template system supporting both HTML5 and XML.
 description:
     Heist is a powerful template system that supports both HTML5 and XML.
@@ -22,12 +23,11 @@ description:
     .
     * Optional merging of multiple \<head\> tags defined anywhere in the
       document
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 author:         Doug Beardsley, Gregory Collins
 maintainer:     snap@snapframework.com
 build-type:     Simple
-cabal-version:  >= 1.8.0.4
 homepage:       http://snapframework.com/
 category:       Web, Snap
 
@@ -48,6 +48,7 @@ Tested-With:
 
 extra-source-files:
   .ghci,
+  CHANGELOG.md,
   CONTRIBUTORS,
   docs/Makefile,
   docs/templates.css,
@@ -136,8 +137,28 @@ extra-source-files:
   test/templates-nscall/nscall.tpl,
   TODO
 
+common universal
+  default-language: Haskell2010
+
+  default-extensions:
+    DeriveDataTypeable
+    FlexibleInstances
+    GeneralizedNewtypeDeriving
+    MultiParamTypeClasses
+    OverloadedStrings
+    PackageImports
+    ScopedTypeVariables
+    TypeSynonymInstances
+
+  build-depends:
+    base >= 4.5 && < 4.18,
+
+  if !impl(ghc >= 8.0)
+    build-depends:
+      semigroups >= 0.16 && < 0.19,
 
 Library
+  import: universal
   hs-source-dirs: src
 
   exposed-modules:
@@ -167,7 +188,6 @@ Library
   build-depends:
     aeson                      >= 0.6     && < 2.2,
     attoparsec                 >= 0.10    && < 0.15,
-    base                       >= 4.5     && < 4.18,
     blaze-builder              >= 0.2     && < 0.5,
     blaze-html                 >= 0.4     && < 0.10,
     bytestring                 >= 0.9     && < 0.12,
@@ -192,25 +212,10 @@ Library
     xmlhtml                    >= 0.2.3.5 && < 0.4,
     indexed-traversable        >= 0.1.1   && < 0.2
 
-  if !impl(ghc >= 8.0)
-    build-depends: semigroups >= 0.16 && < 0.19
+  ghc-options: -Wall -fwarn-tabs -funbox-strict-fields
 
-  if impl(ghc >= 6.12.0)
-    ghc-options: -Wall -fwarn-tabs -funbox-strict-fields
-                 -fno-warn-unused-do-bind
-  else
-    ghc-options: -Wall -fwarn-tabs -funbox-strict-fields
-
-  Extensions:
-    GeneralizedNewtypeDeriving,
-    PackageImports,
-    ScopedTypeVariables,
-    DeriveDataTypeable,
-    FlexibleInstances,
-    MultiParamTypeClasses,
+  default-extensions:
     UndecidableInstances,
-    OverloadedStrings,
-    TypeSynonymInstances,
     NoMonomorphismRestriction
 
 
@@ -219,6 +224,7 @@ source-repository head
   location: https://github.com/snapframework/heist.git
 
 Test-suite testsuite
+  import: universal
   hs-source-dirs: src test/suite
   type: exitcode-stdio-1.0
   main-is: TestSuite.hs
@@ -232,7 +238,6 @@ Test-suite testsuite
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
     aeson,
     attoparsec,
-    base,
     bifunctors >= 5.3 && < 5.6,
     blaze-builder,
     blaze-html,
@@ -258,17 +263,13 @@ Test-suite testsuite
     xmlhtml,
     indexed-traversable
 
-
-  if !impl(ghc >= 8.0)
-    build-depends: semigroups >= 0.16 && < 0.19
-
   if impl(ghc >= 7.8) && impl(ghc < 7.10)
     build-depends: transformers-compat >= 0.3 && < 0.7
 
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
-  Extensions: OverloadedStrings
 
 Benchmark benchmark
+  import: universal
   hs-source-dirs: src test/suite
   type: exitcode-stdio-1.0
   main-is: Benchmark.hs
@@ -284,7 +285,6 @@ Benchmark benchmark
 
     aeson,
     attoparsec,
-    base,
     blaze-builder,
     blaze-html,
     bytestring,
@@ -310,24 +310,12 @@ Benchmark benchmark
     xmlhtml,
     indexed-traversable
 
-
-  if !impl(ghc >= 8.0)
-    build-depends: semigroups >= 0.16 && < 0.19
-
   if impl(ghc >= 7.8) && impl(ghc < 7.10)
     build-depends: transformers-compat
 
   ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -threaded
                -fno-warn-unused-do-bind -rtsopts
 
-  Extensions:
-    GeneralizedNewtypeDeriving,
-    PackageImports,
-    ScopedTypeVariables,
-    DeriveDataTypeable,
-    FlexibleInstances,
-    MultiParamTypeClasses,
+  default-extensions:
     UndecidableInstances,
-    OverloadedStrings,
-    TypeSynonymInstances,
     NoMonomorphismRestriction
