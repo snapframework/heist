@@ -11,6 +11,7 @@ module Heist.Interpreted.Tests
 
 ------------------------------------------------------------------------------
 import           Blaze.ByteString.Builder
+import           Control.Monad
 import           Control.Monad.State
 import           Data.Aeson
 import           Data.ByteString.Char8                (ByteString)
