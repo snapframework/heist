@@ -36,8 +36,9 @@ tested-with:
   GHC == 8.8.4
   GHC == 8.10.7
   GHC == 9.0.2
-  GHC == 9.2.5
+  GHC == 9.2.7
   GHC == 9.4.4
+  GHC == 9.6.1
 
 extra-source-files:
   .ghci,
@@ -231,7 +232,7 @@ Test-suite testsuite
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
     aeson,
     attoparsec,
-    bifunctors >= 5.3 && < 5.6,
+    bifunctors >= 5.3 && < 5.7,
     blaze-builder,
     blaze-html,
     bytestring,
