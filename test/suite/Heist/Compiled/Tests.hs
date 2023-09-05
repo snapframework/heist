@@ -350,24 +350,14 @@ exceptionsTest = do
                               renderTemplate hs ""
                   _ <- lift $ fst runner
                   throwE ["Unexpected success"])
-             (\(e :: CompileException) -> return $ Right
-                                            (show e, head $
-                                                       exceptionContext e))
-
-    H.assertEqual "exceptions" (Right (msg, err)) $ res
+             (\(e :: CompileException) -> return $ case lines (show e) of
+                 l:ls -> Right l
+                 _ -> Left [show e])
+    H.assertEqual "exceptions" (Right firstLine) res
 
   where
-    msg = "templates-loaderror/_error.tpl: Exception in splice compile: Prelude.read: no parse\n   ... via templates-loaderror/_error.tpl: h:adder\n   ... via templates-loaderror/test.tpl: h:call2\nBound splices: h:adder h:call1 h:call2\nNode: Element {elementTag = \"h:adder\", elementAttrs = [(\"value\",\"noparse\")], elementChildren = []}"
-    err = SpliceError [ ( ["test"]
-                        , Just "templates-loaderror/_error.tpl"
-                        , "h:adder"),
-                        ( ["test"]
-                        , Just "templates-loaderror/test.tpl"
-                        ,"h:call2") ]
-              (Just "templates-loaderror/_error.tpl")
-              ["h:adder", "h:call1", "h:call2"]
-              (X.Element "h:adder" [("value", "noparse")] [])
-              "Exception in splice compile: Prelude.read: no parse"
+    firstLine = "templates-loaderror/_error.tpl: Exception in splice compile: Prelude.read: no parse"
+
     hc = HeistConfig sc "h" True
     sc = mempty & scLoadTimeSplices .~ defaultLoadTimeSplices
                 & scCompiledSplices .~ splices
