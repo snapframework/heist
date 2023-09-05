@@ -1,3 +1,7 @@
+# Unreleased
+
+* Fix broken test
+
 # 1.1.1.0
 
 * Expose `lookupTemplate` and `splitTemplatePath`
