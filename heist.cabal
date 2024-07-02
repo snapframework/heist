@@ -36,9 +36,10 @@ tested-with:
   GHC == 8.10.7
   GHC == 9.0.2
   GHC == 9.2.8
-  GHC == 9.4.7
-  GHC == 9.6.3
-  GHC == 9.8.1
+  GHC == 9.4.8
+  GHC == 9.6.5
+  GHC == 9.8.2
+  GHC == 9.10.1
 
 extra-doc-files:
   CHANGELOG.md
@@ -227,8 +228,8 @@ Test-suite testsuite
 
   build-depends:
     HUnit                      >= 1.2      && < 2,
-    QuickCheck                 >= 2        && < 2.15,
-    lens                       >= 4.3      && < 5.3,
+    QuickCheck                 >= 2        && < 2.16,
+    lens                       >= 4.3      && < 5.4,
     test-framework             >= 0.4      && < 0.9,
     test-framework-hunit       >= 0.2.7    && < 0.4,
     test-framework-quickcheck2 >= 0.2.12.1 && < 0.4,
