@@ -39,8 +39,8 @@ jobs:
           - "9.8"
           - "9.10"
         include:
-          - { os: macOS-latest,   ghc: "9.8" }
-          - { os: windows-latest, ghc: "9.8" }
+          - { os: macOS-latest,   ghc: "9.10" }
+          - { os: windows-latest, ghc: "9.10" }
 
     steps:
       - uses: actions/checkout@v4
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: nikeee/setup-pandoc@v1
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: haskell-actions/setup@v2
         name: Setup Haskell Stack
