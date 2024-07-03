@@ -26,6 +26,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         ghc:
@@ -36,12 +37,13 @@ jobs:
           - "9.4"
           - "9.6"
           - "9.8"
+          - "9.10"
         include:
           - { os: macOS-latest,   ghc: "9.8" }
           - { os: windows-latest, ghc: "9.8" }
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
@@ -78,10 +80,11 @@ jobs:
         run: cabal build all
 
       - uses: nikeee/setup-pandoc@v1
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
+
       # Work is needed to get tests to pass on other OSes.
       - name: Test
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: cabal test all
 
       - name: Documentation
