@@ -16,9 +16,10 @@ on:
   push:
     branches:
       - 'master'
-  schedule:
-    # Additionally run once per week (At 00:00 on Sunday) to maintain cache.
-    - cron: '0 0 * * 0'
+  # GitHub disables actions after 60 days of inactivity, so a cron job is rather useless.
+  # schedule:
+  #   # Additionally run once per week (At 00:00 on Sunday) to maintain cache.
+  #   - cron: '0 0 * * 0'
 
 jobs:
   cabal:
