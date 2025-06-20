@@ -38,14 +38,15 @@ jobs:
           - "9.6"
           - "9.8"
           - "9.10"
+          - "9.12"
         include:
-          - { os: macOS-latest,   ghc: "9.10" }
-          - { os: windows-latest, ghc: "9.10" }
+          - { os: macOS-latest,   ghc: "9.12" }
+          - { os: windows-latest, ghc: "9.12" }
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up GHC ${{ matrix.ghc-version }}
+      - name: Set up GHC ${{ matrix.ghc }}
         uses: haskell-actions/setup@v2
         id: setup
         with:
@@ -100,7 +101,7 @@ jobs:
         include:
           # GHC version must match https://www.stackage.org/nightly
           - stack: "latest"
-            ghc: "9.8"
+            ghc: "9.10"
 
     steps:
       - uses: nikeee/setup-pandoc@v1
@@ -119,7 +120,7 @@ jobs:
           cat <<EOF > stack.yaml
             packages:
               - '.'
-            resolver: nightly-2023-07-17
+            resolver: nightly-2025-06-18
           EOF
           stack config set system-ghc true --global
           stack config set resolver nightly
