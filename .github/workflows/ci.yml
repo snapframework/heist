@@ -16,9 +16,10 @@ on:
   push:
     branches:
       - 'master'
-  schedule:
-    # Additionally run once per week (At 00:00 on Sunday) to maintain cache.
-    - cron: '0 0 * * 0'
+  # GitHub disables actions after 60 days of inactivity, so a cron job is rather useless.
+  # schedule:
+  #   # Additionally run once per week (At 00:00 on Sunday) to maintain cache.
+  #   - cron: '0 0 * * 0'
 
 jobs:
   cabal:
@@ -38,14 +39,15 @@ jobs:
           - "9.6"
           - "9.8"
           - "9.10"
+          - "9.12"
         include:
-          - { os: macOS-latest,   ghc: "9.10" }
-          - { os: windows-latest, ghc: "9.10" }
+          - { os: macOS-latest,   ghc: "9.12" }
+          - { os: windows-latest, ghc: "9.12" }
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up GHC ${{ matrix.ghc-version }}
+      - name: Set up GHC ${{ matrix.ghc }}
         uses: haskell-actions/setup@v2
         id: setup
         with:
@@ -100,9 +102,10 @@ jobs:
         include:
           # GHC version must match https://www.stackage.org/nightly
           - stack: "latest"
-            ghc: "9.8"
+            ghc: "9.12"
 
     steps:
+      # for running tests:
       - uses: nikeee/setup-pandoc@v1
 
       - uses: actions/checkout@v4
@@ -119,7 +122,7 @@ jobs:
           cat <<EOF > stack.yaml
             packages:
               - '.'
-            resolver: nightly-2023-07-17
+            resolver: nightly-2025-07-23
           EOF
           stack config set system-ghc true --global
           stack config set resolver nightly
